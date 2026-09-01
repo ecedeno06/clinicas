@@ -1,4 +1,4 @@
 export const environment = {
   production: true,
-  apiUrl: 'TU-BACKEND-DESPLEGADO.com/api',
+  apiUrl: 'https://clinicas-83rb.onrender.com/api',
 };
