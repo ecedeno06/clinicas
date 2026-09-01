@@ -1,0 +1,177 @@
+<div class="page-header">
+  <div>
+    <h1>Citas</h1>
+    <div class="desc">Agenda de citas paciente / doctor</div>
+  </div>
+  @if (auth.puedeEditar()) {
+    <button class="btn btn-accent" (click)="abrirNuevo()">+ Nueva cita</button>
+  }
+</div>
+
+<div class="table-wrap">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Fecha</th>
+        <th>Horario</th>
+        <th>Paciente</th>
+        <th>Doctor</th>
+        <th>Estado</th>
+        <th></th>
+      </tr>
+      <tr class="filter-row">
+        <th><input class="input" type="text" placeholder="dd/mm/aaaa" [ngModel]="filtroFecha()" (ngModelChange)="filtroFecha.set($event)" /></th>
+        <th></th>
+        <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroPaciente()" (ngModelChange)="filtroPaciente.set($event)" /></th>
+        <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroDoctor()" (ngModelChange)="filtroDoctor.set($event)" /></th>
+        <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroEstado()" (ngModelChange)="filtroEstado.set($event)" /></th>
+        <th>
+          @if (hayFiltros()) { <button class="btn btn-outline btn-sm" (click)="limpiarFiltros()">Limpiar</button> }
+        </th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (c of citasFiltradas(); track c.id) {
+        <tr>
+          <td>{{ c.fecha | date:'dd/MM/yyyy' }}</td>
+          <td>{{ c.hora_inicio.substring(0,5) }} - {{ c.hora_fin.substring(0,5) }}</td>
+          <td>{{ c.paciente_nombre }}</td>
+          <td>{{ c.doctor_nombre }} <div class="text-muted text-sm">{{ c.especialidad_nombre }}</div></td>
+          <td>
+            <span class="badge"
+              [class.badge-slate]="c.estado === 'pendiente'"
+              [class.badge-amber]="c.estado === 'confirmada'"
+              [class.badge-green]="c.estado === 'atendida'"
+              [class.badge-red]="c.estado === 'cancelada' || c.estado === 'no_asistio'">
+              {{ c.estado }}
+            </span>
+          </td>
+          <td class="table-actions">
+            @if (puedeVerHistoria()) {
+              <button class="btn btn-outline btn-sm" (click)="abrirHistoria(c)">
+                Historia @if (c.tiene_historia) { (✓) }
+              </button>
+            }
+            @if (auth.puedeEditar()) {
+              <button class="btn btn-outline btn-sm" (click)="abrirEditar(c)">Editar</button>
+            }
+            @if (auth.puedeEliminar()) {
+              <button class="btn btn-danger btn-sm" (click)="eliminar(c)">Eliminar</button>
+            }
+          </td>
+        </tr>
+      } @empty {
+        <tr><td colspan="6"><div class="empty-state">{{ hayFiltros() ? 'Ninguna cita coincide con los filtros.' : 'No hay citas agendadas todavia.' }}</div></td></tr>
+      }
+    </tbody>
+  </table>
+</div>
+
+@if (panelAbierto()) {
+  <div class="overlay">
+    <div class="drawer">
+      <div class="drawer-header">
+        <h2>{{ editando() ? 'Editar cita' : 'Nueva cita' }}</h2>
+        <button class="close" (click)="cerrarPanel()">&times;</button>
+      </div>
+      <form [formGroup]="form" (ngSubmit)="guardar()">
+        <div class="form-group">
+          <label>Paciente *</label>
+          <select class="input" formControlName="paciente_id">
+            <option value="" disabled>Selecciona un paciente</option>
+            @for (p of pacientes(); track p.id) { <option [value]="p.id">{{ p.nombre }}</option> }
+          </select>
+        </div>
+        <div class="form-group mt-16">
+          <label>Doctor *</label>
+          <select class="input" formControlName="doctor_id">
+            <option value="" disabled>Selecciona un doctor</option>
+            @for (d of doctores(); track d.id) { <option [value]="d.id">{{ d.nombre }} &middot; {{ d.especialidad_nombre }}</option> }
+          </select>
+        </div>
+        <div class="form-group mt-16">
+          <label>Fecha *</label>
+          <input class="input" type="date" formControlName="fecha" />
+        </div>
+        <div class="form-group mt-16">
+          <label>Hora de inicio *</label>
+          <input class="input" type="time" formControlName="hora_inicio" />
+        </div>
+        <div class="form-group mt-16">
+          <label>Hora de fin *</label>
+          <input class="input" type="time" formControlName="hora_fin" />
+        </div>
+        <div class="form-group mt-16">
+          <label>Motivo de la cita</label>
+          <textarea class="input" rows="2" formControlName="motivo"></textarea>
+        </div>
+        @if (editando()) {
+          <div class="form-group mt-16">
+            <label>Estado</label>
+            <select class="input" formControlName="estado">
+              <option value="pendiente">Pendiente</option>
+              <option value="confirmada">Confirmada</option>
+              <option value="atendida">Atendida</option>
+              <option value="cancelada">Cancelada</option>
+              <option value="no_asistio">No asistio</option>
+            </select>
+          </div>
+        }
+        <div class="form-group mt-16">
+          <label>Observaciones</label>
+          <textarea class="input" rows="2" formControlName="observaciones"></textarea>
+        </div>
+
+        @if (errorGuardar()) {
+          <div class="error-text mt-16">{{ errorGuardar() }}</div>
+        }
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary" [disabled]="form.invalid">{{ editando() ? 'Guardar cambios' : 'Guardar' }}</button>
+          <button type="button" class="btn btn-outline" (click)="cerrarPanel()">Cancelar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+}
+
+@if (citaHistoria(); as c) {
+  <div class="overlay">
+    <div class="drawer">
+      <div class="drawer-header">
+        <h2>Historia clinica</h2>
+        <button class="close" (click)="cerrarHistoria()">&times;</button>
+      </div>
+
+      <div class="text-muted text-sm">
+        {{ c.paciente_nombre }} &middot; {{ c.doctor_nombre }} &middot; {{ c.fecha | date:'dd/MM/yyyy' }}
+      </div>
+
+      @if (cargandoHistoria()) {
+        <div class="empty-state">Cargando...</div>
+      } @else {
+        <form [formGroup]="historiaForm" (ngSubmit)="guardarHistoria()" class="mt-16">
+          <div class="form-group">
+            <label>Motivo de consulta</label>
+            <textarea class="input" rows="2" formControlName="motivo_consulta"></textarea>
+          </div>
+          <div class="form-group mt-16">
+            <label>Diagnostico</label>
+            <textarea class="input" rows="3" formControlName="diagnostico"></textarea>
+          </div>
+          <div class="form-group mt-16">
+            <label>Tratamiento</label>
+            <textarea class="input" rows="3" formControlName="tratamiento"></textarea>
+          </div>
+          <div class="form-group mt-16">
+            <label>Notas</label>
+            <textarea class="input" rows="3" formControlName="notas"></textarea>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">{{ historia() ? 'Guardar cambios' : 'Registrar consulta' }}</button>
+            <button type="button" class="btn btn-outline" (click)="cerrarHistoria()">Cerrar</button>
+          </div>
+        </form>
+      }
+    </div>
+  </div>
+}

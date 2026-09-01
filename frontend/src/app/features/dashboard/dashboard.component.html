@@ -1,0 +1,65 @@
+<div class="page-header">
+  <div>
+    <h1>Resumen general</h1>
+    <div class="desc">Estado actual de pacientes, doctores y la agenda de hoy</div>
+  </div>
+</div>
+
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="label">Pacientes activos</div>
+    <div class="value">{{ pacientesActivos() }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Doctores activos</div>
+    <div class="value">{{ doctoresActivos() }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Citas hoy</div>
+    <div class="value">{{ citasHoy() }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Citas pendientes</div>
+    <div class="value">{{ citasPendientes() }}</div>
+  </div>
+</div>
+
+<h2>Agenda de hoy</h2>
+<p class="desc mt-16" style="margin-bottom:10px;">Citas agendadas para el dia de hoy, ordenadas por hora</p>
+
+<div class="table-wrap">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Horario</th>
+        <th>Paciente</th>
+        <th>Doctor</th>
+        <th>Estado</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (c of agendaHoy(); track c.id) {
+        <tr>
+          <td>{{ c.hora_inicio.substring(0,5) }} - {{ c.hora_fin.substring(0,5) }}</td>
+          <td>{{ c.paciente_nombre }}</td>
+          <td>{{ c.doctor_nombre }} <div class="text-muted text-sm">{{ c.especialidad_nombre }}</div></td>
+          <td>
+            <span class="badge"
+              [class.badge-slate]="c.estado === 'pendiente'"
+              [class.badge-amber]="c.estado === 'confirmada'"
+              [class.badge-green]="c.estado === 'atendida'"
+              [class.badge-red]="c.estado === 'cancelada' || c.estado === 'no_asistio'">
+              {{ c.estado }}
+            </span>
+          </td>
+          <td class="table-actions">
+            <a class="btn btn-outline btn-sm" routerLink="/citas">Ver en agenda</a>
+          </td>
+        </tr>
+      } @empty {
+        <tr><td colspan="5"><div class="empty-state">No hay citas agendadas para hoy.</div></td></tr>
+      }
+    </tbody>
+  </table>
+</div>

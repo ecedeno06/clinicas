@@ -1,0 +1,163 @@
+<div class="page-header">
+  <div>
+    <h1>Pacientes</h1>
+    <div class="desc">Catalogo de pacientes de la clinica</div>
+  </div>
+  @if (auth.puedeEditar()) {
+    <button class="btn btn-accent" (click)="abrirNuevo()">+ Nuevo paciente</button>
+  }
+</div>
+
+<div class="table-wrap">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Nombre</th>
+        <th>Identificacion</th>
+        <th>Telefono</th>
+        <th>Estado</th>
+        <th></th>
+      </tr>
+      <tr class="filter-row">
+        <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroNombre()" (ngModelChange)="filtroNombre.set($event)" /></th>
+        <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroIdentificacion()" (ngModelChange)="filtroIdentificacion.set($event)" /></th>
+        <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroTelefono()" (ngModelChange)="filtroTelefono.set($event)" /></th>
+        <th></th>
+        <th>
+          @if (hayFiltros()) { <button class="btn btn-outline btn-sm" (click)="limpiarFiltros()">Limpiar</button> }
+        </th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (p of pacientesFiltrados(); track p.id) {
+        <tr>
+          <td>{{ p.nombre }}</td>
+          <td>{{ p.identificacion || '-' }}</td>
+          <td>{{ p.telefono || '-' }}</td>
+          <td><span class="badge" [class.badge-green]="p.activo" [class.badge-slate]="!p.activo">{{ p.activo ? 'Activo' : 'Inactivo' }}</span></td>
+          <td class="table-actions">
+            <button class="btn btn-outline btn-sm" (click)="verHistorial(p)">Historial</button>
+            @if (auth.puedeEditar()) {
+              <button class="btn btn-outline btn-sm" (click)="abrirEditar(p)">Editar</button>
+            }
+            @if (auth.puedeEliminar()) {
+              <button class="btn btn-danger btn-sm" (click)="eliminar(p)">Eliminar</button>
+            }
+          </td>
+        </tr>
+      } @empty {
+        <tr><td colspan="5"><div class="empty-state">{{ hayFiltros() ? 'Ningun paciente coincide con los filtros.' : 'No hay pacientes registrados todavia.' }}</div></td></tr>
+      }
+    </tbody>
+  </table>
+</div>
+
+@if (panelAbierto()) {
+  <div class="overlay">
+    <div class="drawer">
+      <div class="drawer-header">
+        <h2>{{ editando() ? 'Editar paciente' : 'Nuevo paciente' }}</h2>
+        <button class="close" (click)="cerrarPanel()">&times;</button>
+      </div>
+      <form [formGroup]="form" (ngSubmit)="guardar()">
+        <div class="form-group">
+          <label>Nombre *</label>
+          <input class="input" formControlName="nombre" />
+        </div>
+        <div class="form-group mt-16">
+          <label>Identificacion (cedula / pasaporte)</label>
+          <input class="input" formControlName="identificacion" />
+        </div>
+        <div class="form-group mt-16">
+          <label>Fecha de nacimiento</label>
+          <input class="input" type="date" formControlName="fecha_nacimiento" />
+        </div>
+        <div class="form-group mt-16">
+          <label>Sexo</label>
+          <select class="input" formControlName="sexo">
+            <option value="">Sin especificar</option>
+            <option value="M">Masculino</option>
+            <option value="F">Femenino</option>
+            <option value="Otro">Otro</option>
+          </select>
+        </div>
+        <div class="form-group mt-16">
+          <label>Telefono</label>
+          <input class="input" formControlName="telefono" />
+        </div>
+        <div class="form-group mt-16">
+          <label>Email</label>
+          <input class="input" type="email" formControlName="email" />
+        </div>
+        <div class="form-group mt-16">
+          <label>Direccion</label>
+          <textarea class="input" rows="2" formControlName="direccion"></textarea>
+        </div>
+        <div class="form-group mt-16">
+          <label>Alergias</label>
+          <textarea class="input" rows="2" formControlName="alergias" placeholder="Penicilina, polen, etc."></textarea>
+        </div>
+
+        <div class="card mt-16" formGroupName="contacto_emergencia">
+          <h3 style="margin:0;">Contacto de emergencia</h3>
+          <div class="form-group mt-16">
+            <label>Nombre</label>
+            <input class="input" formControlName="nombre" />
+          </div>
+          <div class="form-group mt-16">
+            <label>Telefono</label>
+            <input class="input" formControlName="telefono" />
+          </div>
+          <div class="form-group mt-16">
+            <label>Parentesco</label>
+            <input class="input" formControlName="parentesco" placeholder="Madre, esposo, hijo, etc." />
+          </div>
+        </div>
+
+        <div class="form-group mt-16">
+          <label class="flex items-center gap-8"><input type="checkbox" formControlName="activo" /> Paciente activo</label>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary" [disabled]="form.invalid">Guardar</button>
+          <button type="button" class="btn btn-outline" (click)="cerrarPanel()">Cancelar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+}
+
+@if (pacienteHistorial(); as p) {
+  <div class="overlay">
+    <div class="drawer">
+      <div class="drawer-header">
+        <h2>Historial clinico &middot; {{ p.nombre }}</h2>
+        <button class="close" (click)="cerrarHistorial()">&times;</button>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Fecha</th><th>Doctor</th><th>Diagnostico</th></tr></thead>
+          <tbody>
+            @if (cargandoHistorial()) {
+              <tr><td colspan="3"><div class="empty-state">Cargando historial...</div></td></tr>
+            } @else {
+              @for (h of historial(); track h.id) {
+                <tr>
+                  <td style="white-space: nowrap;">{{ h.fecha_cita | date:'dd/MM/yyyy' }}</td>
+                  <td>{{ h.doctor_nombre }} <div class="text-muted text-sm">{{ h.especialidad_nombre }}</div></td>
+                  <td>
+                    <div>{{ h.diagnostico || '-' }}</div>
+                    @if (h.tratamiento) { <div class="text-muted text-sm">Tratamiento: {{ h.tratamiento }}</div> }
+                    @if (h.notas) { <div class="text-muted text-sm">{{ h.notas }}</div> }
+                  </td>
+                </tr>
+              } @empty {
+                <tr><td colspan="3"><div class="empty-state">Este paciente todavia no tiene historial clinico.</div></td></tr>
+              }
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+}

@@ -1,0 +1,89 @@
+<div class="page-header">
+  <div>
+    <h1>Doctores</h1>
+    <div class="desc">Catalogo de doctores y especialistas de la clinica</div>
+  </div>
+  @if (esAdmin()) {
+    <button class="btn btn-accent" (click)="abrirNuevo()">+ Nuevo doctor</button>
+  }
+</div>
+
+<div class="table-wrap">
+  <table class="data-table">
+    <thead>
+      <tr><th>Nombre</th><th>Especialidad</th><th>Colegiado</th><th>Telefono</th><th>Estado</th><th></th></tr>
+      <tr class="filter-row">
+        <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroNombre()" (ngModelChange)="filtroNombre.set($event)" /></th>
+        <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroEspecialidad()" (ngModelChange)="filtroEspecialidad.set($event)" /></th>
+        <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroColegiado()" (ngModelChange)="filtroColegiado.set($event)" /></th>
+        <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroTelefono()" (ngModelChange)="filtroTelefono.set($event)" /></th>
+        <th></th>
+        <th>
+          @if (hayFiltros()) { <button class="btn btn-outline btn-sm" (click)="limpiarFiltros()">Limpiar</button> }
+        </th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (d of doctoresFiltrados(); track d.id) {
+        <tr>
+          <td>{{ d.nombre }}</td>
+          <td>{{ d.especialidad_nombre }}</td>
+          <td>{{ d.numero_colegiado || '-' }}</td>
+          <td>{{ d.telefono || '-' }}</td>
+          <td><span class="badge" [class.badge-green]="d.activo" [class.badge-slate]="!d.activo">{{ d.activo ? 'Activo' : 'Inactivo' }}</span></td>
+          <td class="table-actions">
+            @if (esAdmin()) {
+              <button class="btn btn-outline btn-sm" (click)="abrirEditar(d)">Editar</button>
+              <button class="btn btn-danger btn-sm" (click)="eliminar(d)">Eliminar</button>
+            }
+          </td>
+        </tr>
+      } @empty {
+        <tr><td colspan="6"><div class="empty-state">{{ hayFiltros() ? 'Ningun doctor coincide con los filtros.' : 'No hay doctores registrados.' }}</div></td></tr>
+      }
+    </tbody>
+  </table>
+</div>
+
+@if (panelAbierto()) {
+  <div class="overlay">
+    <div class="drawer">
+      <div class="drawer-header">
+        <h2>{{ editando() ? 'Editar doctor' : 'Nuevo doctor' }}</h2>
+        <button class="close" (click)="cerrarPanel()">&times;</button>
+      </div>
+      <form [formGroup]="form" (ngSubmit)="guardar()">
+        <div class="form-group">
+          <label>Nombre *</label>
+          <input class="input" formControlName="nombre" placeholder="Dr. Juan Perez" />
+        </div>
+        <div class="form-group mt-16">
+          <label>Especialidad *</label>
+          <select class="input" formControlName="especialidad_id">
+            <option value="" disabled>Selecciona una especialidad</option>
+            @for (e of especialidades(); track e.id) { <option [value]="e.id">{{ e.nombre }}</option> }
+          </select>
+        </div>
+        <div class="form-group mt-16">
+          <label>Numero de colegiado</label>
+          <input class="input" formControlName="numero_colegiado" />
+        </div>
+        <div class="form-group mt-16">
+          <label>Telefono</label>
+          <input class="input" formControlName="telefono" />
+        </div>
+        <div class="form-group mt-16">
+          <label>Email</label>
+          <input class="input" type="email" formControlName="email" />
+        </div>
+        <div class="form-group mt-16">
+          <label class="flex items-center gap-8"><input type="checkbox" formControlName="activo" /> Doctor activo</label>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary" [disabled]="form.invalid">Guardar</button>
+          <button type="button" class="btn btn-outline" (click)="cerrarPanel()">Cancelar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+}

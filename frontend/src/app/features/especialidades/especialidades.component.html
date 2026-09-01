@@ -1,0 +1,70 @@
+<div class="page-header">
+  <div>
+    <h1>Especialidades</h1>
+    <div class="desc">Catalogo de especialidades medicas que ofrece la clinica</div>
+  </div>
+  @if (esAdmin()) {
+    <button class="btn btn-accent" (click)="abrirNuevo()">+ Nueva especialidad</button>
+  }
+</div>
+
+<div class="table-wrap">
+  <table class="data-table">
+    <thead>
+      <tr><th>Nombre</th><th>Descripcion</th><th>Estado</th><th></th></tr>
+      <tr class="filter-row">
+        <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroNombre()" (ngModelChange)="filtroNombre.set($event)" /></th>
+        <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroDescripcion()" (ngModelChange)="filtroDescripcion.set($event)" /></th>
+        <th></th>
+        <th>
+          @if (hayFiltros()) { <button class="btn btn-outline btn-sm" (click)="limpiarFiltros()">Limpiar</button> }
+        </th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (e of especialidadesFiltradas(); track e.id) {
+        <tr>
+          <td>{{ e.nombre }}</td>
+          <td>{{ e.descripcion || '-' }}</td>
+          <td><span class="badge" [class.badge-green]="e.activo" [class.badge-slate]="!e.activo">{{ e.activo ? 'Activo' : 'Inactivo' }}</span></td>
+          <td class="table-actions">
+            @if (esAdmin()) {
+              <button class="btn btn-outline btn-sm" (click)="abrirEditar(e)">Editar</button>
+              <button class="btn btn-danger btn-sm" (click)="eliminar(e)">Eliminar</button>
+            }
+          </td>
+        </tr>
+      } @empty {
+        <tr><td colspan="4"><div class="empty-state">{{ hayFiltros() ? 'Ninguna especialidad coincide con los filtros.' : 'No hay especialidades registradas.' }}</div></td></tr>
+      }
+    </tbody>
+  </table>
+</div>
+
+@if (panelAbierto()) {
+  <div class="overlay">
+    <div class="drawer">
+      <div class="drawer-header">
+        <h2>{{ editando() ? 'Editar especialidad' : 'Nueva especialidad' }}</h2>
+        <button class="close" (click)="cerrarPanel()">&times;</button>
+      </div>
+      <form [formGroup]="form" (ngSubmit)="guardar()">
+        <div class="form-group">
+          <label>Nombre *</label>
+          <input class="input" formControlName="nombre" placeholder="Pediatria, Cardiologia, etc." />
+        </div>
+        <div class="form-group mt-16">
+          <label>Descripcion</label>
+          <textarea class="input" rows="3" formControlName="descripcion"></textarea>
+        </div>
+        <div class="form-group mt-16">
+          <label class="flex items-center gap-8"><input type="checkbox" formControlName="activo" /> Especialidad activa</label>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary" [disabled]="form.invalid">Guardar</button>
+          <button type="button" class="btn btn-outline" (click)="cerrarPanel()">Cancelar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+}
