@@ -148,7 +148,42 @@ export class CitasComponent implements OnInit {
   }
 
   ocupadosTexto(disp: Disponibilidad): string {
-    return disp.ocupados.map((o) => `${o.hora_inicio}–${o.hora_fin}`).join(', ');
+    return disp.ocupados.map((o) => `${this.formatoAmPm(o.hora_inicio)}–${this.formatoAmPm(o.hora_fin)}`).join(', ');
+  }
+
+  formatoAmPm(hora: string): string {
+    const { h, m, periodo } = this.partes12(hora);
+    return `${h}:${m} ${periodo}`;
+  }
+
+  // ---------- Hora de inicio/fin en formato 12h (los <select> no dependen
+  // del locale del navegador, a diferencia de <input type="time">) ----------
+  readonly horas12 = Array.from({ length: 12 }, (_, i) => i + 1);
+  readonly minutos60 = Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0'));
+
+  private partes12(hora24: string | null | undefined): { h: number; m: string; periodo: 'a.m.' | 'p.m.' } {
+    const [hh, mm] = (hora24 || '00:00').split(':').map(Number);
+    const periodo: 'a.m.' | 'p.m.' = hh >= 12 ? 'p.m.' : 'a.m.';
+    const h12 = hh % 12 === 0 ? 12 : hh % 12;
+    return { h: h12, m: (mm || 0).toString().padStart(2, '0'), periodo };
+  }
+
+  partesHora(campo: 'hora_inicio' | 'hora_fin'): { h: number | null; m: string | null; periodo: 'a.m.' | 'p.m.' | null } {
+    const valor = this.form.get(campo)?.value;
+    if (!valor) return { h: null, m: null, periodo: null };
+    return this.partes12(valor);
+  }
+
+  actualizarHora12(campo: 'hora_inicio' | 'hora_fin', parte: 'h' | 'm' | 'periodo', valor: string): void {
+    const actual = this.partesHora(campo);
+    const h12 = parte === 'h' ? Number(valor) : actual.h ?? 12;
+    const m = parte === 'm' ? valor : actual.m ?? '00';
+    const periodo = parte === 'periodo' ? valor : actual.periodo ?? 'a.m.';
+    let h24 = h12 % 12;
+    if (periodo === 'p.m.') h24 += 12;
+    const hora24 = `${h24.toString().padStart(2, '0')}:${m}`;
+    if (campo === 'hora_inicio') this.form.patchValue({ hora_inicio: hora24 });
+    else this.form.patchValue({ hora_fin: hora24 });
   }
 
   cargar(): void { this.srv.listar().subscribe((data) => this.citas.set(data)); }

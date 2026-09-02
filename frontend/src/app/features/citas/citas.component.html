@@ -121,13 +121,43 @@
           <label>Fecha *</label>
           <input class="input" type="date" formControlName="fecha" />
         </div>
-        <div class="form-group mt-16">
-          <label>Hora de inicio *</label>
-          <input class="input" type="time" formControlName="hora_inicio" />
-        </div>
-        <div class="form-group mt-16">
-          <label>Hora de fin *</label>
-          <input class="input" type="time" formControlName="hora_fin" />
+        <div class="flex gap-12 mt-16">
+          <div class="form-group" style="flex: 1;">
+            <label>Hora de inicio *</label>
+            <div class="time12">
+              <select class="input" [value]="partesHora('hora_inicio').h ?? ''" (change)="actualizarHora12('hora_inicio', 'h', $any($event.target).value)">
+                <option value="" disabled>--</option>
+                @for (h of horas12; track h) { <option [value]="h">{{ h }}</option> }
+              </select>
+              <select class="input" [value]="partesHora('hora_inicio').m ?? ''" (change)="actualizarHora12('hora_inicio', 'm', $any($event.target).value)">
+                <option value="" disabled>--</option>
+                @for (m of minutos60; track m) { <option [value]="m">{{ m }}</option> }
+              </select>
+              <select class="input" [value]="partesHora('hora_inicio').periodo ?? ''" (change)="actualizarHora12('hora_inicio', 'periodo', $any($event.target).value)">
+                <option value="" disabled>--</option>
+                <option value="a.m.">a.m.</option>
+                <option value="p.m.">p.m.</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group" style="flex: 1;">
+            <label>Hora de fin *</label>
+            <div class="time12">
+              <select class="input" [value]="partesHora('hora_fin').h ?? ''" (change)="actualizarHora12('hora_fin', 'h', $any($event.target).value)">
+                <option value="" disabled>--</option>
+                @for (h of horas12; track h) { <option [value]="h">{{ h }}</option> }
+              </select>
+              <select class="input" [value]="partesHora('hora_fin').m ?? ''" (change)="actualizarHora12('hora_fin', 'm', $any($event.target).value)">
+                <option value="" disabled>--</option>
+                @for (m of minutos60; track m) { <option [value]="m">{{ m }}</option> }
+              </select>
+              <select class="input" [value]="partesHora('hora_fin').periodo ?? ''" (change)="actualizarHora12('hora_fin', 'periodo', $any($event.target).value)">
+                <option value="" disabled>--</option>
+                <option value="a.m.">a.m.</option>
+                <option value="p.m.">p.m.</option>
+              </select>
+            </div>
+          </div>
         </div>
 
         @if (form.get('doctor_id')?.value && form.get('fecha')?.value) {
@@ -142,7 +172,7 @@
                 } @else {
                   <div class="slots-grid">
                     @for (f of disp.libres; track f.hora_inicio) {
-                      <button type="button" class="slot-chip" [class.selected]="franjaSeleccionada(f)" (click)="elegirFranja(f)">{{ f.hora_inicio }}</button>
+                      <button type="button" class="slot-chip" [class.selected]="franjaSeleccionada(f)" (click)="elegirFranja(f)">{{ formatoAmPm(f.hora_inicio) }}</button>
                     } @empty {
                       <span class="text-muted text-sm">Sin franjas libres ese dia.</span>
                     }
