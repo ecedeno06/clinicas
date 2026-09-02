@@ -193,7 +193,8 @@ async function historial(req, res, next) {
     if (!vinculo.rows[0]) return res.status(404).json({ mensaje: 'Paciente no encontrado' });
 
     const { rows } = await pool.query(
-      `select hc.*, c.fecha as fecha_cita, c.hora_inicio as hora_cita, d.nombre as doctor_nombre, e.nombre as especialidad_nombre
+      `select hc.*, c.fecha as fecha_cita, c.hora_inicio as hora_cita, d.nombre as doctor_nombre, e.nombre as especialidad_nombre,
+              exists(select 1 from recetas r where r.cita_id = hc.cita_id) as tiene_receta
        from historias_clinicas hc
        join citas c on c.id = hc.cita_id
        join doctores d on d.id = hc.doctor_id

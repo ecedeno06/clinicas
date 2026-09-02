@@ -209,4 +209,13 @@ export class PacientesComponent implements OnInit {
       error: () => this.cargandoRecetaSeleccionada.set(false),
     });
   }
+
+  // Selecciona la fila y salta directo al tab "Receta", sin pasar por
+  // "Signos vitales" primero. Detiene la propagacion para no disparar
+  // tambien el (click) de la fila (que haria lo mismo mas el tab por defecto).
+  verRecetaDeHistorial(h: HistoriaClinica, event: MouseEvent): void {
+    event.stopPropagation();
+    this.seleccionarHistorial(h);
+    this.tabSeleccionado.set('receta');
+  }
 }

@@ -150,10 +150,10 @@
       <div class="card">
         <div class="table-wrap">
           <table class="data-table">
-            <thead><tr><th>Fecha</th><th>Hora</th><th>Doctor</th><th>Diagnostico</th></tr></thead>
+            <thead><tr><th>Fecha</th><th>Hora</th><th>Doctor</th><th>Diagnostico</th><th></th></tr></thead>
             <tbody>
               @if (cargandoHistorial()) {
-                <tr><td colspan="4"><div class="empty-state">Cargando historial...</div></td></tr>
+                <tr><td colspan="5"><div class="empty-state">Cargando historial...</div></td></tr>
               } @else {
                 @for (h of historial(); track h.id) {
                   <tr class="row-clickable" [class.row-selected]="historialSeleccionado()?.id === h.id" (click)="seleccionarHistorial(h)">
@@ -165,9 +165,16 @@
                       @if (h.tratamiento) { <div class="text-muted text-sm">Tratamiento: {{ h.tratamiento }}</div> }
                       @if (h.notas) { <div class="text-muted text-sm">{{ h.notas }}</div> }
                     </td>
+                    <td class="table-actions">
+                      @if (h.tiene_receta) {
+                        <button type="button" class="btn-icon" title="Ver receta" aria-label="Ver receta" (click)="verRecetaDeHistorial(h, $event)">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 20.5 3.5 13.5a5 5 0 0 1 7-7l7 7a5 5 0 0 1-7 7Z"/><path d="m8.5 8.5 7 7"/></svg>
+                        </button>
+                      }
+                    </td>
                   </tr>
                 } @empty {
-                  <tr><td colspan="4"><div class="empty-state">Este paciente todavia no tiene historial clinico.</div></td></tr>
+                  <tr><td colspan="5"><div class="empty-state">Este paciente todavia no tiene historial clinico.</div></td></tr>
                 }
               }
             </tbody>

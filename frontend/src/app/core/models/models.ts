@@ -131,6 +131,7 @@ export interface HistoriaClinica {
   hora_cita?: string;
   doctor_nombre?: string;
   especialidad_nombre?: string;
+  tiene_receta?: boolean;
   created_at?: string;
 }
 
