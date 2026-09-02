@@ -109,6 +109,7 @@ export interface FranjaHoraria {
 
 export interface Disponibilidad {
   atiende: boolean;
+  tiene_horario_configurado: boolean;
   dia_semana: number;
   bloques: FranjaHoraria[];
   ocupados: FranjaHoraria[];

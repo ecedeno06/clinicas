@@ -36,7 +36,7 @@
       @for (c of citasFiltradas(); track c.id) {
         <tr>
           <td>{{ c.fecha | date:'dd/MM/yyyy' }}</td>
-          <td>{{ c.hora_inicio.substring(0,5) }} - {{ c.hora_fin.substring(0,5) }}</td>
+          <td>{{ formatoAmPm(c.hora_inicio) }} - {{ formatoAmPm(c.hora_fin) }}</td>
           <td>{{ c.paciente_nombre }}</td>
           <td>{{ c.paciente_edad ?? '-' }}</td>
           <td>{{ c.doctor_nombre }} <div class="text-muted text-sm">{{ c.especialidad_nombre }}</div></td>
@@ -125,36 +125,36 @@
           <div class="form-group" style="flex: 1;">
             <label>Hora de inicio *</label>
             <div class="time12">
-              <select class="input" [value]="partesHora('hora_inicio').h ?? ''" (change)="actualizarHora12('hora_inicio', 'h', $any($event.target).value)">
-                <option value="" disabled>--</option>
-                @for (h of horas12; track h) { <option [value]="h">{{ h }}</option> }
+              <select class="input" [ngModel]="partesHora('hora_inicio').h" [ngModelOptions]="{standalone: true}" (ngModelChange)="actualizarHora12('hora_inicio', 'h', $event)">
+                <option [ngValue]="null" disabled>--</option>
+                @for (h of horas12; track h) { <option [ngValue]="h">{{ h }}</option> }
               </select>
-              <select class="input" [value]="partesHora('hora_inicio').m ?? ''" (change)="actualizarHora12('hora_inicio', 'm', $any($event.target).value)">
-                <option value="" disabled>--</option>
-                @for (m of minutos60; track m) { <option [value]="m">{{ m }}</option> }
+              <select class="input" [ngModel]="partesHora('hora_inicio').m" [ngModelOptions]="{standalone: true}" (ngModelChange)="actualizarHora12('hora_inicio', 'm', $event)">
+                <option [ngValue]="null" disabled>--</option>
+                @for (m of minutos60; track m) { <option [ngValue]="m">{{ m }}</option> }
               </select>
-              <select class="input" [value]="partesHora('hora_inicio').periodo ?? ''" (change)="actualizarHora12('hora_inicio', 'periodo', $any($event.target).value)">
-                <option value="" disabled>--</option>
-                <option value="a.m.">a.m.</option>
-                <option value="p.m.">p.m.</option>
+              <select class="input" [ngModel]="partesHora('hora_inicio').periodo" [ngModelOptions]="{standalone: true}" (ngModelChange)="actualizarHora12('hora_inicio', 'periodo', $event)">
+                <option [ngValue]="null" disabled>--</option>
+                <option ngValue="a.m.">a.m.</option>
+                <option ngValue="p.m.">p.m.</option>
               </select>
             </div>
           </div>
           <div class="form-group" style="flex: 1;">
             <label>Hora de fin *</label>
             <div class="time12">
-              <select class="input" [value]="partesHora('hora_fin').h ?? ''" (change)="actualizarHora12('hora_fin', 'h', $any($event.target).value)">
-                <option value="" disabled>--</option>
-                @for (h of horas12; track h) { <option [value]="h">{{ h }}</option> }
+              <select class="input" [ngModel]="partesHora('hora_fin').h" [ngModelOptions]="{standalone: true}" (ngModelChange)="actualizarHora12('hora_fin', 'h', $event)">
+                <option [ngValue]="null" disabled>--</option>
+                @for (h of horas12; track h) { <option [ngValue]="h">{{ h }}</option> }
               </select>
-              <select class="input" [value]="partesHora('hora_fin').m ?? ''" (change)="actualizarHora12('hora_fin', 'm', $any($event.target).value)">
-                <option value="" disabled>--</option>
-                @for (m of minutos60; track m) { <option [value]="m">{{ m }}</option> }
+              <select class="input" [ngModel]="partesHora('hora_fin').m" [ngModelOptions]="{standalone: true}" (ngModelChange)="actualizarHora12('hora_fin', 'm', $event)">
+                <option [ngValue]="null" disabled>--</option>
+                @for (m of minutos60; track m) { <option [ngValue]="m">{{ m }}</option> }
               </select>
-              <select class="input" [value]="partesHora('hora_fin').periodo ?? ''" (change)="actualizarHora12('hora_fin', 'periodo', $any($event.target).value)">
-                <option value="" disabled>--</option>
-                <option value="a.m.">a.m.</option>
-                <option value="p.m.">p.m.</option>
+              <select class="input" [ngModel]="partesHora('hora_fin').periodo" [ngModelOptions]="{standalone: true}" (ngModelChange)="actualizarHora12('hora_fin', 'periodo', $event)">
+                <option [ngValue]="null" disabled>--</option>
+                <option ngValue="a.m.">a.m.</option>
+                <option ngValue="p.m.">p.m.</option>
               </select>
             </div>
           </div>
@@ -167,14 +167,19 @@
               <div class="text-muted text-sm">Calculando...</div>
             } @else {
               @if (disponibilidad(); as disp) {
-                @if (!disp.atiende) {
-                  <div class="text-muted text-sm">El doctor no atiende este dia segun su horario configurado.</div>
+                @if (!disp.tiene_horario_configurado) {
+                  <div class="text-muted text-sm">Este doctor todavia no tiene un horario configurado.</div>
+                } @else if (!disp.atiende) {
+                  <div class="error-text">El doctor no atiende este dia segun su horario configurado — no se puede guardar la cita.</div>
+                } @else if (disp.libres.length === 0) {
+                  <div class="error-text">No quedan franjas libres ese dia — no se puede guardar la cita.</div>
+                  @if (disp.ocupados.length > 0) {
+                    <div class="text-muted text-sm mt-8">Ocupado: {{ ocupadosTexto(disp) }}</div>
+                  }
                 } @else {
                   <div class="slots-grid">
                     @for (f of disp.libres; track f.hora_inicio) {
                       <button type="button" class="slot-chip" [class.selected]="franjaSeleccionada(f)" (click)="elegirFranja(f)">{{ formatoAmPm(f.hora_inicio) }}</button>
-                    } @empty {
-                      <span class="text-muted text-sm">Sin franjas libres ese dia.</span>
                     }
                   </div>
                   @if (disp.ocupados.length > 0) {
@@ -211,7 +216,7 @@
           <div class="error-text mt-16">{{ errorGuardar() }}</div>
         }
         <div class="form-actions">
-          <button type="submit" class="btn btn-primary" [disabled]="form.invalid">{{ editando() ? 'Guardar cambios' : 'Guardar' }}</button>
+          <button type="submit" class="btn btn-primary" [disabled]="form.invalid || sinDisponibilidad()">{{ editando() ? 'Guardar cambios' : 'Guardar' }}</button>
           <button type="button" class="btn btn-outline" (click)="cerrarPanel()">Cancelar</button>
         </div>
       </form>

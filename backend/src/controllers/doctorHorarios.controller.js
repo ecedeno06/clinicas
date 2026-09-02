@@ -171,6 +171,11 @@ async function disponibilidad(req, res, next) {
     const diaSemanaResult = await pool.query('select extract(dow from $1::date)::int as dia_semana', [fecha]);
     const diaSemana = diaSemanaResult.rows[0].dia_semana;
 
+    const tieneHorarioResult = await pool.query(
+      'select exists(select 1 from doctor_horarios where doctor_id = $1 and activo = true) as existe',
+      [req.params.id]
+    );
+
     const bloquesResult = await pool.query(
       `select hora_inicio, hora_fin from doctor_horarios
        where doctor_id = $1 and dia_semana = $2 and activo = true
@@ -200,6 +205,7 @@ async function disponibilidad(req, res, next) {
 
     res.json({
       atiende: bloquesResult.rows.length > 0,
+      tiene_horario_configurado: tieneHorarioResult.rows[0].existe,
       dia_semana: diaSemana,
       bloques: bloquesResult.rows.map((b) => ({ hora_inicio: b.hora_inicio.substring(0, 5), hora_fin: b.hora_fin.substring(0, 5) })),
       ocupados: citasResult.rows.map((c) => ({ hora_inicio: c.hora_inicio.substring(0, 5), hora_fin: c.hora_fin.substring(0, 5) })),

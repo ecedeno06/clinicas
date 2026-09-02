@@ -110,7 +110,7 @@
             <div class="horario-day-body">
               @for (h of horariosPorDia(i); track h.id) {
                 <div class="horario-slot-block">
-                  {{ h.hora_inicio.substring(0, 5) }}&ndash;{{ h.hora_fin.substring(0, 5) }}
+                  {{ formatoAmPm(h.hora_inicio) }}&ndash;{{ formatoAmPm(h.hora_fin) }}
                   @if (esAdmin()) {
                     <button type="button" class="horario-slot-remove" title="Eliminar" aria-label="Eliminar" (click)="eliminarHorario(h)">&times;</button>
                   }
@@ -133,11 +133,39 @@
           </div>
           <div class="form-group">
             <label>Desde</label>
-            <input class="input" type="time" formControlName="hora_inicio" />
+            <div class="time12">
+              <select class="input" [ngModel]="partesHoraHorario('hora_inicio').h" [ngModelOptions]="{standalone: true}" (ngModelChange)="actualizarHoraHorario12('hora_inicio', 'h', $event)">
+                <option [ngValue]="null" disabled>--</option>
+                @for (h of horas12; track h) { <option [ngValue]="h">{{ h }}</option> }
+              </select>
+              <select class="input" [ngModel]="partesHoraHorario('hora_inicio').m" [ngModelOptions]="{standalone: true}" (ngModelChange)="actualizarHoraHorario12('hora_inicio', 'm', $event)">
+                <option [ngValue]="null" disabled>--</option>
+                @for (m of minutos60; track m) { <option [ngValue]="m">{{ m }}</option> }
+              </select>
+              <select class="input" [ngModel]="partesHoraHorario('hora_inicio').periodo" [ngModelOptions]="{standalone: true}" (ngModelChange)="actualizarHoraHorario12('hora_inicio', 'periodo', $event)">
+                <option [ngValue]="null" disabled>--</option>
+                <option ngValue="a.m.">a.m.</option>
+                <option ngValue="p.m.">p.m.</option>
+              </select>
+            </div>
           </div>
           <div class="form-group">
             <label>Hasta</label>
-            <input class="input" type="time" formControlName="hora_fin" />
+            <div class="time12">
+              <select class="input" [ngModel]="partesHoraHorario('hora_fin').h" [ngModelOptions]="{standalone: true}" (ngModelChange)="actualizarHoraHorario12('hora_fin', 'h', $event)">
+                <option [ngValue]="null" disabled>--</option>
+                @for (h of horas12; track h) { <option [ngValue]="h">{{ h }}</option> }
+              </select>
+              <select class="input" [ngModel]="partesHoraHorario('hora_fin').m" [ngModelOptions]="{standalone: true}" (ngModelChange)="actualizarHoraHorario12('hora_fin', 'm', $event)">
+                <option [ngValue]="null" disabled>--</option>
+                @for (m of minutos60; track m) { <option [ngValue]="m">{{ m }}</option> }
+              </select>
+              <select class="input" [ngModel]="partesHoraHorario('hora_fin').periodo" [ngModelOptions]="{standalone: true}" (ngModelChange)="actualizarHoraHorario12('hora_fin', 'periodo', $event)">
+                <option [ngValue]="null" disabled>--</option>
+                <option ngValue="a.m.">a.m.</option>
+                <option ngValue="p.m.">p.m.</option>
+              </select>
+            </div>
           </div>
           <button type="submit" class="btn btn-primary" [disabled]="horarioForm.invalid">+ Agregar bloque</button>
         </form>

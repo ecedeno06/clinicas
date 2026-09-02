@@ -5,6 +5,7 @@ import { DoctoresService } from '../../core/services/doctores.service';
 import { EspecialidadesService } from '../../core/services/especialidades.service';
 import { AuthService } from '../../core/services/auth.service';
 import { Doctor, DoctorHorario, Especialidad } from '../../core/models/models';
+import { combinar12, formatoAmPm, HORAS_12, MINUTOS_60, partes12 } from '../../core/utils/hora12.util';
 
 @Component({
   selector: 'app-doctores',
@@ -104,6 +105,26 @@ export class DoctoresComponent implements OnInit {
     hora_inicio: ['', Validators.required],
     hora_fin: ['', Validators.required],
   });
+
+  readonly horas12 = HORAS_12;
+  readonly minutos60 = MINUTOS_60;
+  formatoAmPm = formatoAmPm;
+
+  partesHoraHorario(campo: 'hora_inicio' | 'hora_fin'): { h: number | null; m: string | null; periodo: 'a.m.' | 'p.m.' | null } {
+    const valor = this.horarioForm.get(campo)?.value;
+    if (!valor) return { h: null, m: null, periodo: null };
+    return partes12(valor);
+  }
+
+  actualizarHoraHorario12(campo: 'hora_inicio' | 'hora_fin', parte: 'h' | 'm' | 'periodo', valor: number | string): void {
+    const actual = this.partesHoraHorario(campo);
+    const h12 = parte === 'h' ? Number(valor) : actual.h ?? 12;
+    const m = parte === 'm' ? String(valor) : actual.m ?? '00';
+    const periodo = (parte === 'periodo' ? valor : actual.periodo ?? 'a.m.') as 'a.m.' | 'p.m.';
+    const hora24 = combinar12(h12, m, periodo);
+    if (campo === 'hora_inicio') this.horarioForm.patchValue({ hora_inicio: hora24 });
+    else this.horarioForm.patchValue({ hora_fin: hora24 });
+  }
 
   horariosPorDia(dia: number): DoctorHorario[] {
     return this.horarios()

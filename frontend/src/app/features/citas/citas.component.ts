@@ -9,6 +9,7 @@ import { Cita, Disponibilidad, Doctor, EstadoCita, FranjaHoraria, HistoriaClinic
 import { clasificarImc } from '../../core/utils/imc.util';
 import { clasificarPresion } from '../../core/utils/presion.util';
 import { clasificarGlucosa } from '../../core/utils/glucosa.util';
+import { combinar12, formatoAmPm, HORAS_12, MINUTOS_60, partes12 } from '../../core/utils/hora12.util';
 
 @Component({
   selector: 'app-citas',
@@ -148,40 +149,54 @@ export class CitasComponent implements OnInit {
   }
 
   ocupadosTexto(disp: Disponibilidad): string {
-    return disp.ocupados.map((o) => `${this.formatoAmPm(o.hora_inicio)}–${this.formatoAmPm(o.hora_fin)}`).join(', ');
+    return disp.ocupados.map((o) => `${formatoAmPm(o.hora_inicio)}–${formatoAmPm(o.hora_fin)}`).join(', ');
   }
 
-  formatoAmPm(hora: string): string {
-    const { h, m, periodo } = this.partes12(hora);
-    return `${h}:${m} ${periodo}`;
+  // Al editar una cita existente sin tocar doctor/fecha/horario, siempre se
+  // puede guardar (ej. solo cambiar el estado o el motivo) aunque hoy ese
+  // horario ya no aparezca disponible -- el horario del doctor pudo cambiar
+  // despues de agendada. El bloqueo de disponibilidad solo aplica cuando se
+  // esta fijando/moviendo el horario de la cita.
+  private horarioSinCambios(): boolean {
+    const original = this.editando();
+    if (!original) return false;
+    const v = this.form.getRawValue();
+    return v.doctor_id === original.doctor_id
+      && v.fecha === original.fecha?.substring(0, 10)
+      && v.hora_inicio === original.hora_inicio?.substring(0, 5)
+      && v.hora_fin === original.hora_fin?.substring(0, 5);
   }
+
+  // Solo bloquea Guardar cuando el doctor SI tiene un horario configurado
+  // (al menos un bloque, en cualquier dia) pero ese dia no atiende o ya
+  // esta completo. Un doctor sin ningun horario cargado todavia sigue
+  // pudiendo recibir citas con total libertad, como antes de este tablero.
+  sinDisponibilidad(): boolean {
+    if (this.horarioSinCambios()) return false;
+    const disp = this.disponibilidad();
+    if (!disp || !disp.tiene_horario_configurado) return false;
+    return !disp.atiende || disp.libres.length === 0;
+  }
+
+  formatoAmPm = formatoAmPm;
 
   // ---------- Hora de inicio/fin en formato 12h (los <select> no dependen
   // del locale del navegador, a diferencia de <input type="time">) ----------
-  readonly horas12 = Array.from({ length: 12 }, (_, i) => i + 1);
-  readonly minutos60 = Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0'));
-
-  private partes12(hora24: string | null | undefined): { h: number; m: string; periodo: 'a.m.' | 'p.m.' } {
-    const [hh, mm] = (hora24 || '00:00').split(':').map(Number);
-    const periodo: 'a.m.' | 'p.m.' = hh >= 12 ? 'p.m.' : 'a.m.';
-    const h12 = hh % 12 === 0 ? 12 : hh % 12;
-    return { h: h12, m: (mm || 0).toString().padStart(2, '0'), periodo };
-  }
+  readonly horas12 = HORAS_12;
+  readonly minutos60 = MINUTOS_60;
 
   partesHora(campo: 'hora_inicio' | 'hora_fin'): { h: number | null; m: string | null; periodo: 'a.m.' | 'p.m.' | null } {
     const valor = this.form.get(campo)?.value;
     if (!valor) return { h: null, m: null, periodo: null };
-    return this.partes12(valor);
+    return partes12(valor);
   }
 
-  actualizarHora12(campo: 'hora_inicio' | 'hora_fin', parte: 'h' | 'm' | 'periodo', valor: string): void {
+  actualizarHora12(campo: 'hora_inicio' | 'hora_fin', parte: 'h' | 'm' | 'periodo', valor: number | string): void {
     const actual = this.partesHora(campo);
     const h12 = parte === 'h' ? Number(valor) : actual.h ?? 12;
-    const m = parte === 'm' ? valor : actual.m ?? '00';
-    const periodo = parte === 'periodo' ? valor : actual.periodo ?? 'a.m.';
-    let h24 = h12 % 12;
-    if (periodo === 'p.m.') h24 += 12;
-    const hora24 = `${h24.toString().padStart(2, '0')}:${m}`;
+    const m = parte === 'm' ? String(valor) : actual.m ?? '00';
+    const periodo = (parte === 'periodo' ? valor : actual.periodo ?? 'a.m.') as 'a.m.' | 'p.m.';
+    const hora24 = combinar12(h12, m, periodo);
     if (campo === 'hora_inicio') this.form.patchValue({ hora_inicio: hora24 });
     else this.form.patchValue({ hora_fin: hora24 });
   }

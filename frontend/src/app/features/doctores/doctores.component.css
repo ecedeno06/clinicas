@@ -48,8 +48,11 @@
   color: var(--text-on-tint-green);
   border-radius: 7px;
   padding: 5px 4px;
-  font-size: 11.5px;
+  font-size: 9.5px;
+  line-height: 1.3;
   font-weight: 600;
+  white-space: normal;
+  word-break: break-word;
 }
 
 .horario-slot-remove {
@@ -73,3 +76,13 @@
   border-top: 1px solid var(--slate-100);
 }
 .horario-add-form .form-group { margin: 0; min-width: 130px; }
+.horario-add-form .form-group:has(.time12) { min-width: 220px; }
+
+.time12 {
+  display: flex;
+  gap: 6px;
+}
+.time12 select { min-width: 0; }
+.time12 select:nth-child(1) { flex: 1.1; }
+.time12 select:nth-child(2) { flex: 1.1; }
+.time12 select:nth-child(3) { flex: 1.3; }
