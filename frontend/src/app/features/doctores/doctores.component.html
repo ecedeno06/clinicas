@@ -32,6 +32,9 @@
           <td>{{ d.telefono || '-' }}</td>
           <td><span class="badge" [class.badge-green]="d.activo" [class.badge-slate]="!d.activo">{{ d.activo ? 'Activo' : 'Inactivo' }}</span></td>
           <td class="table-actions">
+            <button type="button" class="btn-icon" title="Horario" aria-label="Horario" (click)="abrirHorario(d)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg>
+            </button>
             @if (esAdmin()) {
               <button type="button" class="btn-icon" title="Editar" aria-label="Editar" (click)="abrirEditar(d)">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
@@ -88,6 +91,57 @@
           <button type="button" class="btn btn-outline" (click)="cerrarPanel()">Cancelar</button>
         </div>
       </form>
+    </div>
+  </div>
+}
+
+@if (horarioDoctor(); as d) {
+  <div class="overlay">
+    <div class="drawer">
+      <div class="drawer-header">
+        <h2>Horario &middot; {{ d.nombre }}</h2>
+        <button class="close" (click)="cerrarHorario()">&times;</button>
+      </div>
+
+      <div class="horario-week-grid">
+        @for (dia of diasSemana; track dia; let i = $index) {
+          <div class="horario-day-col" [class.on]="horariosPorDia(i).length > 0">
+            <div class="horario-day-head">{{ dia.substring(0, 3) }}</div>
+            <div class="horario-day-body">
+              @for (h of horariosPorDia(i); track h.id) {
+                <div class="horario-slot-block">
+                  {{ h.hora_inicio.substring(0, 5) }}&ndash;{{ h.hora_fin.substring(0, 5) }}
+                  @if (esAdmin()) {
+                    <button type="button" class="horario-slot-remove" title="Eliminar" aria-label="Eliminar" (click)="eliminarHorario(h)">&times;</button>
+                  }
+                </div>
+              } @empty {
+                <span class="text-muted text-sm">No atiende</span>
+              }
+            </div>
+          </div>
+        }
+      </div>
+
+      @if (esAdmin()) {
+        <form class="horario-add-form" [formGroup]="horarioForm" (ngSubmit)="agregarHorario()">
+          <div class="form-group">
+            <label>Dia</label>
+            <select class="input" formControlName="dia_semana">
+              @for (dia of diasSemana; track dia; let i = $index) { <option [value]="i">{{ dia }}</option> }
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Desde</label>
+            <input class="input" type="time" formControlName="hora_inicio" />
+          </div>
+          <div class="form-group">
+            <label>Hasta</label>
+            <input class="input" type="time" formControlName="hora_fin" />
+          </div>
+          <button type="submit" class="btn btn-primary" [disabled]="horarioForm.invalid">+ Agregar bloque</button>
+        </form>
+      }
     </div>
   </div>
 }

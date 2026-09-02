@@ -4,7 +4,7 @@ import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angu
 import { DoctoresService } from '../../core/services/doctores.service';
 import { EspecialidadesService } from '../../core/services/especialidades.service';
 import { AuthService } from '../../core/services/auth.service';
-import { Doctor, Especialidad } from '../../core/models/models';
+import { Doctor, DoctorHorario, Especialidad } from '../../core/models/models';
 
 @Component({
   selector: 'app-doctores',
@@ -91,5 +91,59 @@ export class DoctoresComponent implements OnInit {
   eliminar(d: Doctor): void {
     if (!confirm(`Eliminar al doctor "${d.nombre}"?`)) return;
     this.srv.eliminar(d.id).subscribe(() => this.cargar());
+  }
+
+  // ---------- Horario semanal (tablero de turnos) ----------
+  readonly diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado'];
+
+  horarioDoctor = signal<Doctor | null>(null);
+  horarios = signal<DoctorHorario[]>([]);
+
+  horarioForm = this.fb.group({
+    dia_semana: [1, Validators.required],
+    hora_inicio: ['', Validators.required],
+    hora_fin: ['', Validators.required],
+  });
+
+  horariosPorDia(dia: number): DoctorHorario[] {
+    return this.horarios()
+      .filter((h) => h.dia_semana === dia)
+      .sort((a, b) => a.hora_inicio.localeCompare(b.hora_inicio));
+  }
+
+  abrirHorario(d: Doctor): void {
+    this.horarioDoctor.set(d);
+    this.horarioForm.reset({ dia_semana: 1, hora_inicio: '', hora_fin: '' });
+    this.cargarHorarios(d.id);
+  }
+
+  cerrarHorario(): void { this.horarioDoctor.set(null); }
+
+  cargarHorarios(doctorId: string): void {
+    this.srv.listarHorarios(doctorId).subscribe((data) => this.horarios.set(data));
+  }
+
+  agregarHorario(): void {
+    if (this.horarioForm.invalid) return;
+    const doctor = this.horarioDoctor();
+    if (!doctor) return;
+    const data = this.horarioForm.getRawValue();
+    this.srv.crearHorario(doctor.id, {
+      dia_semana: Number(data.dia_semana),
+      hora_inicio: data.hora_inicio!,
+      hora_fin: data.hora_fin!,
+    }).subscribe({
+      next: () => {
+        this.horarioForm.patchValue({ hora_inicio: '', hora_fin: '' });
+        this.cargarHorarios(doctor.id);
+      },
+      error: (err) => alert(err?.error?.mensaje || 'No se pudo agregar el horario'),
+    });
+  }
+
+  eliminarHorario(h: DoctorHorario): void {
+    const doctor = this.horarioDoctor();
+    if (!doctor) return;
+    this.srv.eliminarHorario(h.id).subscribe(() => this.cargarHorarios(doctor.id));
   }
 }

@@ -93,6 +93,28 @@ export interface Doctor {
   created_at?: string;
 }
 
+export interface DoctorHorario {
+  id: string;
+  doctor_id: string;
+  dia_semana: number; // 0=domingo … 6=sabado
+  hora_inicio: string;
+  hora_fin: string;
+  activo: boolean;
+}
+
+export interface FranjaHoraria {
+  hora_inicio: string;
+  hora_fin: string;
+}
+
+export interface Disponibilidad {
+  atiende: boolean;
+  dia_semana: number;
+  bloques: FranjaHoraria[];
+  ocupados: FranjaHoraria[];
+  libres: FranjaHoraria[];
+}
+
 export type EstadoCita = 'pendiente' | 'confirmada' | 'atendida' | 'cancelada' | 'no_asistio';
 
 export interface Cita {

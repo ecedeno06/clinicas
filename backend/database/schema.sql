@@ -132,6 +132,24 @@ create table if not exists doctores (
 );
 
 -- ---------------------------------------------------------
+-- Tabla: doctor_horarios (patron semanal recurrente de dias/horas
+-- en que atiende cada doctor -- tablero de turnos). No restringe
+-- la creacion de citas: es informativo para calcular disponibilidad,
+-- un doctor sin filas aqui sigue funcionando igual que antes.
+-- ---------------------------------------------------------
+create table if not exists doctor_horarios (
+    id           uuid primary key default gen_random_uuid(),
+    doctor_id    uuid not null references doctores(id) on delete cascade,
+    dia_semana   smallint not null check (dia_semana between 0 and 6), -- 0=domingo … 6=sabado
+    hora_inicio  time not null,
+    hora_fin     time not null,
+    activo       boolean not null default true,
+    created_at   timestamptz not null default now(),
+    updated_at   timestamptz not null default now(),
+    constraint chk_horario_doctor check (hora_fin > hora_inicio)
+);
+
+-- ---------------------------------------------------------
 -- Tabla: citas (agenda de citas paciente <-> doctor)
 -- ---------------------------------------------------------
 create table if not exists citas (
@@ -250,6 +268,7 @@ create index if not exists idx_usuarios_empresas_rol_empresa on usuarios_empresa
 create index if not exists idx_pacientes_empresas_paciente on pacientes_empresas(paciente_id);
 create index if not exists idx_pacientes_empresas_empresa on pacientes_empresas(empresa_id);
 create index if not exists idx_doctores_empresa on doctores(empresa_id);
+create index if not exists idx_doctor_horarios_doctor on doctor_horarios(doctor_id);
 create index if not exists idx_citas_empresa on citas(empresa_id);
 create index if not exists idx_citas_doctor_fecha on citas(doctor_id, fecha);
 create index if not exists idx_citas_paciente on citas(paciente_id);
@@ -283,7 +302,7 @@ do $$
 declare
     t text;
 begin
-    foreach t in array array['empresas','usuarios','usuarios_empresas_rol','especialidades','pacientes','pacientes_empresas','doctores','citas','historias_clinicas','signos_vitales','recetas']
+    foreach t in array array['empresas','usuarios','usuarios_empresas_rol','especialidades','pacientes','pacientes_empresas','doctores','doctor_horarios','citas','historias_clinicas','signos_vitales','recetas']
     loop
         execute format('drop trigger if exists trg_set_updated_at on %I', t);
         execute format('create trigger trg_set_updated_at before update on %I for each row execute function set_updated_at()', t);

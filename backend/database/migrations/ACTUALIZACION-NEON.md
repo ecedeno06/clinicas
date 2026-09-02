@@ -1,9 +1,9 @@
 # Actualizacion pendiente para Neon (produccion)
 
-Estado: `001` a `004` ya se aplicaron en Neon (2026-09-02, verificado con
-comparacion completa de esquema contra `.19`). Queda pendiente
-`005_pacientes_globales.sql`. Ver tambien [README.md](./README.md) para el
-registro vivo de que esta aplicado en cada entorno.
+Estado: `001` a `006` ya se aplicaron en Neon (verificado con comparacion
+completa de esquema contra `.19`, `006` aplicada 2026-09-02). Ver tambien
+[README.md](./README.md) para el registro vivo de que esta aplicado en
+cada entorno.
 
 ## Resumen
 
@@ -13,7 +13,8 @@ registro vivo de que esta aplicado en cada entorno.
 | 2 | `002_glucosa_glicosilada.sql` | 1 columna nueva en `signos_vitales` | ✅ Aplicada |
 | 3 | `003_recetas.sql` | 2 tablas nuevas: `recetas` y `receta_medicamentos` | ✅ Aplicada |
 | 4 | `004_recetas_multiples.sql` | Permite varias recetas por cita | ✅ Aplicada |
-| 5 | `005_pacientes_globales.sql` | `pacientes` pasa a ser global (multi-clinica) | ⬜ Pendiente |
+| 5 | `005_pacientes_globales.sql` | `pacientes` pasa a ser global (multi-clinica) | ✅ Aplicada |
+| 6 | `006_horarios_doctores.sql` | Tabla nueva `doctor_horarios` (horario semanal por doctor) | ✅ Aplicada |
 
 ---
 
@@ -86,6 +87,30 @@ propio, invitacion por correo) que NO forma parte de esta migracion.
 
 ---
 
+## 6. `006_horarios_doctores.sql` — Horario semanal por doctor (tablero de turnos)
+
+Tabla nueva `doctor_horarios`: el patron recurrente de dias/horas en que
+atiende cada doctor (puede tener varios bloques el mismo dia, ej. turno
+partido manana/tarde). No modifica `citas` ni ninguna tabla existente, y
+no es una restriccion dura — un doctor sin filas aqui sigue recibiendo
+citas exactamente igual que antes.
+
+Se usa para:
+1. Un tablero de horario por doctor (pantalla nueva en Doctores, icono
+   "Horario" en cada fila).
+2. Un endpoint de disponibilidad (`GET /api/doctores/:id/disponibilidad?fecha=`)
+   que combina ese horario con las citas ya agendadas ese dia, y devuelve
+   franjas libres en bloques de 30 minutos — el formulario de "Nueva cita"
+   las muestra como chips clicables que rellenan hora de inicio/fin (sin
+   dejar de poder escribirlas a mano).
+
+Validado con Postgres desechable (creacion limpia + re-ejecucion
+idempotente) y probado end-to-end contra `.19` con datos reales: horario
+con turno partido, un dia sin atencion, y una cita ya agendada restando
+correctamente su franja de las disponibles.
+
+---
+
 ## Como aplicarlo a Neon
 
 Necesitas la cadena de conexion de Neon (Project Settings → Database →
@@ -93,37 +118,21 @@ Necesitas la cadena de conexion de Neon (Project Settings → Database →
 
 ```bash
 docker run --rm -i -e PGPASSWORD='<password-neon>' postgres:16 \
-  psql -h <host-neon> -U <usuario-neon> -d <base-neon> < backend/database/migrations/005_pacientes_globales.sql
-```
-
-**Recomendado**: antes de correrla, ejecutar el analisis de duplicados por
-separado contra Neon para confirmar que sigue en cero (puede haber
-cambiado desde que se escribio este documento si se agregaron pacientes
-nuevos):
-```sql
-select identificacion, count(*) from pacientes
-where identificacion is not null and identificacion <> ''
-group by identificacion having count(*) > 1;
+  psql -h <host-neon> -U <usuario-neon> -d <base-neon> < backend/database/migrations/006_horarios_doctores.sql
 ```
 
 ## Verificacion despues de aplicar
 
 ```sql
-\d pacientes   -- empresa_id y activo ya no deben aparecer; identificacion
-               -- y email deben mostrar "UNIQUE CONSTRAINT"
+\d doctor_horarios   -- debe existir, con su fk a doctores y el chk_horario_doctor
 
-select count(*) from pacientes_empresas;  -- debe ser >= al total de pacientes que habia antes
+select count(*) from doctor_horarios;  -- 0 es normal (nadie ha cargado horarios todavia)
 ```
 
 ## Riesgo / reversibilidad
 
-Los pasos 1-3 (crear tabla, migrar vinculos, deduplicar) son aditivos y
-seguros. Los pasos 4-5 (quitar columnas, agregar unique) son los que
-requieren mas cuidado: si Neon llegara a tener pacientes duplicados por
-identificacion que el paso 3 no lograra fusionar por algun motivo, el
-`alter table ... add constraint unique` del paso 5 fallaria limpio (no deja
-la tabla a medio migrar) — en ese caso, revisar el resultado de la consulta
-de duplicados de arriba antes de reintentar. El backend desplegado en
-Render debe actualizarse junto con esta migracion: las queries viejas de
-`pacientes.controller.js` (que filtraban por `empresa_id` directo en la
-tabla) dejan de funcionar en cuanto se quita esa columna.
+Migracion 100% aditiva: crea una tabla nueva, no toca ninguna existente.
+No hay riesgo de romper datos ni backend viejo — un doctor sin filas en
+`doctor_horarios` sigue funcionando exactamente igual que antes de esta
+migracion. Revertirla es un simple `drop table doctor_horarios;` si
+hiciera falta.

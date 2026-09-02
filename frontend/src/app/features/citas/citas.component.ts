@@ -5,7 +5,7 @@ import { CitasService } from '../../core/services/citas.service';
 import { PacientesService } from '../../core/services/pacientes.service';
 import { DoctoresService } from '../../core/services/doctores.service';
 import { AuthService } from '../../core/services/auth.service';
-import { Cita, Doctor, EstadoCita, HistoriaClinica, Paciente, Receta, SignosVitales } from '../../core/models/models';
+import { Cita, Disponibilidad, Doctor, EstadoCita, FranjaHoraria, HistoriaClinica, Paciente, Receta, SignosVitales } from '../../core/models/models';
 import { clasificarImc } from '../../core/utils/imc.util';
 import { clasificarPresion } from '../../core/utils/presion.util';
 import { clasificarGlucosa } from '../../core/utils/glucosa.util';
@@ -42,6 +42,12 @@ export class CitasComponent implements OnInit {
   recetaEditando = signal<Receta | null>(null); // null = formulario de receta nueva
   mostrarFormularioReceta = signal(false);
   recetaParaImprimir = signal<Receta | null>(null);
+
+  // Disponibilidad del doctor seleccionado para la fecha del formulario:
+  // se recalcula al cambiar doctor_id o fecha, y clicar una franja libre
+  // rellena hora_inicio/hora_fin (siguen siendo editables a mano tambien).
+  disponibilidad = signal<Disponibilidad | null>(null);
+  cargandoDisponibilidad = signal(false);
 
   filtroFecha = signal('');
   filtroPaciente = signal('');
@@ -117,6 +123,32 @@ export class CitasComponent implements OnInit {
     this.cargar();
     this.pacientesSrv.listar().subscribe((data) => this.pacientes.set(data));
     this.doctoresSrv.listar().subscribe((data) => this.doctores.set(data));
+
+    this.form.get('doctor_id')!.valueChanges.subscribe(() => this.actualizarDisponibilidad());
+    this.form.get('fecha')!.valueChanges.subscribe(() => this.actualizarDisponibilidad());
+  }
+
+  actualizarDisponibilidad(): void {
+    const doctorId = this.form.get('doctor_id')?.value;
+    const fecha = this.form.get('fecha')?.value;
+    if (!doctorId || !fecha) { this.disponibilidad.set(null); return; }
+    this.cargandoDisponibilidad.set(true);
+    this.doctoresSrv.disponibilidad(doctorId, fecha).subscribe({
+      next: (data) => { this.disponibilidad.set(data); this.cargandoDisponibilidad.set(false); },
+      error: () => { this.disponibilidad.set(null); this.cargandoDisponibilidad.set(false); },
+    });
+  }
+
+  elegirFranja(f: FranjaHoraria): void {
+    this.form.patchValue({ hora_inicio: f.hora_inicio, hora_fin: f.hora_fin });
+  }
+
+  franjaSeleccionada(f: FranjaHoraria): boolean {
+    return this.form.get('hora_inicio')?.value === f.hora_inicio && this.form.get('hora_fin')?.value === f.hora_fin;
+  }
+
+  ocupadosTexto(disp: Disponibilidad): string {
+    return disp.ocupados.map((o) => `${o.hora_inicio}–${o.hora_fin}`).join(', ');
   }
 
   cargar(): void { this.srv.listar().subscribe((data) => this.citas.set(data)); }

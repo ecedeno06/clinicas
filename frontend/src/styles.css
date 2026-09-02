@@ -780,6 +780,7 @@ table.data-table {
 .gap-12 { gap: 12px; }
 .gap-16 { gap: 16px; }
 .mt-16 { margin-top: 16px; }
+.mt-8 { margin-top: 8px; }
 .text-muted { color: var(--slate-500); }
 .text-sm { font-size: 12.5px; }
 .w-full { width: 100%; }
