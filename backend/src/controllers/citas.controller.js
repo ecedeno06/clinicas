@@ -85,7 +85,7 @@ async function crear(req, res, next) {
       return res.status(400).json({ mensaje: 'La hora de fin debe ser posterior a la hora de inicio.' });
     }
 
-    const paciente = await pool.query('select id from pacientes where id = $1 and empresa_id = $2', [paciente_id, req.empresaId]);
+    const paciente = await pool.query('select 1 from pacientes_empresas where paciente_id = $1 and empresa_id = $2', [paciente_id, req.empresaId]);
     if (!paciente.rows[0]) return res.status(400).json({ mensaje: 'El paciente indicado no pertenece a esta clinica' });
 
     const doctor = await pool.query('select id from doctores where id = $1 and empresa_id = $2', [doctor_id, req.empresaId]);

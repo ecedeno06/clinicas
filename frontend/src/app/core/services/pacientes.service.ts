@@ -15,4 +15,8 @@ export class PacientesService {
   actualizar(id: string, data: any): Observable<Paciente> { return this.http.put<Paciente>(`${this.base}/${id}`, data); }
   eliminar(id: string): Observable<void> { return this.http.delete<void>(`${this.base}/${id}`); }
   historial(id: string): Observable<HistoriaClinica[]> { return this.http.get<HistoriaClinica[]>(`${this.base}/${id}/historial`); }
+
+  buscarPorIdentificacion(identificacion: string): Observable<{ existe: boolean; paciente?: Paciente }> {
+    return this.http.get<{ existe: boolean; paciente?: Paciente }>(`${this.base}/buscar`, { params: { identificacion } });
+  }
 }

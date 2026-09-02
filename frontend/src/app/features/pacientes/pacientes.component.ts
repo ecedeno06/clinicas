@@ -18,6 +18,9 @@ export class PacientesComponent implements OnInit {
   pacientes = signal<Paciente[]>([]);
   panelAbierto = signal(false);
   editando = signal<Paciente | null>(null);
+  pacienteExistente = signal<Paciente | null>(null);
+
+  private readonly camposIdentidad = ['nombre', 'fecha_nacimiento', 'sexo', 'telefono', 'email', 'direccion', 'alergias', 'contacto_emergencia'];
 
   pacienteHistorial = signal<Paciente | null>(null);
   historial = signal<HistoriaClinica[]>([]);
@@ -81,12 +84,15 @@ export class PacientesComponent implements OnInit {
 
   abrirNuevo(): void {
     this.editando.set(null);
+    this.pacienteExistente.set(null);
     this.form.reset({ activo: true, contacto_emergencia: { nombre: '', telefono: '', parentesco: '' } });
+    this.habilitarCamposIdentidad();
     this.panelAbierto.set(true);
   }
 
   abrirEditar(p: Paciente): void {
     this.editando.set(p);
+    this.pacienteExistente.set(null);
     this.form.reset({
       ...p,
       fecha_nacimiento: p.fecha_nacimiento?.substring(0, 10) ?? '',
@@ -96,10 +102,59 @@ export class PacientesComponent implements OnInit {
         parentesco: p.contacto_emergencia?.parentesco ?? '',
       },
     });
+    this.habilitarCamposIdentidad();
     this.panelAbierto.set(true);
   }
 
   cerrarPanel(): void { this.panelAbierto.set(false); }
+
+  // Solo aplica al registrar un paciente nuevo: busca en TODA la red (no
+  // solo esta clinica) si la identificacion ya pertenece a alguien. Si es
+  // asi, reutiliza sus datos globales (alergias, contacto de emergencia,
+  // etc.) en vez de dejar que se vuelvan a capturar distinto por error.
+  onIdentificacionBlur(): void {
+    if (this.editando()) return;
+    const identificacion = (this.form.get('identificacion')?.value || '').trim();
+    if (!identificacion) {
+      this.pacienteExistente.set(null);
+      this.habilitarCamposIdentidad();
+      return;
+    }
+    this.srv.buscarPorIdentificacion(identificacion).subscribe({
+      next: (res) => {
+        if (res.existe && res.paciente) {
+          this.pacienteExistente.set(res.paciente);
+          this.form.patchValue({
+            nombre: res.paciente.nombre,
+            fecha_nacimiento: res.paciente.fecha_nacimiento?.substring(0, 10) ?? '',
+            sexo: res.paciente.sexo ?? '',
+            telefono: res.paciente.telefono ?? '',
+            email: res.paciente.email ?? '',
+            direccion: res.paciente.direccion ?? '',
+            alergias: res.paciente.alergias ?? '',
+            contacto_emergencia: {
+              nombre: res.paciente.contacto_emergencia?.nombre ?? '',
+              telefono: res.paciente.contacto_emergencia?.telefono ?? '',
+              parentesco: res.paciente.contacto_emergencia?.parentesco ?? '',
+            },
+          });
+          this.deshabilitarCamposIdentidad();
+        } else {
+          this.pacienteExistente.set(null);
+          this.habilitarCamposIdentidad();
+        }
+      },
+      error: () => { this.pacienteExistente.set(null); this.habilitarCamposIdentidad(); },
+    });
+  }
+
+  private deshabilitarCamposIdentidad(): void {
+    this.camposIdentidad.forEach((c) => this.form.get(c)?.disable());
+  }
+
+  private habilitarCamposIdentidad(): void {
+    this.camposIdentidad.forEach((c) => this.form.get(c)?.enable());
+  }
 
   guardar(): void {
     if (this.form.invalid) return;

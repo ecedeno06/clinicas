@@ -74,24 +74,41 @@ create table if not exists especialidades (
 );
 
 -- ---------------------------------------------------------
--- Tabla: pacientes
+-- Tabla: pacientes. Es GLOBAL (mismo patron que usuarios): una
+-- misma persona puede ser atendida en varias clinicas de la red
+-- sin duplicar su registro (ver pacientes_empresas). identificacion
+-- y email son unicos en toda la plataforma, no por clinica.
 -- ---------------------------------------------------------
 create table if not exists pacientes (
     id                  uuid primary key default gen_random_uuid(),
-    empresa_id          uuid not null references empresas(id),
     nombre              text not null,
-    identificacion      text,                 -- cedula / pasaporte
+    identificacion      text unique,          -- cedula / pasaporte
     fecha_nacimiento    date,
     sexo                text check (sexo in ('M', 'F', 'Otro')),
     telefono            text,
-    email               text,
+    email               text unique,
     direccion           text,
     -- Contacto de emergencia: { nombre, telefono, parentesco }
     contacto_emergencia jsonb,
     alergias            text,
-    activo              boolean not null default true,
     created_at          timestamptz not null default now(),
     updated_at          timestamptz not null default now()
+);
+
+-- ---------------------------------------------------------
+-- Tabla: pacientes_empresas (relacion N:M paciente <-> clinica,
+-- paralela a usuarios_empresas_rol). "activo" es un atributo de
+-- la relacion: un paciente puede estar activo en una clinica e
+-- inactivo (dado de baja) en otra.
+-- ---------------------------------------------------------
+create table if not exists pacientes_empresas (
+    id           uuid primary key default gen_random_uuid(),
+    paciente_id  uuid not null references pacientes(id) on delete cascade,
+    empresa_id   uuid not null references empresas(id) on delete cascade,
+    activo       boolean not null default true,
+    created_at   timestamptz not null default now(),
+    updated_at   timestamptz not null default now(),
+    unique (paciente_id, empresa_id)
 );
 
 -- ---------------------------------------------------------
@@ -230,7 +247,8 @@ create table if not exists receta_medicamentos (
 -- ---------------------------------------------------------
 create index if not exists idx_usuarios_empresas_rol_usuario on usuarios_empresas_rol(usuario_id);
 create index if not exists idx_usuarios_empresas_rol_empresa on usuarios_empresas_rol(empresa_id);
-create index if not exists idx_pacientes_empresa on pacientes(empresa_id);
+create index if not exists idx_pacientes_empresas_paciente on pacientes_empresas(paciente_id);
+create index if not exists idx_pacientes_empresas_empresa on pacientes_empresas(empresa_id);
 create index if not exists idx_doctores_empresa on doctores(empresa_id);
 create index if not exists idx_citas_empresa on citas(empresa_id);
 create index if not exists idx_citas_doctor_fecha on citas(doctor_id, fecha);
@@ -245,9 +263,10 @@ create index if not exists idx_receta_medicamentos_receta on receta_medicamentos
 
 -- ---------------------------------------------------------
 -- Restricciones unicas por clinica
+-- (pacientes.identificacion y pacientes.email ya son unicos
+-- globalmente, definidos inline en la tabla mas arriba)
 -- ---------------------------------------------------------
 alter table especialidades add constraint uq_especialidades_empresa_nombre unique (empresa_id, nombre);
-alter table pacientes       add constraint uq_pacientes_empresa_identificacion unique (empresa_id, identificacion);
 
 -- ---------------------------------------------------------
 -- Trigger generico para actualizar updated_at
@@ -264,7 +283,7 @@ do $$
 declare
     t text;
 begin
-    foreach t in array array['empresas','usuarios','usuarios_empresas_rol','especialidades','pacientes','doctores','citas','historias_clinicas','signos_vitales','recetas']
+    foreach t in array array['empresas','usuarios','usuarios_empresas_rol','especialidades','pacientes','pacientes_empresas','doctores','citas','historias_clinicas','signos_vitales','recetas']
     loop
         execute format('drop trigger if exists trg_set_updated_at on %I', t);
         execute format('create trigger trg_set_updated_at before update on %I for each row execute function set_updated_at()', t);
