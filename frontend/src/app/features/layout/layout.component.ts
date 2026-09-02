@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, ValidationErrors, Validators, AbstractControl } from '@angular/forms';
 import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
+import { ThemeService } from '../../core/services/theme.service';
 
 const SIDEBAR_STORAGE_KEY = 'clinica_sidebar_colapsado';
 
@@ -28,7 +29,7 @@ export class LayoutComponent {
     { validators: passwordsCoincidenValidator }
   );
 
-  constructor(public auth: AuthService, private fb: FormBuilder) {}
+  constructor(public auth: AuthService, public theme: ThemeService, private fb: FormBuilder) {}
 
   toggleSidebar(): void {
     const nuevo = !this.sidebarColapsado();

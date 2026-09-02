@@ -1,5 +1,6 @@
 import { Component, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { forkJoin } from 'rxjs';
 import { PacientesService } from '../../core/services/pacientes.service';
@@ -10,7 +11,7 @@ import { Cita, Doctor, Paciente } from '../../core/models/models';
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.css',
 })
@@ -19,16 +20,23 @@ export class DashboardComponent implements OnInit {
   doctores = signal<Doctor[]>([]);
   citas = signal<Cita[]>([]);
 
+  // Fecha que se esta consultando en "Agenda del dia" (por defecto, hoy).
+  fechaAgenda = signal<string>(hoyISO());
+
   pacientesActivos = computed(() => this.pacientes().filter((p) => p.activo).length);
   doctoresActivos = computed(() => this.doctores().filter((d) => d.activo).length);
   citasHoy = computed(() => this.citas().filter((c) => c.fecha.substring(0, 10) === hoyISO()).length);
   citasPendientes = computed(() => this.citas().filter((c) => c.estado === 'pendiente' || c.estado === 'confirmada').length);
 
-  agendaHoy = computed(() =>
+  esHoy = computed(() => this.fechaAgenda() === hoyISO());
+
+  agendaDelDia = computed(() =>
     this.citas()
-      .filter((c) => c.fecha.substring(0, 10) === hoyISO())
+      .filter((c) => c.fecha.substring(0, 10) === this.fechaAgenda())
       .sort((a, b) => a.hora_inicio.localeCompare(b.hora_inicio))
   );
+
+  irAHoy(): void { this.fechaAgenda.set(hoyISO()); }
 
   constructor(
     private pacientesSrv: PacientesService,

@@ -36,12 +36,18 @@
           <td>{{ p.telefono || '-' }}</td>
           <td><span class="badge" [class.badge-green]="p.activo" [class.badge-slate]="!p.activo">{{ p.activo ? 'Activo' : 'Inactivo' }}</span></td>
           <td class="table-actions">
-            <button class="btn btn-outline btn-sm" (click)="verHistorial(p)">Historial</button>
+            <button type="button" class="btn-icon" title="Historial" aria-label="Historial" (click)="verHistorial(p)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="12" height="16" rx="2"/><path d="M9 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"/><path d="M9 11h6M9 15h4"/></svg>
+            </button>
             @if (auth.puedeEditar()) {
-              <button class="btn btn-outline btn-sm" (click)="abrirEditar(p)">Editar</button>
+              <button type="button" class="btn-icon" title="Editar" aria-label="Editar" (click)="abrirEditar(p)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+              </button>
             }
             @if (auth.puedeEliminar()) {
-              <button class="btn btn-danger btn-sm" (click)="eliminar(p)">Eliminar</button>
+              <button type="button" class="btn-icon btn-icon-danger" title="Eliminar" aria-label="Eliminar" (click)="eliminar(p)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+              </button>
             }
           </td>
         </tr>
@@ -134,29 +140,111 @@
         <button class="close" (click)="cerrarHistorial()">&times;</button>
       </div>
 
-      <div class="table-wrap">
-        <table class="data-table">
-          <thead><tr><th>Fecha</th><th>Doctor</th><th>Diagnostico</th></tr></thead>
-          <tbody>
-            @if (cargandoHistorial()) {
-              <tr><td colspan="3"><div class="empty-state">Cargando historial...</div></td></tr>
+      <div class="card">
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead><tr><th>Fecha</th><th>Hora</th><th>Doctor</th><th>Diagnostico</th></tr></thead>
+            <tbody>
+              @if (cargandoHistorial()) {
+                <tr><td colspan="4"><div class="empty-state">Cargando historial...</div></td></tr>
+              } @else {
+                @for (h of historial(); track h.id) {
+                  <tr class="row-clickable" [class.row-selected]="historialSeleccionado()?.id === h.id" (click)="seleccionarHistorial(h)">
+                    <td style="white-space: nowrap;">{{ h.fecha_cita | date:'dd/MM/yyyy' }}</td>
+                    <td style="white-space: nowrap;">{{ h.hora_cita?.substring(0, 5) || '-' }}</td>
+                    <td>{{ h.doctor_nombre }} <div class="text-muted text-sm">{{ h.especialidad_nombre }}</div></td>
+                    <td>
+                      <div>{{ h.diagnostico || '-' }}</div>
+                      @if (h.tratamiento) { <div class="text-muted text-sm">Tratamiento: {{ h.tratamiento }}</div> }
+                      @if (h.notas) { <div class="text-muted text-sm">{{ h.notas }}</div> }
+                    </td>
+                  </tr>
+                } @empty {
+                  <tr><td colspan="4"><div class="empty-state">Este paciente todavia no tiene historial clinico.</div></td></tr>
+                }
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card mt-16">
+        <div class="tabs">
+          <button type="button" class="tab-btn" [class.active]="tabSeleccionado() === 'signos'" (click)="tabSeleccionado.set('signos')">Signos vitales</button>
+          <button type="button" class="tab-btn" [class.active]="tabSeleccionado() === 'receta'" (click)="tabSeleccionado.set('receta')">
+            Receta
+            @if (recetasSeleccionadas().length > 0) {
+              <span class="tab-badge">{{ recetasSeleccionadas().length }}</span>
+            }
+          </button>
+        </div>
+
+        @if (!historialSeleccionado()) {
+          <div class="empty-state">Selecciona una consulta de la lista para ver {{ tabSeleccionado() === 'signos' ? 'sus signos vitales' : 'su receta' }}.</div>
+        } @else {
+          <div class="text-muted text-sm" style="margin-bottom:8px;">{{ historialSeleccionado()!.fecha_cita | date:'dd/MM/yyyy' }} &middot; {{ historialSeleccionado()!.doctor_nombre }}</div>
+
+          @if (tabSeleccionado() === 'signos') {
+            @if (cargandoSignosSeleccionado()) {
+              <div class="empty-state">Cargando...</div>
             } @else {
-              @for (h of historial(); track h.id) {
-                <tr>
-                  <td style="white-space: nowrap;">{{ h.fecha_cita | date:'dd/MM/yyyy' }}</td>
-                  <td>{{ h.doctor_nombre }} <div class="text-muted text-sm">{{ h.especialidad_nombre }}</div></td>
-                  <td>
-                    <div>{{ h.diagnostico || '-' }}</div>
-                    @if (h.tratamiento) { <div class="text-muted text-sm">Tratamiento: {{ h.tratamiento }}</div> }
-                    @if (h.notas) { <div class="text-muted text-sm">{{ h.notas }}</div> }
-                  </td>
-                </tr>
-              } @empty {
-                <tr><td colspan="3"><div class="empty-state">Este paciente todavia no tiene historial clinico.</div></td></tr>
+              @if (signosVitalesSeleccionado(); as sv) {
+                <div class="stats-grid">
+                  <div><div class="text-muted text-sm">Temperatura</div><div>{{ sv.temperatura ?? '-' }} °C</div></div>
+                  <div><div class="text-muted text-sm">Peso</div><div>{{ sv.peso ?? '-' }} kg</div></div>
+                  <div><div class="text-muted text-sm">Talla</div><div>{{ sv.talla ?? '-' }} cm</div></div>
+                  <div>
+                    <div class="text-muted text-sm">IMC</div>
+                    <div>
+                      {{ sv.imc ?? '-' }} kg/m²
+                      @if (claseImc(sv.imc); as clasificacion) {
+                        <span class="badge" [class.badge-green]="clasificacion.clase === 'badge-green'" [class.badge-amber]="clasificacion.clase === 'badge-amber'" [class.badge-red]="clasificacion.clase === 'badge-red'">
+                          {{ clasificacion.etiqueta }}
+                        </span>
+                      }
+                    </div>
+                  </div>
+                  <div><div class="text-muted text-sm">Presion arterial</div><div>{{ sv.presion_sistolica ?? '-' }} / {{ sv.presion_diastolica ?? '-' }} mmHg</div></div>
+                  <div><div class="text-muted text-sm">Glucosa</div><div>{{ sv.glucosa ?? '-' }} mg/dL</div></div>
+                  <div><div class="text-muted text-sm">Glucosa glicosilada (HbA1c)</div><div>{{ sv.glucosa_glicosilada ?? '-' }} %</div></div>
+                </div>
+              } @else {
+                <div class="empty-state">No se registraron signos vitales para esta consulta.</div>
               }
             }
-          </tbody>
-        </table>
+          } @else {
+            @if (cargandoRecetaSeleccionada()) {
+              <div class="empty-state">Cargando...</div>
+            } @else {
+              @for (r of recetasSeleccionadas(); track r.id) {
+                <div class="card mt-16">
+                  <div class="text-muted text-sm">{{ r.created_at | date:'dd/MM/yyyy HH:mm' }}</div>
+                  <div class="table-wrap mt-16">
+                    <table class="data-table">
+                      <thead><tr><th>Medicamento</th><th>Dosis</th><th>Frecuencia</th><th>Duracion</th><th>Indicaciones</th></tr></thead>
+                      <tbody>
+                        @for (m of r.medicamentos; track m.id) {
+                          <tr>
+                            <td>{{ m.medicamento }}</td>
+                            <td>{{ m.dosis || '-' }}</td>
+                            <td>{{ m.frecuencia || '-' }}</td>
+                            <td>{{ m.duracion || '-' }}</td>
+                            <td>{{ m.indicaciones || '-' }}</td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                  @if (r.indicaciones_generales) {
+                    <div class="text-muted text-sm mt-16">{{ r.indicaciones_generales }}</div>
+                  }
+                </div>
+              } @empty {
+                <div class="empty-state">No se registraron recetas para esta consulta.</div>
+              }
+            }
+          }
+        }
       </div>
     </div>
   </div>

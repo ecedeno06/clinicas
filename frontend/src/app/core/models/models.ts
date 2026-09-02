@@ -100,6 +100,7 @@ export interface Cita {
   empresa_id?: string;
   paciente_id: string;
   paciente_nombre?: string;
+  paciente_edad?: number | null;
   doctor_id: string;
   doctor_nombre?: string;
   especialidad_nombre?: string;
@@ -110,6 +111,8 @@ export interface Cita {
   motivo?: string;
   observaciones?: string;
   tiene_historia?: boolean;
+  tiene_signos_vitales?: boolean;
+  tiene_receta?: boolean;
   created_at?: string;
 }
 
@@ -125,7 +128,45 @@ export interface HistoriaClinica {
   notas?: string;
   // Presentes solo cuando viene del historial de un paciente (join con la cita)
   fecha_cita?: string;
+  hora_cita?: string;
   doctor_nombre?: string;
   especialidad_nombre?: string;
+  created_at?: string;
+}
+
+export interface RecetaMedicamento {
+  id?: string;
+  medicamento: string;
+  dosis?: string | null;
+  frecuencia?: string | null;
+  duracion?: string | null;
+  indicaciones?: string | null;
+}
+
+export interface Receta {
+  id: string;
+  empresa_id?: string;
+  cita_id: string;
+  paciente_id: string;
+  doctor_id: string;
+  indicaciones_generales?: string | null;
+  medicamentos: RecetaMedicamento[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface SignosVitales {
+  id: string;
+  empresa_id?: string;
+  cita_id: string;
+  paciente_id: string;
+  temperatura?: number | null;
+  peso?: number | null;
+  talla?: number | null;
+  imc?: number | null;
+  presion_sistolica?: number | null;
+  presion_diastolica?: number | null;
+  glucosa?: number | null;
+  glucosa_glicosilada?: number | null;
   created_at?: string;
 }

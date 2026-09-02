@@ -87,27 +87,42 @@
         }
       </div>
 
-      <div class="user-menu">
-        <button class="user-pill user-pill-btn" (click)="menuAbierto.set(!menuAbierto())">
-          @if (auth.usuario()?.avatar) {
-            <img class="avatar-img" [src]="auth.usuario()?.avatar" alt="Avatar" />
+      <div class="flex items-center gap-12">
+        <button
+          type="button"
+          class="btn-icon"
+          (click)="theme.toggle()"
+          [attr.title]="theme.tema() === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'"
+          [attr.aria-label]="theme.tema() === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'">
+          @if (theme.tema() === 'dark') {
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
           } @else {
-            <div class="avatar">{{ iniciales() }}</div>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/></svg>
           }
-          <div>
-            <div>{{ auth.usuario()?.nombre }}</div>
-            <div class="text-muted" style="font-size:11px;">{{ auth.usuario()?.rol }}</div>
-          </div>
         </button>
 
-        @if (menuAbierto()) {
-          <div class="dropdown-backdrop" (click)="menuAbierto.set(false)"></div>
-          <div class="dropdown-menu">
-            <button type="button" class="dropdown-item" (click)="fileInput.click()">Cambiar foto de perfil</button>
-            <button type="button" class="dropdown-item" (click)="abrirCambioPassword()">Cambiar contrasena</button>
-            <button type="button" class="dropdown-item dropdown-item-danger" (click)="auth.logout()">Salir</button>
-          </div>
-        }
+        <div class="user-menu">
+          <button class="user-pill user-pill-btn" (click)="menuAbierto.set(!menuAbierto())">
+            @if (auth.usuario()?.avatar) {
+              <img class="avatar-img" [src]="auth.usuario()?.avatar" alt="Avatar" />
+            } @else {
+              <div class="avatar">{{ iniciales() }}</div>
+            }
+            <div>
+              <div>{{ auth.usuario()?.nombre }}</div>
+              <div class="text-muted" style="font-size:11px;">{{ auth.usuario()?.rol }}</div>
+            </div>
+          </button>
+
+          @if (menuAbierto()) {
+            <div class="dropdown-backdrop" (click)="menuAbierto.set(false)"></div>
+            <div class="dropdown-menu">
+              <button type="button" class="dropdown-item" (click)="fileInput.click()">Cambiar foto de perfil</button>
+              <button type="button" class="dropdown-item" (click)="abrirCambioPassword()">Cambiar contrasena</button>
+              <button type="button" class="dropdown-item dropdown-item-danger" (click)="auth.logout()">Salir</button>
+            </div>
+          }
+        </div>
       </div>
 
       <input #fileInput type="file" accept="image/*" style="display:none" (change)="onArchivoSeleccionado($event)" />

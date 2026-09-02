@@ -24,8 +24,18 @@
   </div>
 </div>
 
-<h2>Agenda de hoy</h2>
-<p class="desc mt-16" style="margin-bottom:10px;">Citas agendadas para el dia de hoy, ordenadas por hora</p>
+<div class="page-header">
+  <div>
+    <h2>{{ esHoy() ? 'Agenda de hoy' : 'Agenda del dia' }}</h2>
+    <p class="desc" style="margin-bottom:0;">Citas agendadas para la fecha seleccionada, ordenadas por hora</p>
+  </div>
+  <div class="flex items-center gap-8">
+    <input class="input" type="date" [ngModel]="fechaAgenda()" (ngModelChange)="fechaAgenda.set($event)" style="max-width:180px;" />
+    @if (!esHoy()) {
+      <button type="button" class="btn btn-outline btn-sm" (click)="irAHoy()">Hoy</button>
+    }
+  </div>
+</div>
 
 <div class="table-wrap">
   <table class="data-table">
@@ -39,7 +49,7 @@
       </tr>
     </thead>
     <tbody>
-      @for (c of agendaHoy(); track c.id) {
+      @for (c of agendaDelDia(); track c.id) {
         <tr>
           <td>{{ c.hora_inicio.substring(0,5) }} - {{ c.hora_fin.substring(0,5) }}</td>
           <td>{{ c.paciente_nombre }}</td>
@@ -58,7 +68,7 @@
           </td>
         </tr>
       } @empty {
-        <tr><td colspan="5"><div class="empty-state">No hay citas agendadas para hoy.</div></td></tr>
+        <tr><td colspan="5"><div class="empty-state">{{ esHoy() ? 'No hay citas agendadas para hoy.' : 'No hay citas agendadas para esta fecha.' }}</div></td></tr>
       }
     </tbody>
   </table>

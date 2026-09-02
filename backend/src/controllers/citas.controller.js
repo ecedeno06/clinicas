@@ -17,12 +17,16 @@ async function listar(req, res, next) {
 
     const { rows } = await pool.query(
       `select c.*, p.nombre as paciente_nombre, d.nombre as doctor_nombre, e.nombre as especialidad_nombre,
-              (hc.id is not null) as tiene_historia
+              (hc.id is not null) as tiene_historia,
+              (sv.id is not null) as tiene_signos_vitales,
+              exists(select 1 from recetas r where r.cita_id = c.id) as tiene_receta,
+              (case when p.fecha_nacimiento is not null then date_part('year', age(c.fecha, p.fecha_nacimiento))::int end) as paciente_edad
        from citas c
        join pacientes p on p.id = c.paciente_id
        join doctores d on d.id = c.doctor_id
        join especialidades e on e.id = d.especialidad_id
        left join historias_clinicas hc on hc.cita_id = c.id
+       left join signos_vitales sv on sv.cita_id = c.id
        ${where}
        order by c.fecha desc, c.hora_inicio desc`,
       valores

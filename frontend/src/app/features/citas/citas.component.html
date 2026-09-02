@@ -15,6 +15,7 @@
         <th>Fecha</th>
         <th>Horario</th>
         <th>Paciente</th>
+        <th>Edad</th>
         <th>Doctor</th>
         <th>Estado</th>
         <th></th>
@@ -23,6 +24,7 @@
         <th><input class="input" type="text" placeholder="dd/mm/aaaa" [ngModel]="filtroFecha()" (ngModelChange)="filtroFecha.set($event)" /></th>
         <th></th>
         <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroPaciente()" (ngModelChange)="filtroPaciente.set($event)" /></th>
+        <th></th>
         <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroDoctor()" (ngModelChange)="filtroDoctor.set($event)" /></th>
         <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroEstado()" (ngModelChange)="filtroEstado.set($event)" /></th>
         <th>
@@ -36,6 +38,7 @@
           <td>{{ c.fecha | date:'dd/MM/yyyy' }}</td>
           <td>{{ c.hora_inicio.substring(0,5) }} - {{ c.hora_fin.substring(0,5) }}</td>
           <td>{{ c.paciente_nombre }}</td>
+          <td>{{ c.paciente_edad ?? '-' }}</td>
           <td>{{ c.doctor_nombre }} <div class="text-muted text-sm">{{ c.especialidad_nombre }}</div></td>
           <td>
             <span class="badge"
@@ -47,21 +50,46 @@
             </span>
           </td>
           <td class="table-actions">
-            @if (puedeVerHistoria()) {
-              <button class="btn btn-outline btn-sm" (click)="abrirHistoria(c)">
-                Historia @if (c.tiene_historia) { (✓) }
-              </button>
-            }
-            @if (auth.puedeEditar()) {
-              <button class="btn btn-outline btn-sm" (click)="abrirEditar(c)">Editar</button>
-            }
-            @if (auth.puedeEliminar()) {
-              <button class="btn btn-danger btn-sm" (click)="eliminar(c)">Eliminar</button>
-            }
+            <div class="row-menu">
+              <button type="button" class="btn-icon" (click)="toggleMenu($event, c.id)" aria-label="Mas acciones">&#8942;</button>
+              @if (menuAbiertoId() === c.id) {
+                <div class="dropdown-backdrop" (click)="menuAbiertoId.set(null)"></div>
+                <div class="dropdown-menu dropdown-menu-fixed" [style.top.px]="menuPos()?.top" [style.right.px]="menuPos()?.right">
+                  @if (puedeRegistrarSignos()) {
+                    <button type="button" class="dropdown-item" (click)="menuAbiertoId.set(null); abrirSignos(c)">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg>
+                      <span>Signos vitales @if (c.tiene_signos_vitales) { (✓) }</span>
+                    </button>
+                  }
+                  @if (puedeVerHistoria()) {
+                    <button type="button" class="dropdown-item" (click)="menuAbiertoId.set(null); abrirHistoria(c)">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="12" height="16" rx="2"/><path d="M9 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"/><path d="M9 11h6M9 15h4"/></svg>
+                      <span>Consulta @if (c.tiene_historia) { (✓) }</span>
+                    </button>
+                    <button type="button" class="dropdown-item" (click)="menuAbiertoId.set(null); abrirRecetas(c)">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 20.5 3.5 13.5a5 5 0 0 1 7-7l7 7a5 5 0 0 1-7 7Z"/><path d="m8.5 8.5 7 7"/></svg>
+                      <span>Receta @if (c.tiene_receta) { (✓) }</span>
+                    </button>
+                  }
+                  @if (auth.puedeEditar()) {
+                    <button type="button" class="dropdown-item" (click)="menuAbiertoId.set(null); abrirEditar(c)">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                      <span>Editar</span>
+                    </button>
+                  }
+                  @if (auth.puedeEliminar()) {
+                    <button type="button" class="dropdown-item dropdown-item-danger" (click)="menuAbiertoId.set(null); eliminar(c)">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+                      <span>Eliminar</span>
+                    </button>
+                  }
+                </div>
+              }
+            </div>
           </td>
         </tr>
       } @empty {
-        <tr><td colspan="6"><div class="empty-state">{{ hayFiltros() ? 'Ninguna cita coincide con los filtros.' : 'No hay citas agendadas todavia.' }}</div></td></tr>
+        <tr><td colspan="7"><div class="empty-state">{{ hayFiltros() ? 'Ninguna cita coincide con los filtros.' : 'No hay citas agendadas todavia.' }}</div></td></tr>
       }
     </tbody>
   </table>
@@ -138,7 +166,7 @@
   <div class="overlay">
     <div class="drawer">
       <div class="drawer-header">
-        <h2>Historia clinica</h2>
+        <h2>Consulta Médica</h2>
         <button class="close" (click)="cerrarHistoria()">&times;</button>
       </div>
 
@@ -173,5 +201,200 @@
         </form>
       }
     </div>
+  </div>
+}
+
+@if (citaSignos(); as c) {
+  <div class="overlay">
+    <div class="drawer">
+      <div class="drawer-header">
+        <h2>Signos vitales</h2>
+        <button class="close" (click)="cerrarSignos()">&times;</button>
+      </div>
+
+      <div class="text-muted text-sm">
+        {{ c.paciente_nombre }} &middot; {{ c.doctor_nombre }} &middot; {{ c.fecha | date:'dd/MM/yyyy' }}
+      </div>
+
+      @if (cargandoSignos()) {
+        <div class="empty-state">Cargando...</div>
+      } @else {
+        <form [formGroup]="signosForm" (ngSubmit)="guardarSignos()" class="mt-16">
+          <div class="form-group">
+            <label>Temperatura (°C)</label>
+            <input class="input" type="number" step="0.1" formControlName="temperatura" />
+          </div>
+          <div class="form-group mt-16">
+            <label>Peso (kg)</label>
+            <input class="input" type="number" step="0.01" formControlName="peso" />
+          </div>
+          <div class="form-group mt-16">
+            <label>Talla (cm)</label>
+            <input class="input" type="number" step="0.01" formControlName="talla" />
+          </div>
+          @if (estadoImc(); as imc) {
+            <div class="text-sm mt-16">
+              IMC: <strong>{{ imc.valor }}</strong> kg/m² &middot;
+              <span class="badge" [class.badge-green]="imc.clase === 'badge-green'" [class.badge-amber]="imc.clase === 'badge-amber'" [class.badge-red]="imc.clase === 'badge-red'">
+                {{ imc.etiqueta }}
+              </span>
+            </div>
+          }
+          <div class="form-group mt-16">
+            <label>Presion arterial (mmHg) &mdash; Alta / Baja</label>
+            <div class="flex items-center gap-8">
+              <input class="input" type="number" aria-label="Presion arterial alta (sistolica)" formControlName="presion_sistolica" />
+              <span>/</span>
+              <input class="input" type="number" aria-label="Presion arterial baja (diastolica)" formControlName="presion_diastolica" />
+            </div>
+          </div>
+          <div class="form-group mt-16">
+            <label>Glucosa (mg/dL)</label>
+            <input class="input" type="number" step="0.1" formControlName="glucosa" />
+          </div>
+          <div class="form-group mt-16">
+            <label>Glucosa glicosilada / HbA1c (%)</label>
+            <input class="input" type="number" step="0.1" formControlName="glucosa_glicosilada" />
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">{{ signosVitales() ? 'Guardar cambios' : 'Registrar' }}</button>
+            <button type="button" class="btn btn-outline" (click)="cerrarSignos()">Cerrar</button>
+          </div>
+        </form>
+      }
+    </div>
+  </div>
+}
+
+@if (citaReceta(); as c) {
+  <div class="overlay">
+    <div class="drawer">
+      <div class="drawer-header">
+        <h2>Recetas</h2>
+        <button class="close" (click)="cerrarRecetas()">&times;</button>
+      </div>
+
+      <div class="text-muted text-sm">
+        {{ c.paciente_nombre }} &middot; {{ c.doctor_nombre }} &middot; {{ c.fecha | date:'dd/MM/yyyy' }}
+      </div>
+
+      @if (cargandoRecetas()) {
+        <div class="empty-state">Cargando...</div>
+      } @else if (!mostrarFormularioReceta()) {
+        <!-- Lista de recetas de esta cita: puede haber varias -->
+        <div class="form-actions mt-16">
+          <button type="button" class="btn btn-primary" (click)="nuevaReceta()">+ Nueva receta</button>
+        </div>
+
+        @for (r of recetas(); track r.id) {
+          <div class="card mt-16">
+            <div class="flex items-center" style="justify-content: space-between;">
+              <div class="text-muted text-sm">{{ r.created_at | date:'dd/MM/yyyy HH:mm' }}</div>
+              <div class="flex gap-6">
+                <button type="button" class="btn btn-outline btn-sm" (click)="imprimirReceta(r)">Imprimir</button>
+                <button type="button" class="btn btn-outline btn-sm" (click)="editarReceta(r)">Editar</button>
+                <button type="button" class="btn btn-danger btn-sm" (click)="eliminarReceta(r)">Eliminar</button>
+              </div>
+            </div>
+            <ul style="margin:12px 0 0; padding-left:18px;">
+              @for (m of r.medicamentos; track m.id) {
+                <li>
+                  <strong>{{ m.medicamento }}</strong>
+                  @if (m.dosis) { &middot; {{ m.dosis }} }
+                  @if (m.frecuencia) { &middot; {{ m.frecuencia }} }
+                  @if (m.duracion) { &middot; {{ m.duracion }} }
+                </li>
+              }
+            </ul>
+            @if (r.indicaciones_generales) {
+              <div class="text-muted text-sm mt-16">{{ r.indicaciones_generales }}</div>
+            }
+          </div>
+        } @empty {
+          <div class="empty-state">Esta cita todavia no tiene recetas registradas.</div>
+        }
+      } @else {
+        <!-- Formulario para registrar o editar una receta puntual -->
+        <form [formGroup]="recetaForm" (ngSubmit)="guardarReceta()" class="mt-16">
+          <div formArrayName="medicamentos">
+            @for (m of medicamentosArray.controls; track $index; let i = $index) {
+              <div class="card mt-16" [formGroupName]="i">
+                <div class="flex items-center" style="justify-content: space-between;">
+                  <h3 style="margin:0;">Medicamento {{ i + 1 }}</h3>
+                  @if (medicamentosArray.length > 1) {
+                    <button type="button" class="btn btn-outline btn-sm" (click)="quitarMedicamento(i)">Quitar</button>
+                  }
+                </div>
+                <div class="form-group mt-16">
+                  <label>Medicamento *</label>
+                  <input class="input" formControlName="medicamento" />
+                </div>
+                <div class="form-group mt-16">
+                  <label>Dosis</label>
+                  <input class="input" formControlName="dosis" placeholder="ej. 500mg" />
+                </div>
+                <div class="form-group mt-16">
+                  <label>Frecuencia</label>
+                  <input class="input" formControlName="frecuencia" placeholder="ej. Cada 8 horas" />
+                </div>
+                <div class="form-group mt-16">
+                  <label>Duracion</label>
+                  <input class="input" formControlName="duracion" placeholder="ej. 7 dias" />
+                </div>
+                <div class="form-group mt-16">
+                  <label>Indicaciones</label>
+                  <textarea class="input" rows="2" formControlName="indicaciones" placeholder="ej. Tomar con alimentos"></textarea>
+                </div>
+              </div>
+            }
+          </div>
+          <button type="button" class="btn btn-outline mt-16" (click)="agregarMedicamento()">+ Agregar medicamento</button>
+
+          <div class="form-group mt-16">
+            <label>Indicaciones generales</label>
+            <textarea class="input" rows="2" formControlName="indicaciones_generales"></textarea>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary" [disabled]="recetaForm.invalid || recetaForm.pristine">{{ recetaEditando() ? 'Guardar cambios' : 'Registrar receta' }}</button>
+            <button type="button" class="btn btn-outline" (click)="cancelarFormularioReceta()">Cancelar</button>
+          </div>
+        </form>
+      }
+    </div>
+  </div>
+}
+
+@if (recetaParaImprimir(); as r) {
+  <div class="print-receta">
+    <h2>Receta medica</h2>
+    <div>{{ citaReceta()?.doctor_nombre }} &middot; {{ citaReceta()?.especialidad_nombre }}</div>
+    <div>Paciente: {{ citaReceta()?.paciente_nombre }}</div>
+    <div>Fecha: {{ r.created_at | date:'dd/MM/yyyy' }}</div>
+    <table style="width:100%; margin-top:16px; border-collapse: collapse;">
+      <thead>
+        <tr>
+          <th style="text-align:left; border-bottom:1px solid #ccc;">Medicamento</th>
+          <th style="text-align:left; border-bottom:1px solid #ccc;">Dosis</th>
+          <th style="text-align:left; border-bottom:1px solid #ccc;">Frecuencia</th>
+          <th style="text-align:left; border-bottom:1px solid #ccc;">Duracion</th>
+          <th style="text-align:left; border-bottom:1px solid #ccc;">Indicaciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (m of r.medicamentos; track m.id) {
+          <tr>
+            <td>{{ m.medicamento }}</td>
+            <td>{{ m.dosis || '-' }}</td>
+            <td>{{ m.frecuencia || '-' }}</td>
+            <td>{{ m.duracion || '-' }}</td>
+            <td>{{ m.indicaciones || '-' }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+    @if (r.indicaciones_generales) {
+      <div style="margin-top:16px;">Indicaciones generales: {{ r.indicaciones_generales }}</div>
+    }
   </div>
 }

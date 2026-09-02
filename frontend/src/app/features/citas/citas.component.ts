@@ -1,11 +1,12 @@
 import { Component, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormArray, FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { CitasService } from '../../core/services/citas.service';
 import { PacientesService } from '../../core/services/pacientes.service';
 import { DoctoresService } from '../../core/services/doctores.service';
 import { AuthService } from '../../core/services/auth.service';
-import { Cita, Doctor, EstadoCita, HistoriaClinica, Paciente } from '../../core/models/models';
+import { Cita, Doctor, EstadoCita, HistoriaClinica, Paciente, Receta, SignosVitales } from '../../core/models/models';
+import { clasificarImc } from '../../core/utils/imc.util';
 
 @Component({
   selector: 'app-citas',
@@ -21,10 +22,24 @@ export class CitasComponent implements OnInit {
   panelAbierto = signal(false);
   editando = signal<Cita | null>(null);
   errorGuardar = signal<string | null>(null);
+  menuAbiertoId = signal<string | null>(null);
+  menuPos = signal<{ top: number; right: number } | null>(null);
 
   citaHistoria = signal<Cita | null>(null);
   historia = signal<HistoriaClinica | null>(null);
   cargandoHistoria = signal(false);
+
+  citaSignos = signal<Cita | null>(null);
+  signosVitales = signal<SignosVitales | null>(null);
+  cargandoSignos = signal(false);
+
+  // Una cita puede tener varias recetas.
+  citaReceta = signal<Cita | null>(null);
+  recetas = signal<Receta[]>([]);
+  cargandoRecetas = signal(false);
+  recetaEditando = signal<Receta | null>(null); // null = formulario de receta nueva
+  mostrarFormularioReceta = signal(false);
+  recetaParaImprimir = signal<Receta | null>(null);
 
   filtroFecha = signal('');
   filtroPaciente = signal('');
@@ -73,6 +88,21 @@ export class CitasComponent implements OnInit {
     notas: [''],
   });
 
+  signosForm = this.fb.group({
+    temperatura: [null as number | null],
+    peso: [null as number | null],
+    talla: [null as number | null],
+    presion_sistolica: [null as number | null],
+    presion_diastolica: [null as number | null],
+    glucosa: [null as number | null],
+    glucosa_glicosilada: [null as number | null],
+  });
+
+  recetaForm = this.fb.group({
+    indicaciones_generales: [''],
+    medicamentos: this.fb.array([this.crearMedicamentoGroup()]),
+  });
+
   constructor(
     private fb: FormBuilder,
     private srv: CitasService,
@@ -89,9 +119,21 @@ export class CitasComponent implements OnInit {
 
   cargar(): void { this.srv.listar().subscribe((data) => this.citas.set(data)); }
 
+  toggleMenu(event: MouseEvent, id: string): void {
+    if (this.menuAbiertoId() === id) { this.menuAbiertoId.set(null); return; }
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    this.menuPos.set({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+    this.menuAbiertoId.set(id);
+  }
+
   puedeVerHistoria(): boolean {
     const rol = this.auth.usuario()?.rol;
     return this.auth.esSuperAdmin() || rol === 'admin' || rol === 'doctor';
+  }
+
+  puedeRegistrarSignos(): boolean {
+    const rol = this.auth.usuario()?.rol;
+    return this.auth.esSuperAdmin() || rol === 'admin' || rol === 'doctor' || rol === 'recepcionista';
   }
 
   abrirNuevo(): void {
@@ -167,6 +209,144 @@ export class CitasComponent implements OnInit {
       },
       error: (err) => alert(err?.error?.mensaje || 'No se pudo guardar la historia clinica'),
     });
+  }
+
+  abrirSignos(c: Cita): void {
+    this.citaSignos.set(c);
+    this.signosVitales.set(null);
+    this.signosForm.reset();
+    this.cargandoSignos.set(true);
+    this.srv.obtenerSignosVitales(c.id).subscribe({
+      next: (data) => {
+        this.signosVitales.set(data);
+        this.signosForm.reset({ ...data });
+        this.cargandoSignos.set(false);
+      },
+      error: () => this.cargandoSignos.set(false), // 404: todavia no se han tomado
+    });
+  }
+
+  cerrarSignos(): void { this.citaSignos.set(null); }
+
+  // Se recalcula en cada deteccion de cambios mientras se escribe peso/talla,
+  // para mostrar el IMC y su clasificacion antes de guardar (el IMC real se
+  // calcula y persiste en la base de datos; esto es solo la vista previa).
+  estadoImc(): { valor: number; etiqueta: string; clase: string } | null {
+    const peso = Number(this.signosForm.get('peso')?.value);
+    const talla = Number(this.signosForm.get('talla')?.value);
+    if (!peso || !talla) return null;
+
+    const tallaM = talla / 100;
+    const valor = Math.round((peso / (tallaM * tallaM)) * 100) / 100;
+    return { valor, ...clasificarImc(valor) };
+  }
+
+  guardarSignos(): void {
+    const cita = this.citaSignos();
+    if (!cita) return;
+    const data = this.signosForm.getRawValue();
+    const existente = this.signosVitales();
+    const req = existente ? this.srv.actualizarSignosVitales(cita.id, data) : this.srv.crearSignosVitales(cita.id, data);
+    req.subscribe({
+      next: (sv) => {
+        this.signosVitales.set(sv);
+        this.cargar();
+        this.cerrarSignos();
+      },
+      error: (err) => alert(err?.error?.mensaje || 'No se pudieron guardar los signos vitales'),
+    });
+  }
+
+  crearMedicamentoGroup(m?: Partial<{ medicamento: string; dosis: string; frecuencia: string; duracion: string; indicaciones: string }>) {
+    return this.fb.group({
+      medicamento: [m?.medicamento ?? '', Validators.required],
+      dosis: [m?.dosis ?? ''],
+      frecuencia: [m?.frecuencia ?? ''],
+      duracion: [m?.duracion ?? ''],
+      indicaciones: [m?.indicaciones ?? ''],
+    });
+  }
+
+  get medicamentosArray(): FormArray {
+    return this.recetaForm.get('medicamentos') as FormArray;
+  }
+
+  agregarMedicamento(): void {
+    this.medicamentosArray.push(this.crearMedicamentoGroup());
+  }
+
+  quitarMedicamento(i: number): void {
+    if (this.medicamentosArray.length > 1) this.medicamentosArray.removeAt(i);
+  }
+
+  abrirRecetas(c: Cita): void {
+    this.citaReceta.set(c);
+    this.recetas.set([]);
+    this.mostrarFormularioReceta.set(false);
+    this.recetaEditando.set(null);
+    this.recetaParaImprimir.set(null);
+    this.cargandoRecetas.set(true);
+    this.srv.listarRecetas(c.id).subscribe({
+      next: (data) => { this.recetas.set(data); this.cargandoRecetas.set(false); },
+      error: () => this.cargandoRecetas.set(false),
+    });
+  }
+
+  cerrarRecetas(): void { this.citaReceta.set(null); }
+
+  nuevaReceta(): void {
+    this.recetaEditando.set(null);
+    this.recetaForm.reset({ indicaciones_generales: '' });
+    this.medicamentosArray.clear();
+    this.medicamentosArray.push(this.crearMedicamentoGroup());
+    this.mostrarFormularioReceta.set(true);
+  }
+
+  editarReceta(r: Receta): void {
+    this.recetaEditando.set(r);
+    this.recetaForm.reset({ indicaciones_generales: r.indicaciones_generales ?? '' });
+    this.medicamentosArray.clear();
+    r.medicamentos.forEach((m) => this.medicamentosArray.push(this.crearMedicamentoGroup(m as any)));
+    this.mostrarFormularioReceta.set(true);
+  }
+
+  cancelarFormularioReceta(): void {
+    this.mostrarFormularioReceta.set(false);
+    this.recetaEditando.set(null);
+  }
+
+  guardarReceta(): void {
+    const cita = this.citaReceta();
+    if (!cita || this.recetaForm.invalid) return;
+    const data = this.recetaForm.getRawValue();
+    const existente = this.recetaEditando();
+    const req = existente ? this.srv.actualizarReceta(existente.id, data) : this.srv.crearReceta(cita.id, data);
+    req.subscribe({
+      next: () => {
+        this.mostrarFormularioReceta.set(false);
+        this.recetaEditando.set(null);
+        this.abrirRecetas(cita);
+        this.cargar();
+      },
+      error: (err) => alert(err?.error?.mensaje || 'No se pudo guardar la receta'),
+    });
+  }
+
+  eliminarReceta(r: Receta): void {
+    if (!confirm('Eliminar esta receta?')) return;
+    this.srv.eliminarReceta(r.id).subscribe({
+      next: () => {
+        const cita = this.citaReceta();
+        if (cita) this.abrirRecetas(cita);
+        this.cargar();
+      },
+      error: (err) => alert(err?.error?.mensaje || 'No se pudo eliminar la receta'),
+    });
+  }
+
+  imprimirReceta(r: Receta): void {
+    this.recetaParaImprimir.set(r);
+    setTimeout(() => window.print(), 0);
   }
 }
 

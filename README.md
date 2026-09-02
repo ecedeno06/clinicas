@@ -101,4 +101,3 @@ correr ambos proyectos al mismo tiempo en la misma maquina sin choques:
   atendida y registrar su historia clinica) completada sin errores,
   tanto por API como en el navegador (login, seleccion de clinica,
   dashboard, listado de pacientes y citas).
-# clinicas

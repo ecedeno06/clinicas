@@ -5,7 +5,10 @@
    ========================================================= */
 
 :root {
-  /* Paleta */
+  /* Paleta - tematizable (modo claro, por defecto). La sidebar y la pantalla
+     de login NO usan estas variables: son fijas a proposito (ver sus reglas
+     mas abajo), por eso es seguro redefinir esta paleta para el modo oscuro
+     sin afectarlas. */
   --slate-950: #0f172a;
   --slate-900: #141c2e;
   --slate-800: #1c2740;
@@ -16,6 +19,8 @@
   --slate-50:  #f6f8fb;
   --white: #ffffff;
 
+  /* Colores de acento (marca): se mantienen iguales en ambos temas a
+     proposito, no se redefinen en modo oscuro. */
   --teal-600: #0d9488;
   --teal-500: #14b8a6;
   --teal-100: #ccfbf1;
@@ -29,6 +34,18 @@
   --green-600: #16a34a;
   --green-100: #dcfce7;
 
+  /* Fondos "tinte" + texto de acento para badges y botones de peligro.
+     Estos si se redefinen en modo oscuro (fondos translucidos, texto
+     mas brillante) para mantener buen contraste sobre superficies oscuras. */
+  --tint-red-bg: var(--red-100);
+  --tint-green-bg: var(--green-100);
+  --tint-amber-bg: var(--amber-100);
+  --tint-teal-bg: var(--teal-100);
+  --text-on-tint-red: var(--red-600);
+  --text-on-tint-green: var(--green-600);
+  --text-on-tint-amber: var(--amber-500);
+  --text-on-tint-teal: var(--teal-600);
+
   /* Tipografia */
   --font-display: 'Space Grotesk', 'Inter', sans-serif;
   --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -38,6 +55,35 @@
   --radius: 10px;
   --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
   --shadow-md: 0 4px 16px rgba(15, 23, 42, 0.10);
+}
+
+/* ---------- Modo oscuro ---------- */
+/* Solo redefine la paleta neutra (--slate-*, --white) y los tintes de
+   acento; los colores de marca (--teal-*, --red-600, etc.) quedan iguales.
+   La sidebar y el login usan valores fijos (no variables), por lo que no
+   cambian con el tema. */
+[data-theme="dark"] {
+  --slate-950: #f8fafc;
+  --slate-900: #e2e8f0;
+  --slate-800: #cbd5e1;
+  --slate-700: #a8b3c7;
+  --slate-500: #7c879c;
+  --slate-300: #3a4763;
+  --slate-100: #253248;
+  --slate-50:  #0f1729;
+  --white: #141c2e;
+
+  --tint-red-bg: rgba(248, 113, 113, 0.16);
+  --tint-green-bg: rgba(74, 222, 128, 0.16);
+  --tint-amber-bg: rgba(251, 191, 36, 0.16);
+  --tint-teal-bg: rgba(45, 212, 191, 0.16);
+  --text-on-tint-red: #f87171;
+  --text-on-tint-green: #4ade80;
+  --text-on-tint-amber: #fbbf24;
+  --text-on-tint-teal: #5eead4;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.45);
 }
 
 * { box-sizing: border-box; }
@@ -70,7 +116,7 @@ p { margin: 0 0 8px 0; }
 a { color: var(--teal-600); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
-button, input, select, textarea { font-family: inherit; font-size: inherit; }
+button, input, select, textarea { font-family: inherit; font-size: inherit; color: inherit; }
 
 :focus-visible {
   outline: 2px solid var(--teal-500);
@@ -83,10 +129,13 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
   min-height: 100vh;
 }
 
+/* La sidebar es intencionalmente oscura de forma fija (no cambia con el
+   tema claro/oscuro, es parte del look de marca), por eso usa colores
+   literales en vez de las variables tematizables --slate-*. */
 .sidebar {
   width: var(--sidebar-w);
-  background: var(--slate-950);
-  color: var(--slate-300);
+  background: #32436d;
+  color: #cbd5e1;
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
@@ -102,7 +151,7 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
   align-items: center;
   gap: 10px;
   padding: 20px 18px;
-  border-bottom: 1px solid var(--slate-800);
+  border-bottom: 1px solid #1c2740;
 }
 
 .sidebar.collapsed .sidebar-brand {
@@ -133,7 +182,7 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
 }
 .sidebar-brand .subtitle {
   font-size: 11px;
-  color: var(--slate-500);
+  color: #64748b;
 }
 
 .sidebar-nav {
@@ -150,7 +199,7 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
   gap: 10px;
   padding: 9px 12px;
   border-radius: 8px;
-  color: var(--slate-300);
+  color: #cbd5e1;
   font-size: 13.5px;
   font-weight: 500;
   text-decoration: none;
@@ -179,18 +228,18 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
   display: none;
 }
 
-.sidebar-nav a:hover { background: var(--slate-800); color: white; }
+.sidebar-nav a:hover { background: #1c2740; color: white; }
 .sidebar-nav a.active {
-  background: var(--slate-800);
+  background: #1c2740;
   color: white;
   box-shadow: inset 2px 0 0 var(--teal-500);
 }
 
 .sidebar-footer {
   padding: 10px;
-  border-top: 1px solid var(--slate-800);
+  border-top: 1px solid #1c2740;
   font-size: 12px;
-  color: var(--slate-500);
+  color: #64748b;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -205,14 +254,14 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
   border: none;
   border-radius: 8px;
   background: none;
-  color: var(--slate-300);
+  color: #cbd5e1;
   font-size: 12.5px;
   font-weight: 500;
   cursor: pointer;
 }
 
 .sidebar-toggle svg { width: 16px; height: 16px; flex-shrink: 0; }
-.sidebar-toggle:hover { background: var(--slate-900); color: white; }
+.sidebar-toggle:hover { background: #141c2e; color: white; }
 .sidebar.collapsed .sidebar-toggle { justify-content: center; }
 
 .sidebar-footer .footer-text {
@@ -245,7 +294,7 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
 
 .user-pill .avatar {
   width: 30px; height: 30px; border-radius: 50%;
-  background: var(--teal-100); color: var(--teal-600);
+  background: var(--tint-teal-bg); color: var(--text-on-tint-teal);
   display: flex; align-items: center; justify-content: center;
   font-weight: 700; font-size: 12px;
 }
@@ -300,6 +349,26 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
 }
 
 .user-menu { position: relative; }
+.row-menu { position: relative; display: inline-block; }
+
+.btn-icon {
+  background: none;
+  border: 1px solid var(--slate-300);
+  border-radius: var(--radius);
+  width: 32px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--slate-700, #334155);
+  cursor: pointer;
+}
+.btn-icon:hover { background: var(--slate-50); }
+
+.btn-icon-danger { background: var(--white); color: var(--text-on-tint-red); border-color: var(--tint-red-bg); }
+.btn-icon-danger:hover { background: var(--tint-red-bg); }
 
 .user-pill-btn {
   background: none;
@@ -333,7 +402,15 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
   gap: 2px;
 }
 
+/* Variante para menus dentro de contenedores con overflow (ej. tablas con
+   scroll): se posiciona respecto al viewport en vez del ancestro relativo,
+   para no quedar recortada por el overflow del contenedor. */
+.dropdown-menu-fixed { position: fixed; top: auto; }
+
 .dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   background: none;
   border: none;
   text-align: left;
@@ -344,8 +421,8 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
   cursor: pointer;
 }
 .dropdown-item:hover { background: var(--slate-50); }
-.dropdown-item-danger { color: var(--red-600); }
-.dropdown-item-danger:hover { background: var(--red-100); }
+.dropdown-item-danger { color: var(--text-on-tint-red); }
+.dropdown-item-danger:hover { background: var(--tint-red-bg); }
 
 .content {
   padding: 10px;
@@ -401,17 +478,17 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
 }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-.btn-primary { background: var(--slate-950); color: white; }
+.btn-primary { background: var(--slate-950); color: var(--white); }
 .btn-primary:hover { background: var(--slate-800); }
 
 .btn-accent { background: var(--teal-600); color: white; }
 .btn-accent:hover { background: var(--teal-500); }
 
-.btn-outline { background: white; color: var(--slate-900); border-color: var(--slate-300); }
+.btn-outline { background: var(--white); color: var(--slate-900); border-color: var(--slate-300); }
 .btn-outline:hover { background: var(--slate-100); }
 
-.btn-danger { background: var(--white); color: var(--red-600); border-color: var(--red-100); }
-.btn-danger:hover { background: var(--red-100); }
+.btn-danger { background: var(--white); color: var(--text-on-tint-red); border-color: var(--tint-red-bg); }
+.btn-danger:hover { background: var(--tint-red-bg); }
 
 .btn-sm { padding: 5px 10px; font-size: 12.5px; }
 
@@ -429,6 +506,46 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 14px;
   margin-bottom: 20px;
+}
+
+/* ---------- Tabs ---------- */
+.tabs {
+  display: flex;
+  gap: 20px;
+  border-bottom: 1px solid var(--slate-100);
+  margin-bottom: 16px;
+}
+.tab-btn {
+  position: relative;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 8px 4px;
+  margin-bottom: -1px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--slate-500);
+  cursor: pointer;
+}
+.tab-btn:hover { color: var(--slate-900); }
+.tab-btn.active { color: var(--slate-900); border-bottom-color: var(--slate-900); }
+
+.tab-badge {
+  position: absolute;
+  top: -6px;
+  right: -10px;
+  background: var(--green-600);
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
 }
 
 .stat-card {
@@ -507,6 +624,10 @@ table.data-table {
 .data-table tbody tr:last-child td { border-bottom: none; }
 .data-table tbody tr:hover { background: var(--slate-50); }
 
+.data-table tbody tr.row-clickable { cursor: pointer; }
+.data-table tbody tr.row-selected { background: var(--slate-100); }
+.data-table tbody tr.row-selected:hover { background: var(--slate-100); }
+
 .table-actions { display: flex; gap: 6px; justify-content: flex-end; }
 
 .empty-state {
@@ -526,9 +647,9 @@ table.data-table {
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
-.badge-green { background: var(--green-100); color: var(--green-600); }
-.badge-amber { background: var(--amber-100); color: var(--amber-500); }
-.badge-red { background: var(--red-100); color: var(--red-600); }
+.badge-green { background: var(--tint-green-bg); color: var(--text-on-tint-green); }
+.badge-amber { background: var(--tint-amber-bg); color: var(--text-on-tint-amber); }
+.badge-red { background: var(--tint-red-bg); color: var(--text-on-tint-red); }
 .badge-slate { background: var(--slate-100); color: var(--slate-500); }
 
 /* ---------- Formularios ---------- */
@@ -551,8 +672,16 @@ table.data-table {
   width: 100%;
 }
 .input:focus { border-color: var(--teal-500); }
-.input.invalid { border-color: var(--red-600); }
-.error-text { font-size: 11.5px; color: var(--red-600); }
+.input.invalid { border-color: var(--text-on-tint-red); }
+.error-text { font-size: 11.5px; color: var(--text-on-tint-red); }
+
+/* El icono nativo de los inputs type="date"/"time" (calendario/reloj) lo
+   dibuja el navegador y no responde a las variables de color; color-scheme
+   le indica que use la variante clara del icono sobre fondo oscuro. */
+[data-theme="dark"] input.input[type="date"],
+[data-theme="dark"] input.input[type="time"] {
+  color-scheme: dark;
+}
 
 .form-actions { display: flex; gap: 8px; margin-top: 16px; }
 
@@ -582,20 +711,39 @@ table.data-table {
 }
 
 /* ---------- Login ---------- */
+/* Pantalla de login intencionalmente fija (no cambia con el tema
+   claro/oscuro), igual que la sidebar: es parte del look de marca. */
 .auth-screen {
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(circle at top left, var(--slate-900), var(--slate-950));
+  background: radial-gradient(circle at top left, #141c2e, #0f172a);
 }
 .auth-card {
   width: 360px;
-  background: var(--white);
+  background: #ffffff;
+  color: #0f172a;
   border-radius: 14px;
   padding: 32px 28px;
   box-shadow: var(--shadow-md);
 }
+/* Todo lo de adentro de la tarjeta de login se fuerza a los valores de modo
+   claro sin importar el tema activo (mismo criterio que la sidebar): estos
+   elementos usan clases globales (h1, .input, .btn-primary, etc.) que si
+   cambian con el tema en el resto de la app, asi que hay que fijarlos aqui. */
+.auth-card h1, .auth-card h2, .auth-card h3, .auth-card h4 { color: #0f172a; }
+.auth-card .text-muted { color: #64748b; }
+.auth-card .form-group label { color: #2a3654; }
+.auth-card .input {
+  background: #ffffff;
+  color: #0f172a;
+  border-color: #cbd5e1;
+}
+.auth-card .btn-primary { background: #0f172a; color: #ffffff; }
+.auth-card .btn-primary:hover { background: #1c2740; }
+.auth-card .btn-outline { background: #ffffff; color: #141c2e; border-color: #cbd5e1; }
+.auth-card .btn-outline:hover { background: #eef1f6; }
 .auth-logo {
   width: 42px; height: 42px; border-radius: 10px;
   background: linear-gradient(135deg, var(--teal-500), var(--teal-600));
@@ -604,8 +752,24 @@ table.data-table {
   margin-bottom: 14px;
 }
 .auth-error {
-  background: var(--red-100); color: var(--red-600);
+  background: #fee2e2; color: #dc2626;
   padding: 8px 12px; border-radius: 8px; font-size: 12.5px; margin-bottom: 12px;
+}
+
+/* ---------- Impresion de receta ---------- */
+.print-receta { display: none; }
+
+@media print {
+  body * { visibility: hidden; }
+  .print-receta, .print-receta * { visibility: visible; }
+  .print-receta {
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    padding: 24px;
+  }
 }
 
 /* ---------- Utilidades ---------- */

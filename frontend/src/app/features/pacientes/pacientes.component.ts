@@ -2,8 +2,10 @@ import { Component, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { PacientesService } from '../../core/services/pacientes.service';
+import { CitasService } from '../../core/services/citas.service';
 import { AuthService } from '../../core/services/auth.service';
-import { HistoriaClinica, Paciente } from '../../core/models/models';
+import { HistoriaClinica, Paciente, Receta, SignosVitales } from '../../core/models/models';
+import { clasificarImc } from '../../core/utils/imc.util';
 
 @Component({
   selector: 'app-pacientes',
@@ -20,6 +22,15 @@ export class PacientesComponent implements OnInit {
   pacienteHistorial = signal<Paciente | null>(null);
   historial = signal<HistoriaClinica[]>([]);
   cargandoHistorial = signal(false);
+
+  historialSeleccionado = signal<HistoriaClinica | null>(null);
+  tabSeleccionado = signal<'signos' | 'receta'>('signos');
+
+  signosVitalesSeleccionado = signal<SignosVitales | null>(null);
+  cargandoSignosSeleccionado = signal(false);
+
+  recetasSeleccionadas = signal<Receta[]>([]);
+  cargandoRecetaSeleccionada = signal(false);
 
   filtroNombre = signal('');
   filtroIdentificacion = signal('');
@@ -63,7 +74,7 @@ export class PacientesComponent implements OnInit {
     activo: [true],
   });
 
-  constructor(private fb: FormBuilder, private srv: PacientesService, public auth: AuthService) {}
+  constructor(private fb: FormBuilder, private srv: PacientesService, private citasSrv: CitasService, public auth: AuthService) {}
 
   ngOnInit(): void { this.cargar(); }
   cargar(): void { this.srv.listar().subscribe((data) => this.pacientes.set(data)); }
@@ -109,6 +120,9 @@ export class PacientesComponent implements OnInit {
   verHistorial(p: Paciente): void {
     this.pacienteHistorial.set(p);
     this.historial.set([]);
+    this.historialSeleccionado.set(null);
+    this.signosVitalesSeleccionado.set(null);
+    this.recetasSeleccionadas.set([]);
     this.cargandoHistorial.set(true);
     this.srv.historial(p.id).subscribe({
       next: (data) => { this.historial.set(data); this.cargandoHistorial.set(false); },
@@ -117,4 +131,27 @@ export class PacientesComponent implements OnInit {
   }
 
   cerrarHistorial(): void { this.pacienteHistorial.set(null); }
+
+  claseImc(imc: number | null | undefined): { etiqueta: string; clase: string } | null {
+    return imc != null ? clasificarImc(imc) : null;
+  }
+
+  seleccionarHistorial(h: HistoriaClinica): void {
+    this.historialSeleccionado.set(h);
+    this.tabSeleccionado.set('signos');
+
+    this.signosVitalesSeleccionado.set(null);
+    this.cargandoSignosSeleccionado.set(true);
+    this.citasSrv.obtenerSignosVitales(h.cita_id).subscribe({
+      next: (data) => { this.signosVitalesSeleccionado.set(data); this.cargandoSignosSeleccionado.set(false); },
+      error: () => this.cargandoSignosSeleccionado.set(false), // 404: no se registraron signos vitales en esa consulta
+    });
+
+    this.recetasSeleccionadas.set([]);
+    this.cargandoRecetaSeleccionada.set(true);
+    this.citasSrv.listarRecetas(h.cita_id).subscribe({
+      next: (data) => { this.recetasSeleccionadas.set(data); this.cargandoRecetaSeleccionada.set(false); },
+      error: () => this.cargandoRecetaSeleccionada.set(false),
+    });
+  }
 }
