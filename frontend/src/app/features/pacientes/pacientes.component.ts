@@ -29,7 +29,10 @@ export class PacientesComponent implements OnInit {
   cargandoHistorial = signal(false);
 
   historialSeleccionado = signal<HistoriaClinica | null>(null);
-  tabSeleccionado = signal<'signos' | 'receta'>('signos');
+  // Dos grupos de tabs independientes: arriba (lista/antecedentes del
+  // paciente) y abajo (detalle de la consulta seleccionada).
+  tabSuperior = signal<'consultas' | 'antecedentes'>('consultas');
+  tabInferior = signal<'signos' | 'receta'>('signos');
 
   signosVitalesSeleccionado = signal<SignosVitales | null>(null);
   cargandoSignosSeleccionado = signal(false);
@@ -181,6 +184,8 @@ export class PacientesComponent implements OnInit {
     this.pacienteHistorial.set(p);
     this.historial.set([]);
     this.historialSeleccionado.set(null);
+    this.tabSuperior.set('consultas');
+    this.tabInferior.set('signos');
     this.signosVitalesSeleccionado.set(null);
     this.signosVitalesHistorialLista.set([]);
     this.recetasSeleccionadas.set([]);
@@ -233,7 +238,7 @@ export class PacientesComponent implements OnInit {
 
   seleccionarHistorial(h: HistoriaClinica): void {
     this.historialSeleccionado.set(h);
-    this.tabSeleccionado.set('signos');
+    this.tabInferior.set('signos');
 
     this.signosVitalesSeleccionado.set(null);
     this.cargandoSignosSeleccionado.set(true);
@@ -256,6 +261,6 @@ export class PacientesComponent implements OnInit {
   verRecetaDeHistorial(h: HistoriaClinica, event: MouseEvent): void {
     event.stopPropagation();
     this.seleccionarHistorial(h);
-    this.tabSeleccionado.set('receta');
+    this.tabInferior.set('receta');
   }
 }
