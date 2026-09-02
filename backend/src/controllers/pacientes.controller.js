@@ -207,4 +207,28 @@ async function historial(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { listar, obtener, crear, actualizar, eliminar, historial, buscarPorIdentificacion };
+// GET /api/pacientes/:id/signos-vitales-historial -> todos los signos
+// vitales del paciente EN ESTA CLINICA, ordenados cronologicamente. Sirve
+// para calcular tendencias (ej. subio/bajo de peso respecto a la consulta
+// anterior) sin tener que pedir cita por cita.
+async function signosVitalesHistorial(req, res, next) {
+  try {
+    const vinculo = await pool.query(
+      'select 1 from pacientes_empresas where paciente_id = $1 and empresa_id = $2',
+      [req.params.id, req.empresaId]
+    );
+    if (!vinculo.rows[0]) return res.status(404).json({ mensaje: 'Paciente no encontrado' });
+
+    const { rows } = await pool.query(
+      `select sv.*, c.fecha as fecha_cita, c.hora_inicio as hora_cita
+       from signos_vitales sv
+       join citas c on c.id = sv.cita_id
+       where sv.paciente_id = $1 and sv.empresa_id = $2
+       order by c.fecha asc, c.hora_inicio asc`,
+      [req.params.id, req.empresaId]
+    );
+    res.json(rows);
+  } catch (err) { next(err); }
+}
+
+module.exports = { listar, obtener, crear, actualizar, eliminar, historial, buscarPorIdentificacion, signosVitalesHistorial };

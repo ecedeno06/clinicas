@@ -6,6 +6,8 @@ import { CitasService } from '../../core/services/citas.service';
 import { AuthService } from '../../core/services/auth.service';
 import { HistoriaClinica, Paciente, Receta, SignosVitales } from '../../core/models/models';
 import { clasificarImc } from '../../core/utils/imc.util';
+import { clasificarPresion } from '../../core/utils/presion.util';
+import { clasificarGlucosa } from '../../core/utils/glucosa.util';
 
 @Component({
   selector: 'app-pacientes',
@@ -31,6 +33,9 @@ export class PacientesComponent implements OnInit {
 
   signosVitalesSeleccionado = signal<SignosVitales | null>(null);
   cargandoSignosSeleccionado = signal(false);
+  // Historial completo de signos vitales del paciente (asc por fecha), para
+  // calcular tendencias (ej. peso subio/bajo respecto a la consulta anterior).
+  signosVitalesHistorialLista = signal<SignosVitales[]>([]);
 
   recetasSeleccionadas = signal<Receta[]>([]);
   cargandoRecetaSeleccionada = signal(false);
@@ -177,11 +182,16 @@ export class PacientesComponent implements OnInit {
     this.historial.set([]);
     this.historialSeleccionado.set(null);
     this.signosVitalesSeleccionado.set(null);
+    this.signosVitalesHistorialLista.set([]);
     this.recetasSeleccionadas.set([]);
     this.cargandoHistorial.set(true);
     this.srv.historial(p.id).subscribe({
       next: (data) => { this.historial.set(data); this.cargandoHistorial.set(false); },
       error: () => this.cargandoHistorial.set(false),
+    });
+    this.srv.signosVitalesHistorial(p.id).subscribe({
+      next: (data) => this.signosVitalesHistorialLista.set(data),
+      error: () => this.signosVitalesHistorialLista.set([]),
     });
   }
 
@@ -189,6 +199,36 @@ export class PacientesComponent implements OnInit {
 
   claseImc(imc: number | null | undefined): { etiqueta: string; clase: string } | null {
     return imc != null ? clasificarImc(imc) : null;
+  }
+
+  clasePresion(sistolica: number | null | undefined, diastolica: number | null | undefined): { etiqueta: string; clase: string } | null {
+    return sistolica != null && diastolica != null ? clasificarPresion(sistolica, diastolica) : null;
+  }
+
+  // Compara el peso de la consulta seleccionada contra el ultimo registro
+  // ANTERIOR (cronologicamente) que si tenga peso -- puede no ser la
+  // consulta inmediatamente anterior si esa no tenia signos vitales.
+  tendenciaPeso(): 'subio' | 'bajo' | null {
+    const actual = this.signosVitalesSeleccionado();
+    if (actual?.peso == null) return null;
+
+    const lista = this.signosVitalesHistorialLista(); // asc por fecha
+    const idx = lista.findIndex((sv) => sv.id === actual.id);
+    if (idx <= 0) return null;
+
+    for (let i = idx - 1; i >= 0; i--) {
+      const anterior = lista[i].peso;
+      if (anterior != null) {
+        if (actual.peso > anterior) return 'subio';
+        if (actual.peso < anterior) return 'bajo';
+        return null;
+      }
+    }
+    return null;
+  }
+
+  claseGlucosa(glucosa: number | null | undefined): { etiqueta: string; clase: string } | null {
+    return glucosa != null ? clasificarGlucosa(glucosa) : null;
   }
 
   seleccionarHistorial(h: HistoriaClinica): void {

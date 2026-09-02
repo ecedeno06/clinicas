@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { HistoriaClinica, Paciente } from '../models/models';
+import { HistoriaClinica, Paciente, SignosVitales } from '../models/models';
 
 @Injectable({ providedIn: 'root' })
 export class PacientesService {
@@ -15,6 +15,12 @@ export class PacientesService {
   actualizar(id: string, data: any): Observable<Paciente> { return this.http.put<Paciente>(`${this.base}/${id}`, data); }
   eliminar(id: string): Observable<void> { return this.http.delete<void>(`${this.base}/${id}`); }
   historial(id: string): Observable<HistoriaClinica[]> { return this.http.get<HistoriaClinica[]>(`${this.base}/${id}/historial`); }
+
+  // Ordenado cronologicamente (mas antiguo primero), para calcular
+  // tendencias (ej. peso subio/bajo respecto a la consulta anterior).
+  signosVitalesHistorial(id: string): Observable<SignosVitales[]> {
+    return this.http.get<SignosVitales[]>(`${this.base}/${id}/signos-vitales-historial`);
+  }
 
   buscarPorIdentificacion(identificacion: string): Observable<{ existe: boolean; paciente?: Paciente }> {
     return this.http.get<{ existe: boolean; paciente?: Paciente }>(`${this.base}/buscar`, { params: { identificacion } });

@@ -246,11 +246,23 @@
               <input class="input" type="number" aria-label="Presion arterial alta (sistolica)" formControlName="presion_sistolica" />
               <span>/</span>
               <input class="input" type="number" aria-label="Presion arterial baja (diastolica)" formControlName="presion_diastolica" />
+              @if (estadoPresion(); as presion) {
+                <span class="badge" style="white-space:nowrap;" [class.badge-green]="presion.clase === 'badge-green'" [class.badge-amber]="presion.clase === 'badge-amber'" [class.badge-red]="presion.clase === 'badge-red'">
+                  {{ presion.etiqueta }}
+                </span>
+              }
             </div>
           </div>
           <div class="form-group mt-16">
             <label>Glucosa (mg/dL)</label>
-            <input class="input" type="number" step="0.1" formControlName="glucosa" />
+            <div class="flex items-center gap-8">
+              <input class="input" type="number" step="0.1" formControlName="glucosa" />
+              @if (estadoGlucosa(); as glucosa) {
+                <span class="badge" style="white-space:nowrap;" [class.badge-green]="glucosa.clase === 'badge-green'" [class.badge-amber]="glucosa.clase === 'badge-amber'" [class.badge-red]="glucosa.clase === 'badge-red'">
+                  {{ glucosa.etiqueta }}
+                </span>
+              }
+            </div>
           </div>
           <div class="form-group mt-16">
             <label>Glucosa glicosilada / HbA1c (%)</label>

@@ -205,7 +205,19 @@
               @if (signosVitalesSeleccionado(); as sv) {
                 <div class="stats-grid">
                   <div><div class="text-muted text-sm">Temperatura</div><div>{{ sv.temperatura ?? '-' }} °C</div></div>
-                  <div><div class="text-muted text-sm">Peso</div><div>{{ sv.peso ?? '-' }} kg</div></div>
+                  <div>
+                    <div class="text-muted text-sm">Peso</div>
+                    <div>
+                      {{ sv.peso ?? '-' }} kg
+                      @if (tendenciaPeso(); as tendencia) {
+                        @if (tendencia === 'subio') {
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; color:var(--slate-500);" title="Aumento respecto a la consulta anterior"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+                        } @else {
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; color:var(--slate-500);" title="Disminuyo respecto a la consulta anterior"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>
+                        }
+                      }
+                    </div>
+                  </div>
                   <div><div class="text-muted text-sm">Talla</div><div>{{ sv.talla ?? '-' }} cm</div></div>
                   <div>
                     <div class="text-muted text-sm">IMC</div>
@@ -218,8 +230,28 @@
                       }
                     </div>
                   </div>
-                  <div><div class="text-muted text-sm">Presion arterial</div><div>{{ sv.presion_sistolica ?? '-' }} / {{ sv.presion_diastolica ?? '-' }} mmHg</div></div>
-                  <div><div class="text-muted text-sm">Glucosa</div><div>{{ sv.glucosa ?? '-' }} mg/dL</div></div>
+                  <div>
+                    <div class="text-muted text-sm">Presion arterial</div>
+                    <div>
+                      {{ sv.presion_sistolica ?? '-' }} / {{ sv.presion_diastolica ?? '-' }} mmHg
+                      @if (clasePresion(sv.presion_sistolica, sv.presion_diastolica); as presion) {
+                        <span class="badge" [class.badge-green]="presion.clase === 'badge-green'" [class.badge-amber]="presion.clase === 'badge-amber'" [class.badge-red]="presion.clase === 'badge-red'">
+                          {{ presion.etiqueta }}
+                        </span>
+                      }
+                    </div>
+                  </div>
+                  <div>
+                    <div class="text-muted text-sm">Glucosa</div>
+                    <div>
+                      {{ sv.glucosa ?? '-' }} mg/dL
+                      @if (claseGlucosa(sv.glucosa); as glucosa) {
+                        <span class="badge" [class.badge-green]="glucosa.clase === 'badge-green'" [class.badge-amber]="glucosa.clase === 'badge-amber'" [class.badge-red]="glucosa.clase === 'badge-red'">
+                          {{ glucosa.etiqueta }}
+                        </span>
+                      }
+                    </div>
+                  </div>
                   <div><div class="text-muted text-sm">Glucosa glicosilada (HbA1c)</div><div>{{ sv.glucosa_glicosilada ?? '-' }} %</div></div>
                 </div>
               } @else {

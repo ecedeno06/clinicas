@@ -7,6 +7,8 @@ import { DoctoresService } from '../../core/services/doctores.service';
 import { AuthService } from '../../core/services/auth.service';
 import { Cita, Doctor, EstadoCita, HistoriaClinica, Paciente, Receta, SignosVitales } from '../../core/models/models';
 import { clasificarImc } from '../../core/utils/imc.util';
+import { clasificarPresion } from '../../core/utils/presion.util';
+import { clasificarGlucosa } from '../../core/utils/glucosa.util';
 
 @Component({
   selector: 'app-citas',
@@ -239,6 +241,20 @@ export class CitasComponent implements OnInit {
     const tallaM = talla / 100;
     const valor = Math.round((peso / (tallaM * tallaM)) * 100) / 100;
     return { valor, ...clasificarImc(valor) };
+  }
+
+  // Igual que estadoImc(): vista previa en vivo mientras se escribe.
+  estadoPresion(): { etiqueta: string; clase: string } | null {
+    const sistolica = Number(this.signosForm.get('presion_sistolica')?.value);
+    const diastolica = Number(this.signosForm.get('presion_diastolica')?.value);
+    if (!sistolica || !diastolica) return null;
+    return clasificarPresion(sistolica, diastolica);
+  }
+
+  estadoGlucosa(): { etiqueta: string; clase: string } | null {
+    const glucosa = Number(this.signosForm.get('glucosa')?.value);
+    if (!glucosa) return null;
+    return clasificarGlucosa(glucosa);
   }
 
   guardarSignos(): void {
