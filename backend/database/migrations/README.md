@@ -22,7 +22,7 @@ docker run --rm -i -e PGPASSWORD='<password>' postgres:16 \
 | `002_glucosa_glicosilada.sql` | Columna `glucosa_glicosilada` (HbA1c, %) en `signos_vitales` | ✅ Aplicada 2026-09-01 | ✅ Aplicada 2026-09-02 |
 | `003_recetas.sql` | Tablas `recetas` (cabecera) y `receta_medicamentos` (lineas), ligadas a `cita_id` | ✅ Aplicada 2026-09-02 | ✅ Aplicada 2026-09-02 |
 | `004_recetas_multiples.sql` | Quita el `unique` de `recetas.cita_id`: una cita puede tener varias recetas | ✅ Aplicada 2026-09-02 | ✅ Aplicada 2026-09-02 |
-| `005_pacientes_globales.sql` | `pacientes` pasa a ser global (multi-clinica), nueva tabla `pacientes_empresas` | ✅ Aplicada 2026-09-02 | ⬜ Pendiente |
+| `005_pacientes_globales.sql` | `pacientes` pasa a ser global (multi-clinica), nueva tabla `pacientes_empresas` | ✅ Aplicada 2026-09-02 | ✅ Aplicada 2026-09-02 |
 
 **Verificado 2026-09-02**: comparacion completa de esquema (tablas, columnas,
 indices, constraints, funciones, triggers) entre `.19` y Neon — identicos
