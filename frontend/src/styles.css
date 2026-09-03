@@ -369,7 +369,7 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; colo
 
 /* Insignia de "ya tiene registro" sobre un btn-icon de fila (esquina
    inferior derecha). Verde = ya registrado; para laboratorio tambien se
-   usa rojo (pendiente) vs verde (completado). */
+   usa ambar (pendiente) y rojo (cancelado). */
 .icon-check-badge {
   position: absolute;
   bottom: -4px;
@@ -385,6 +385,7 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; colo
 }
 .icon-check-badge svg { width: 8px; height: 8px; }
 .icon-check-badge.badge-check-green { background: var(--green-600); }
+.icon-check-badge.badge-check-amber { background: var(--amber-500); }
 .icon-check-badge.badge-check-red { background: var(--red-600); }
 
 .btn-icon-danger { background: var(--white); color: var(--text-on-tint-red); border-color: var(--tint-red-bg); }
