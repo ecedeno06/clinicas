@@ -694,7 +694,7 @@ table.data-table {
 }
 .drawer {
   background: var(--white);
-  width: 640px;
+  width: 800px;
   max-width: 100%;
   height: 100vh;
   overflow-y: auto;
