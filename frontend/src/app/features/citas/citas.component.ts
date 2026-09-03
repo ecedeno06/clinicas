@@ -26,8 +26,6 @@ export class CitasComponent implements OnInit {
   panelAbierto = signal(false);
   editando = signal<Cita | null>(null);
   errorGuardar = signal<string | null>(null);
-  menuAbiertoId = signal<string | null>(null);
-  menuPos = signal<{ top: number; right: number } | null>(null);
 
   citaHistoria = signal<Cita | null>(null);
   historia = signal<HistoriaClinica | null>(null);
@@ -224,16 +222,16 @@ export class CitasComponent implements OnInit {
 
   cargar(): void { this.srv.listar().subscribe((data) => this.citas.set(data)); }
 
-  toggleMenu(event: MouseEvent, id: string): void {
-    if (this.menuAbiertoId() === id) { this.menuAbiertoId.set(null); return; }
-    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    this.menuPos.set({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
-    this.menuAbiertoId.set(id);
-  }
-
   puedeVerHistoria(): boolean {
     const rol = this.auth.usuario()?.rol;
     return this.auth.esSuperAdmin() || rol === 'admin' || rol === 'doctor';
+  }
+
+  // La cita no se llego a atender: no tiene sentido esperar que aparezca
+  // un registro de signos/consulta/receta, asi que se marca con una X en
+  // vez de dejar el icono en blanco.
+  citaCancelada(c: Cita): boolean {
+    return c.estado === 'cancelada' || c.estado === 'no_asistio';
   }
 
   puedeRegistrarSignos(): boolean {

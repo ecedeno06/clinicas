@@ -349,9 +349,9 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; colo
 }
 
 .user-menu { position: relative; }
-.row-menu { position: relative; display: inline-block; }
 
 .btn-icon {
+  position: relative;
   background: none;
   border: 1px solid var(--slate-300);
   border-radius: var(--radius);
@@ -366,6 +366,26 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; colo
   cursor: pointer;
 }
 .btn-icon:hover { background: var(--slate-50); }
+
+/* Insignia de "ya tiene registro" sobre un btn-icon de fila (esquina
+   inferior derecha). Verde = ya registrado; para laboratorio tambien se
+   usa rojo (pendiente) vs verde (completado). */
+.icon-check-badge {
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--white);
+  color: white;
+}
+.icon-check-badge svg { width: 8px; height: 8px; }
+.icon-check-badge.badge-check-green { background: var(--green-600); }
+.icon-check-badge.badge-check-red { background: var(--red-600); }
 
 .btn-icon-danger { background: var(--white); color: var(--text-on-tint-red); border-color: var(--tint-red-bg); }
 .btn-icon-danger:hover { background: var(--tint-red-bg); }
@@ -407,11 +427,6 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; colo
   flex-direction: column;
   gap: 2px;
 }
-
-/* Variante para menus dentro de contenedores con overflow (ej. tablas con
-   scroll): se posiciona respecto al viewport en vez del ancestro relativo,
-   para no quedar recortada por el overflow del contenedor. */
-.dropdown-menu-fixed { position: fixed; top: auto; }
 
 .dropdown-item {
   display: flex;

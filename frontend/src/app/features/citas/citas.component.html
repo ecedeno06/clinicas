@@ -50,46 +50,56 @@
             </span>
           </td>
           <td class="table-actions">
-            <div class="row-menu">
-              <button type="button" class="btn-icon" (click)="toggleMenu($event, c.id)" aria-label="Mas acciones">&#8942;</button>
-              @if (menuAbiertoId() === c.id) {
-                <div class="dropdown-backdrop" (click)="menuAbiertoId.set(null)"></div>
-                <div class="dropdown-menu dropdown-menu-fixed" [style.top.px]="menuPos()?.top" [style.right.px]="menuPos()?.right">
-                  @if (puedeRegistrarSignos()) {
-                    <button type="button" class="dropdown-item" (click)="menuAbiertoId.set(null); abrirSignos(c)">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg>
-                      <span>Signos vitales @if (c.tiene_signos_vitales) { (✓) }</span>
-                    </button>
-                  }
-                  @if (puedeVerHistoria()) {
-                    <button type="button" class="dropdown-item" (click)="menuAbiertoId.set(null); abrirHistoria(c)">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="12" height="16" rx="2"/><path d="M9 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"/><path d="M9 11h6M9 15h4"/></svg>
-                      <span>Consulta @if (c.tiene_historia) { (✓) }</span>
-                    </button>
-                    <button type="button" class="dropdown-item" (click)="menuAbiertoId.set(null); abrirRecetas(c)">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 20.5 3.5 13.5a5 5 0 0 1 7-7l7 7a5 5 0 0 1-7 7Z"/><path d="m8.5 8.5 7 7"/></svg>
-                      <span>Receta @if (c.tiene_receta) { (✓) }</span>
-                    </button>
-                    <button type="button" class="dropdown-item" (click)="menuAbiertoId.set(null); abrirLaboratorio(c)">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2v6L4 20a1 1 0 0 0 1 2h14a1 1 0 0 0 1-2L15 8V2"/><path d="M9 2h6"/><path d="M8.5 15h7"/></svg>
-                      <span>Laboratorio @if (c.tiene_laboratorio) { (✓) }</span>
-                    </button>
-                  }
-                  @if (auth.puedeEditar()) {
-                    <button type="button" class="dropdown-item" (click)="menuAbiertoId.set(null); abrirEditar(c)">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
-                      <span>Editar</span>
-                    </button>
-                  }
-                  @if (auth.puedeEliminar()) {
-                    <button type="button" class="dropdown-item dropdown-item-danger" (click)="menuAbiertoId.set(null); eliminar(c)">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
-                      <span>Eliminar</span>
-                    </button>
-                  }
-                </div>
-              }
-            </div>
+            @if (puedeRegistrarSignos()) {
+              <button type="button" class="btn-icon" title="Signos vitales" aria-label="Signos vitales" (click)="abrirSignos(c)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg>
+                @if (c.tiene_signos_vitales) {
+                  <span class="icon-check-badge badge-check-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+                } @else if (citaCancelada(c)) {
+                  <span class="icon-check-badge badge-check-red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></span>
+                }
+              </button>
+            }
+            @if (puedeVerHistoria()) {
+              <button type="button" class="btn-icon" title="Consulta" aria-label="Consulta" (click)="abrirHistoria(c)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="12" height="16" rx="2"/><path d="M9 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"/><path d="M9 11h6M9 15h4"/></svg>
+                @if (c.tiene_historia) {
+                  <span class="icon-check-badge badge-check-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+                } @else if (citaCancelada(c)) {
+                  <span class="icon-check-badge badge-check-red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></span>
+                }
+              </button>
+              <button type="button" class="btn-icon" title="Receta" aria-label="Receta" (click)="abrirRecetas(c)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 20.5 3.5 13.5a5 5 0 0 1 7-7l7 7a5 5 0 0 1-7 7Z"/><path d="m8.5 8.5 7 7"/></svg>
+                @if (c.tiene_receta) {
+                  <span class="icon-check-badge badge-check-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+                } @else if (citaCancelada(c)) {
+                  <span class="icon-check-badge badge-check-red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></span>
+                }
+              </button>
+              <button type="button" class="btn-icon" [title]="c.tiene_laboratorio ? ('Laboratorio (' + c.estado_laboratorio + ')') : 'Laboratorio'" aria-label="Laboratorio" (click)="abrirLaboratorio(c)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2v6L4 20a1 1 0 0 0 1 2h14a1 1 0 0 0 1-2L15 8V2"/><path d="M9 2h6"/><path d="M8.5 15h7"/></svg>
+                @if (c.estado_laboratorio === 'completada') {
+                  <span class="icon-check-badge badge-check-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+                } @else if (c.estado_laboratorio === 'pendiente') {
+                  <span class="icon-check-badge badge-check-red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+                } @else if (c.estado_laboratorio === 'cancelada') {
+                  <span class="icon-check-badge badge-check-red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></span>
+                } @else if (citaCancelada(c)) {
+                  <span class="icon-check-badge badge-check-red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></span>
+                }
+              </button>
+            }
+            @if (auth.puedeEditar()) {
+              <button type="button" class="btn-icon" title="Editar" aria-label="Editar" (click)="abrirEditar(c)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+              </button>
+            }
+            @if (auth.puedeEliminar()) {
+              <button type="button" class="btn-icon btn-icon-danger" title="Eliminar" aria-label="Eliminar" (click)="eliminar(c)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+              </button>
+            }
           </td>
         </tr>
       } @empty {

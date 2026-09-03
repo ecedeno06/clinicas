@@ -137,6 +137,7 @@ export interface Cita {
   tiene_signos_vitales?: boolean;
   tiene_receta?: boolean;
   tiene_laboratorio?: boolean;
+  estado_laboratorio?: EstadoLaboratorio | null;
   created_at?: string;
 }
 
