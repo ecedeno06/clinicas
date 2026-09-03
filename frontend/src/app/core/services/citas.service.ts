@@ -2,12 +2,13 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { Cita, HistoriaClinica, Receta, SignosVitales } from '../models/models';
+import { Cita, HistoriaClinica, LaboratorioPendiente, OrdenLaboratorio, Receta, SignosVitales } from '../models/models';
 
 @Injectable({ providedIn: 'root' })
 export class CitasService {
   private base = `${environment.apiUrl}/citas`;
   private baseRecetas = `${environment.apiUrl}/recetas`;
+  private baseLaboratorio = `${environment.apiUrl}/laboratorio`;
   constructor(private http: HttpClient) {}
 
   listar(filtros: Record<string, string> = {}): Observable<Cita[]> {
@@ -51,5 +52,23 @@ export class CitasService {
   }
   eliminarReceta(recetaId: string): Observable<void> {
     return this.http.delete<void>(`${this.baseRecetas}/${recetaId}`);
+  }
+
+  // Una cita puede tener varias ordenes de laboratorio.
+  listarLaboratorio(citaId: string): Observable<OrdenLaboratorio[]> {
+    return this.http.get<OrdenLaboratorio[]>(`${this.base}/${citaId}/laboratorio`);
+  }
+  crearLaboratorio(citaId: string, data: any): Observable<OrdenLaboratorio> {
+    return this.http.post<OrdenLaboratorio>(`${this.base}/${citaId}/laboratorio`, data);
+  }
+  actualizarLaboratorio(ordenId: string, data: any): Observable<OrdenLaboratorio> {
+    return this.http.put<OrdenLaboratorio>(`${this.baseLaboratorio}/${ordenId}`, data);
+  }
+  eliminarLaboratorio(ordenId: string): Observable<void> {
+    return this.http.delete<void>(`${this.baseLaboratorio}/${ordenId}`);
+  }
+
+  listarLaboratorioPendientes(): Observable<LaboratorioPendiente[]> {
+    return this.http.get<LaboratorioPendiente[]>(`${this.baseLaboratorio}/pendientes`);
   }
 }

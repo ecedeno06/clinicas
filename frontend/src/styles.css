@@ -370,6 +370,12 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; colo
 .btn-icon-danger { background: var(--white); color: var(--text-on-tint-red); border-color: var(--tint-red-bg); }
 .btn-icon-danger:hover { background: var(--tint-red-bg); }
 
+.btn-icon-amber { background: var(--tint-amber-bg); color: var(--text-on-tint-amber); border-color: var(--tint-amber-bg); }
+.btn-icon-amber:hover { filter: brightness(0.96); }
+
+.btn-icon-green { background: var(--tint-green-bg); color: var(--text-on-tint-green); border-color: var(--tint-green-bg); }
+.btn-icon-green:hover { filter: brightness(0.96); }
+
 .user-pill-btn {
   background: none;
   border: none;
@@ -556,6 +562,15 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; colo
 }
 .stat-card .label { font-size: 12px; color: var(--slate-500); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
 .stat-card .value { font-family: var(--font-display); font-size: 26px; font-weight: 700; color: var(--slate-950); margin-top: 4px; }
+
+.stat-card-clickable {
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  font: inherit;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+.stat-card-clickable:hover { border-color: var(--teal-500); box-shadow: var(--shadow-sm); }
 
 /* ---------- Tablas ---------- */
 .table-wrap {

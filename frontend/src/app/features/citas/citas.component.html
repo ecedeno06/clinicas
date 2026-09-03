@@ -70,6 +70,10 @@
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 20.5 3.5 13.5a5 5 0 0 1 7-7l7 7a5 5 0 0 1-7 7Z"/><path d="m8.5 8.5 7 7"/></svg>
                       <span>Receta @if (c.tiene_receta) { (✓) }</span>
                     </button>
+                    <button type="button" class="dropdown-item" (click)="menuAbiertoId.set(null); abrirLaboratorio(c)">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2v6L4 20a1 1 0 0 0 1 2h14a1 1 0 0 0 1-2L15 8V2"/><path d="M9 2h6"/><path d="M8.5 15h7"/></svg>
+                      <span>Laboratorio @if (c.tiene_laboratorio) { (✓) }</span>
+                    </button>
                   }
                   @if (auth.puedeEditar()) {
                     <button type="button" class="dropdown-item" (click)="menuAbiertoId.set(null); abrirEditar(c)">
@@ -432,6 +436,124 @@
           <div class="form-actions">
             <button type="submit" class="btn btn-primary" [disabled]="recetaForm.invalid || recetaForm.pristine">{{ recetaEditando() ? 'Guardar cambios' : 'Registrar receta' }}</button>
             <button type="button" class="btn btn-outline" (click)="cancelarFormularioReceta()">Cancelar</button>
+          </div>
+        </form>
+      }
+    </div>
+  </div>
+}
+
+@if (citaLaboratorio(); as c) {
+  <div class="overlay">
+    <div class="drawer">
+      <div class="drawer-header">
+        <h2>Laboratorio</h2>
+        <button class="close" (click)="cerrarLaboratorio()">&times;</button>
+      </div>
+
+      <div class="text-muted text-sm">
+        {{ c.paciente_nombre }} &middot; {{ c.doctor_nombre }} &middot; {{ c.fecha | date:'dd/MM/yyyy' }}
+      </div>
+
+      @if (cargandoLaboratorio()) {
+        <div class="empty-state">Cargando...</div>
+      } @else if (!mostrarFormularioLaboratorio()) {
+        <!-- Lista de ordenes de laboratorio de esta cita: puede haber varias -->
+        <div class="form-actions mt-16">
+          <button type="button" class="btn btn-primary" (click)="nuevaOrdenLaboratorio()">+ Nueva orden</button>
+        </div>
+
+        @for (o of ordenesLaboratorio(); track o.id) {
+          <div class="card mt-16">
+            <div class="flex items-center" style="justify-content: space-between;">
+              <div class="flex items-center gap-12">
+                <div class="text-muted text-sm">{{ o.created_at | date:'dd/MM/yyyy HH:mm' }}</div>
+                <span class="badge"
+                  [class.badge-slate]="o.estado === 'pendiente'"
+                  [class.badge-green]="o.estado === 'completada'"
+                  [class.badge-red]="o.estado === 'cancelada'">
+                  {{ o.estado }}
+                </span>
+              </div>
+              <div class="flex gap-6">
+                <button type="button" class="btn btn-outline btn-sm" (click)="editarOrdenLaboratorio(o)">Editar</button>
+                <button type="button" class="btn btn-danger btn-sm" (click)="eliminarOrdenLaboratorio(o)">Eliminar</button>
+              </div>
+            </div>
+            <div class="table-wrap mt-16">
+              <table class="data-table">
+                <thead><tr><th>Examen</th><th>Valor de referencia</th><th>Resultado</th><th>Unidad</th></tr></thead>
+                <tbody>
+                  @for (e of o.examenes; track e.id) {
+                    <tr>
+                      <td>{{ e.nombre_examen }}</td>
+                      <td>{{ e.valor_referencia || '-' }}</td>
+                      <td>{{ e.resultado || '-' }}</td>
+                      <td>{{ e.unidad || '-' }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+            @if (o.observaciones) {
+              <div class="text-muted text-sm mt-16">{{ o.observaciones }}</div>
+            }
+          </div>
+        } @empty {
+          <div class="empty-state">Esta cita todavia no tiene ordenes de laboratorio.</div>
+        }
+      } @else {
+        <!-- Formulario para registrar o editar una orden puntual -->
+        <form [formGroup]="laboratorioForm" (ngSubmit)="guardarOrdenLaboratorio()" class="mt-16">
+          <div formArrayName="examenes">
+            @for (e of examenesArray.controls; track $index; let i = $index) {
+              <div class="card mt-16" [formGroupName]="i">
+                <div class="flex items-center" style="justify-content: space-between;">
+                  <h3 style="margin:0;">Examen {{ i + 1 }}</h3>
+                  @if (examenesArray.length > 1) {
+                    <button type="button" class="btn btn-outline btn-sm" (click)="quitarExamen(i)">Quitar</button>
+                  }
+                </div>
+                <div class="form-group mt-16">
+                  <label>Examen *</label>
+                  <input class="input" formControlName="nombre_examen" placeholder="ej. Glucosa en ayunas" />
+                </div>
+                <div class="form-group mt-16">
+                  <label>Valor de referencia</label>
+                  <input class="input" formControlName="valor_referencia" placeholder="ej. 70-100 mg/dL" />
+                </div>
+                <div class="flex gap-12 mt-16">
+                  <div class="form-group" style="flex: 1;">
+                    <label>Resultado</label>
+                    <input class="input" formControlName="resultado" placeholder="ej. 92" />
+                  </div>
+                  <div class="form-group" style="flex: 1;">
+                    <label>Unidad</label>
+                    <input class="input" formControlName="unidad" placeholder="ej. mg/dL" />
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+          <button type="button" class="btn btn-outline mt-16" (click)="agregarExamen()">+ Agregar examen</button>
+
+          <div class="form-group mt-16">
+            <label>Estado</label>
+            <select class="input" formControlName="estado">
+              <option value="pendiente">Pendiente</option>
+              <option value="completada">Completada</option>
+              <option value="cancelada">Cancelada</option>
+            </select>
+          </div>
+
+          <div class="form-group mt-16">
+            <label>Observaciones</label>
+            <textarea class="input" rows="2" formControlName="observaciones"></textarea>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary" [disabled]="laboratorioForm.invalid || laboratorioForm.pristine">{{ laboratorioEditando() ? 'Guardar cambios' : 'Registrar orden' }}</button>
+            <button type="button" class="btn btn-outline" (click)="cancelarFormularioLaboratorio()">Cancelar</button>
           </div>
         </form>
       }

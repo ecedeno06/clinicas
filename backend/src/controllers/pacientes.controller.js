@@ -183,7 +183,10 @@ async function eliminar(req, res, next) {
   } catch (err) { next(err); }
 }
 
-// GET /api/pacientes/:id/historial  -> historias clinicas del paciente EN ESTA CLINICA
+// GET /api/pacientes/:id/historial  -> citas del paciente EN ESTA CLINICA, con su
+// historia clinica si ya se registro (puede no existir todavia: signos vitales,
+// recetas y ordenes de laboratorio se pueden cargar antes de que el doctor
+// escriba la consulta, y la cita no debe desaparecer de esta lista por eso).
 async function historial(req, res, next) {
   try {
     const vinculo = await pool.query(
@@ -193,13 +196,21 @@ async function historial(req, res, next) {
     if (!vinculo.rows[0]) return res.status(404).json({ mensaje: 'Paciente no encontrado' });
 
     const { rows } = await pool.query(
-      `select hc.*, c.fecha as fecha_cita, c.hora_inicio as hora_cita, d.nombre as doctor_nombre, e.nombre as especialidad_nombre,
-              exists(select 1 from recetas r where r.cita_id = hc.cita_id) as tiene_receta
-       from historias_clinicas hc
-       join citas c on c.id = hc.cita_id
-       join doctores d on d.id = hc.doctor_id
+      `select coalesce(hc.id, c.id) as id, c.id as cita_id, c.empresa_id, c.paciente_id, c.doctor_id,
+              hc.motivo_consulta, hc.diagnostico, hc.tratamiento, hc.notas, hc.created_at,
+              c.fecha as fecha_cita, c.hora_inicio as hora_cita, d.nombre as doctor_nombre, e.nombre as especialidad_nombre,
+              exists(select 1 from recetas r where r.cita_id = c.id) as tiene_receta,
+              exists(select 1 from ordenes_laboratorio ol where ol.cita_id = c.id) as tiene_laboratorio,
+              (case
+                when exists(select 1 from ordenes_laboratorio ol where ol.cita_id = c.id and ol.estado = 'pendiente') then 'pendiente'
+                when exists(select 1 from ordenes_laboratorio ol where ol.cita_id = c.id and ol.estado = 'completada') then 'completada'
+                when exists(select 1 from ordenes_laboratorio ol where ol.cita_id = c.id and ol.estado = 'cancelada') then 'cancelada'
+              end) as estado_laboratorio
+       from citas c
+       join doctores d on d.id = c.doctor_id
        join especialidades e on e.id = d.especialidad_id
-       where hc.paciente_id = $1 and hc.empresa_id = $2
+       left join historias_clinicas hc on hc.cita_id = c.id
+       where c.paciente_id = $1 and c.empresa_id = $2
        order by c.fecha desc, c.hora_inicio desc`,
       [req.params.id, req.empresaId]
     );

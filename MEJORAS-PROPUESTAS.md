@@ -22,11 +22,18 @@ Ya implementado (ver `backend/database/schema.sql` y `backend/src/routes/`):
 - Recetas por cita (`recetas` + `receta_medicamentos`): N medicamentos por receta
   (medicamento, dosis, frecuencia, duracion, indicaciones), impresion via `window.print()`
   (el navegador permite "Guardar como PDF" sin agregar ninguna libreria).
+- Laboratorio por cita (`ordenes_laboratorio` + `orden_laboratorio_examenes`): N examenes
+  por orden (nombre, valor de referencia, resultado, unidad), estado (pendiente/completada/
+  cancelada), mas un card de "Laboratorios pendientes" en el tablero. Ver
+  [LABORATORIO.md](LABORATORIO.md). Certificado en `.19` y promovido a Neon.
+- Horario semanal por doctor (`doctor_horarios`) + disponibilidad calculada al agendar una
+  cita (franjas libres como chips, bloqueo de Guardar si no hay disponibilidad configurada).
 
-No implementado todavia (lo que cubre este documento): laboratorio, imagenes, facturacion,
+No implementado todavia (lo que cubre este documento): imagenes medicas, facturacion,
 hospitalizacion, inventario, MFA, auditoria, reportes/dashboard, portal de paciente,
 notificaciones, telemedicina, y varios campos clinicos mas ricos (examen fisico,
-antecedentes, alergias estructuradas, medicamentos actuales, evoluciones).
+antecedentes estructurados — ver diseno en DISENO-CATALOGO-ANTECEDENTES.md, medicamentos
+actuales, evoluciones).
 
 ---
 
@@ -36,7 +43,7 @@ antecedentes, alergias estructuradas, medicamentos actuales, evoluciones).
 |---|---|---|
 | Historia clinica (ampliada) | ~~Signos vitales~~ (implementado), examen fisico, antecedentes, alergias estructuradas, medicamentos actuales, evoluciones | Alta |
 | ~~Recetas~~ | ~~Medicamentos, dosis, frecuencia, duracion, indicaciones, impresion en PDF~~ (implementado) | Alta |
-| Laboratorio | Ordenes, resultados, archivos adjuntos, valores de referencia | Media |
+| ~~Laboratorio~~ | ~~Ordenes, resultados, valores de referencia~~ (implementado y en produccion; archivos adjuntos sigue pendiente) | Media |
 | Imagenes medicas | Ordenes, informes, archivos asociados | Media |
 | Facturacion | Servicios, consultas, facturas, pagos, saldos, copagos, seguros | Media |
 | Hospitalizacion | Habitaciones, camas, admisiones, altas, evolucion durante internamiento | Baja (solo si aplica al negocio) |
@@ -178,13 +185,14 @@ necesidad concreta.
 
 ## 7. Orden sugerido de implementacion
 
-1. Ampliar historia clinica: primero signos vitales (temperatura, peso, talla/IMC,
-   presion arterial, glucosa — tabla nueva, esfuerzo bajo, se toma en toda atencion),
-   luego examen fisico, antecedentes y evolucion.
-2. Recetas (modulo pequeno, alto valor, reusa el patron de `historias_clinicas`).
-3. Reportes/Dashboard basico (aprovecha los datos que ya existen, no requiere nuevas tablas).
-4. RBAC mas granular + auditoria (antes de agregar modulos con datos mas sensibles como
-   facturacion o laboratorio).
-5. Laboratorio e imagenes (requieren storage de archivos).
+1. ~~Ampliar historia clinica: signos vitales~~ (implementado) — sigue pendiente examen
+   fisico, antecedentes estructurados (diseno listo, ver DISENO-CATALOGO-ANTECEDENTES.md)
+   y evolucion.
+2. ~~Recetas~~ (implementado).
+3. ~~Laboratorio~~ (implementado y en produccion, sin archivos adjuntos; imagenes medicas
+   si requiere storage de archivos y sigue sin implementar).
+4. Reportes/Dashboard basico (aprovecha los datos que ya existen, no requiere nuevas tablas).
+5. RBAC mas granular + auditoria (antes de agregar modulos con datos mas sensibles como
+   facturacion).
 6. Facturacion (requiere definir reglas de negocio: servicios, precios, seguros).
 7. Hospitalizacion / inventario, solo si el modelo de negocio de la clinica los necesita.

@@ -4,7 +4,7 @@ import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angu
 import { PacientesService } from '../../core/services/pacientes.service';
 import { CitasService } from '../../core/services/citas.service';
 import { AuthService } from '../../core/services/auth.service';
-import { HistoriaClinica, Paciente, Receta, SignosVitales } from '../../core/models/models';
+import { HistoriaClinica, OrdenLaboratorio, Paciente, Receta, SignosVitales } from '../../core/models/models';
 import { clasificarImc } from '../../core/utils/imc.util';
 import { clasificarPresion } from '../../core/utils/presion.util';
 import { clasificarGlucosa } from '../../core/utils/glucosa.util';
@@ -32,7 +32,7 @@ export class PacientesComponent implements OnInit {
   // Dos grupos de tabs independientes: arriba (lista/antecedentes del
   // paciente) y abajo (detalle de la consulta seleccionada).
   tabSuperior = signal<'consultas' | 'antecedentes'>('consultas');
-  tabInferior = signal<'signos' | 'receta'>('signos');
+  tabInferior = signal<'signos' | 'receta' | 'laboratorio'>('signos');
 
   signosVitalesSeleccionado = signal<SignosVitales | null>(null);
   cargandoSignosSeleccionado = signal(false);
@@ -42,6 +42,9 @@ export class PacientesComponent implements OnInit {
 
   recetasSeleccionadas = signal<Receta[]>([]);
   cargandoRecetaSeleccionada = signal(false);
+
+  ordenesLaboratorioSeleccionadas = signal<OrdenLaboratorio[]>([]);
+  cargandoLaboratorioSeleccionado = signal(false);
 
   filtroNombre = signal('');
   filtroIdentificacion = signal('');
@@ -189,6 +192,7 @@ export class PacientesComponent implements OnInit {
     this.signosVitalesSeleccionado.set(null);
     this.signosVitalesHistorialLista.set([]);
     this.recetasSeleccionadas.set([]);
+    this.ordenesLaboratorioSeleccionadas.set([]);
     this.cargandoHistorial.set(true);
     this.srv.historial(p.id).subscribe({
       next: (data) => { this.historial.set(data); this.cargandoHistorial.set(false); },
@@ -253,6 +257,13 @@ export class PacientesComponent implements OnInit {
       next: (data) => { this.recetasSeleccionadas.set(data); this.cargandoRecetaSeleccionada.set(false); },
       error: () => this.cargandoRecetaSeleccionada.set(false),
     });
+
+    this.ordenesLaboratorioSeleccionadas.set([]);
+    this.cargandoLaboratorioSeleccionado.set(true);
+    this.citasSrv.listarLaboratorio(h.cita_id).subscribe({
+      next: (data) => { this.ordenesLaboratorioSeleccionadas.set(data); this.cargandoLaboratorioSeleccionado.set(false); },
+      error: () => this.cargandoLaboratorioSeleccionado.set(false),
+    });
   }
 
   // Selecciona la fila y salta directo al tab "Receta", sin pasar por
@@ -262,5 +273,12 @@ export class PacientesComponent implements OnInit {
     event.stopPropagation();
     this.seleccionarHistorial(h);
     this.tabInferior.set('receta');
+  }
+
+  // Igual que verRecetaDeHistorial, pero para el tab "Laboratorio".
+  verLaboratorioDeHistorial(h: HistoriaClinica, event: MouseEvent): void {
+    event.stopPropagation();
+    this.seleccionarHistorial(h);
+    this.tabInferior.set('laboratorio');
   }
 }

@@ -3,6 +3,7 @@ const ctrl = require('../controllers/citas.controller');
 const historiaCtrl = require('../controllers/historiasClinicas.controller');
 const signosVitalesCtrl = require('../controllers/signosVitales.controller');
 const recetasCtrl = require('../controllers/recetas.controller');
+const laboratorioCtrl = require('../controllers/laboratorio.controller');
 const { requireAuth, requireEmpresa, requireRol } = require('../middleware/auth');
 
 router.use(requireAuth, requireEmpresa);
@@ -28,5 +29,10 @@ router.put('/:citaId/signos-vitales', requireRol('admin', 'doctor', 'recepcionis
 // la historia clinica). Una cita puede tener varias recetas.
 router.get('/:citaId/recetas', requireRol('admin', 'doctor'), recetasCtrl.listarPorCita);
 router.post('/:citaId/recetas', requireRol('admin', 'doctor'), recetasCtrl.crear);
+
+// Ordenes de laboratorio de una cita puntual: confidencial, solo admin y
+// doctor (igual que recetas). Una cita puede tener varias ordenes.
+router.get('/:citaId/laboratorio', requireRol('admin', 'doctor'), laboratorioCtrl.listarPorCita);
+router.post('/:citaId/laboratorio', requireRol('admin', 'doctor'), laboratorioCtrl.crear);
 
 module.exports = router;

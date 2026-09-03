@@ -20,6 +20,7 @@ async function listar(req, res, next) {
               (hc.id is not null) as tiene_historia,
               (sv.id is not null) as tiene_signos_vitales,
               exists(select 1 from recetas r where r.cita_id = c.id) as tiene_receta,
+              exists(select 1 from ordenes_laboratorio ol where ol.cita_id = c.id) as tiene_laboratorio,
               (case when p.fecha_nacimiento is not null then date_part('year', age(c.fecha, p.fecha_nacimiento))::int end) as paciente_edad
        from citas c
        join pacientes p on p.id = c.paciente_id

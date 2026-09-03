@@ -1,11 +1,12 @@
 import { Component, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormArray, FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { CitasService } from '../../core/services/citas.service';
 import { PacientesService } from '../../core/services/pacientes.service';
 import { DoctoresService } from '../../core/services/doctores.service';
 import { AuthService } from '../../core/services/auth.service';
-import { Cita, Disponibilidad, Doctor, EstadoCita, FranjaHoraria, HistoriaClinica, Paciente, Receta, SignosVitales } from '../../core/models/models';
+import { Cita, Disponibilidad, Doctor, EstadoCita, EstadoLaboratorio, FranjaHoraria, HistoriaClinica, OrdenLaboratorio, Paciente, Receta, SignosVitales } from '../../core/models/models';
 import { clasificarImc } from '../../core/utils/imc.util';
 import { clasificarPresion } from '../../core/utils/presion.util';
 import { clasificarGlucosa } from '../../core/utils/glucosa.util';
@@ -43,6 +44,13 @@ export class CitasComponent implements OnInit {
   recetaEditando = signal<Receta | null>(null); // null = formulario de receta nueva
   mostrarFormularioReceta = signal(false);
   recetaParaImprimir = signal<Receta | null>(null);
+
+  // Una cita puede tener varias ordenes de laboratorio.
+  citaLaboratorio = signal<Cita | null>(null);
+  ordenesLaboratorio = signal<OrdenLaboratorio[]>([]);
+  cargandoLaboratorio = signal(false);
+  laboratorioEditando = signal<OrdenLaboratorio | null>(null); // null = formulario de orden nueva
+  mostrarFormularioLaboratorio = signal(false);
 
   // Disponibilidad del doctor seleccionado para la fecha del formulario:
   // se recalcula al cambiar doctor_id o fecha, y clicar una franja libre
@@ -112,11 +120,18 @@ export class CitasComponent implements OnInit {
     medicamentos: this.fb.array([this.crearMedicamentoGroup()]),
   });
 
+  laboratorioForm = this.fb.group({
+    estado: ['pendiente' as EstadoLaboratorio],
+    observaciones: [''],
+    examenes: this.fb.array([this.crearExamenGroup()]),
+  });
+
   constructor(
     private fb: FormBuilder,
     private srv: CitasService,
     private pacientesSrv: PacientesService,
     private doctoresSrv: DoctoresService,
+    private route: ActivatedRoute,
     public auth: AuthService
   ) {}
 
@@ -127,6 +142,12 @@ export class CitasComponent implements OnInit {
 
     this.form.get('doctor_id')!.valueChanges.subscribe(() => this.actualizarDisponibilidad());
     this.form.get('fecha')!.valueChanges.subscribe(() => this.actualizarDisponibilidad());
+
+    // Llegar aqui desde otra pantalla (ej. "Laboratorios pendientes" del
+    // tablero) puede traer ?fecha=dd/mm/aaaa&paciente=... para prefiltrar.
+    const params = this.route.snapshot.queryParamMap;
+    if (params.get('fecha')) this.filtroFecha.set(params.get('fecha')!);
+    if (params.get('paciente')) this.filtroPaciente.set(params.get('paciente')!);
   }
 
   actualizarDisponibilidad(): void {
@@ -445,6 +466,91 @@ export class CitasComponent implements OnInit {
   imprimirReceta(r: Receta): void {
     this.recetaParaImprimir.set(r);
     setTimeout(() => window.print(), 0);
+  }
+
+  crearExamenGroup(e?: Partial<{ nombre_examen: string; valor_referencia: string; resultado: string; unidad: string }>) {
+    return this.fb.group({
+      nombre_examen: [e?.nombre_examen ?? '', Validators.required],
+      valor_referencia: [e?.valor_referencia ?? ''],
+      resultado: [e?.resultado ?? ''],
+      unidad: [e?.unidad ?? ''],
+    });
+  }
+
+  get examenesArray(): FormArray {
+    return this.laboratorioForm.get('examenes') as FormArray;
+  }
+
+  agregarExamen(): void {
+    this.examenesArray.push(this.crearExamenGroup());
+  }
+
+  quitarExamen(i: number): void {
+    if (this.examenesArray.length > 1) this.examenesArray.removeAt(i);
+  }
+
+  abrirLaboratorio(c: Cita): void {
+    this.citaLaboratorio.set(c);
+    this.ordenesLaboratorio.set([]);
+    this.mostrarFormularioLaboratorio.set(false);
+    this.laboratorioEditando.set(null);
+    this.cargandoLaboratorio.set(true);
+    this.srv.listarLaboratorio(c.id).subscribe({
+      next: (data) => { this.ordenesLaboratorio.set(data); this.cargandoLaboratorio.set(false); },
+      error: () => this.cargandoLaboratorio.set(false),
+    });
+  }
+
+  cerrarLaboratorio(): void { this.citaLaboratorio.set(null); }
+
+  nuevaOrdenLaboratorio(): void {
+    this.laboratorioEditando.set(null);
+    this.laboratorioForm.reset({ estado: 'pendiente', observaciones: '' });
+    this.examenesArray.clear();
+    this.examenesArray.push(this.crearExamenGroup());
+    this.mostrarFormularioLaboratorio.set(true);
+  }
+
+  editarOrdenLaboratorio(o: OrdenLaboratorio): void {
+    this.laboratorioEditando.set(o);
+    this.laboratorioForm.reset({ estado: o.estado, observaciones: o.observaciones ?? '' });
+    this.examenesArray.clear();
+    o.examenes.forEach((e) => this.examenesArray.push(this.crearExamenGroup(e as any)));
+    this.mostrarFormularioLaboratorio.set(true);
+  }
+
+  cancelarFormularioLaboratorio(): void {
+    this.mostrarFormularioLaboratorio.set(false);
+    this.laboratorioEditando.set(null);
+  }
+
+  guardarOrdenLaboratorio(): void {
+    const cita = this.citaLaboratorio();
+    if (!cita || this.laboratorioForm.invalid) return;
+    const data = this.laboratorioForm.getRawValue();
+    const existente = this.laboratorioEditando();
+    const req = existente ? this.srv.actualizarLaboratorio(existente.id, data) : this.srv.crearLaboratorio(cita.id, data);
+    req.subscribe({
+      next: () => {
+        this.mostrarFormularioLaboratorio.set(false);
+        this.laboratorioEditando.set(null);
+        this.abrirLaboratorio(cita);
+        this.cargar();
+      },
+      error: (err) => alert(err?.error?.mensaje || 'No se pudo guardar la orden de laboratorio'),
+    });
+  }
+
+  eliminarOrdenLaboratorio(o: OrdenLaboratorio): void {
+    if (!confirm('Eliminar esta orden de laboratorio?')) return;
+    this.srv.eliminarLaboratorio(o.id).subscribe({
+      next: () => {
+        const cita = this.citaLaboratorio();
+        if (cita) this.abrirLaboratorio(cita);
+        this.cargar();
+      },
+      error: (err) => alert(err?.error?.mensaje || 'No se pudo eliminar la orden de laboratorio'),
+    });
   }
 }
 

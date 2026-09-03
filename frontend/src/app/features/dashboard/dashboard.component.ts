@@ -6,7 +6,8 @@ import { forkJoin } from 'rxjs';
 import { PacientesService } from '../../core/services/pacientes.service';
 import { DoctoresService } from '../../core/services/doctores.service';
 import { CitasService } from '../../core/services/citas.service';
-import { Cita, Doctor, Paciente } from '../../core/models/models';
+import { AuthService } from '../../core/services/auth.service';
+import { Cita, Doctor, LaboratorioPendiente, Paciente } from '../../core/models/models';
 
 @Component({
   selector: 'app-dashboard',
@@ -19,6 +20,8 @@ export class DashboardComponent implements OnInit {
   pacientes = signal<Paciente[]>([]);
   doctores = signal<Doctor[]>([]);
   citas = signal<Cita[]>([]);
+  laboratoriosPendientes = signal<LaboratorioPendiente[]>([]);
+  mostrarPendientesLaboratorio = signal(false);
 
   // Fecha que se esta consultando en "Agenda del dia" (por defecto, hoy).
   fechaAgenda = signal<string>(hoyISO());
@@ -41,8 +44,14 @@ export class DashboardComponent implements OnInit {
   constructor(
     private pacientesSrv: PacientesService,
     private doctoresSrv: DoctoresService,
-    private citasSrv: CitasService
+    private citasSrv: CitasService,
+    public auth: AuthService
   ) {}
+
+  puedeVerLaboratorio(): boolean {
+    const rol = this.auth.usuario()?.rol;
+    return this.auth.esSuperAdmin() || rol === 'admin' || rol === 'doctor';
+  }
 
   ngOnInit(): void {
     forkJoin({
@@ -54,6 +63,16 @@ export class DashboardComponent implements OnInit {
       this.doctores.set(doctores);
       this.citas.set(citas);
     });
+
+    if (this.puedeVerLaboratorio()) {
+      this.citasSrv.listarLaboratorioPendientes().subscribe((data) => this.laboratoriosPendientes.set(data));
+    }
+  }
+
+  // Formato dd/mm/aaaa, igual al que espera el filtro de fecha de Citas.
+  fechaParaFiltro(iso: string): string {
+    const [anio, mes, dia] = iso.substring(0, 10).split('-');
+    return `${dia}/${mes}/${anio}`;
   }
 }
 

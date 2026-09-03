@@ -261,6 +261,36 @@ create table if not exists receta_medicamentos (
 );
 
 -- ---------------------------------------------------------
+-- Tabla: ordenes_laboratorio (cabecera, N por cita) y
+-- orden_laboratorio_examenes (lineas, N por orden). Mismo patron que
+-- recetas: se ata a cita_id, no a historia_clinica_id, y las lineas
+-- se reemplazan como conjunto en cada actualizacion. MVP sin archivos
+-- adjuntos: resultado y valor de referencia son texto libre.
+-- ---------------------------------------------------------
+create table if not exists ordenes_laboratorio (
+    id              uuid primary key default gen_random_uuid(),
+    empresa_id      uuid not null references empresas(id),
+    cita_id         uuid not null references citas(id) on delete cascade,
+    paciente_id     uuid not null references pacientes(id) on delete restrict,
+    doctor_id       uuid not null references doctores(id) on delete restrict,
+    estado          text not null check (estado in ('pendiente', 'completada', 'cancelada')) default 'pendiente',
+    observaciones   text,
+    created_at      timestamptz not null default now(),
+    updated_at      timestamptz not null default now()
+);
+
+create table if not exists orden_laboratorio_examenes (
+    id                  uuid primary key default gen_random_uuid(),
+    orden_id            uuid not null references ordenes_laboratorio(id) on delete cascade,
+    nombre_examen       text not null,
+    valor_referencia    text,
+    resultado           text,
+    unidad              text,
+    orden               integer not null default 0,
+    created_at          timestamptz not null default now()
+);
+
+-- ---------------------------------------------------------
 -- Indices
 -- ---------------------------------------------------------
 create index if not exists idx_usuarios_empresas_rol_usuario on usuarios_empresas_rol(usuario_id);
@@ -279,6 +309,10 @@ create index if not exists idx_recetas_paciente on recetas(paciente_id);
 create index if not exists idx_recetas_empresa on recetas(empresa_id);
 create index if not exists idx_recetas_cita on recetas(cita_id);
 create index if not exists idx_receta_medicamentos_receta on receta_medicamentos(receta_id);
+create index if not exists idx_ordenes_laboratorio_paciente on ordenes_laboratorio(paciente_id);
+create index if not exists idx_ordenes_laboratorio_empresa on ordenes_laboratorio(empresa_id);
+create index if not exists idx_ordenes_laboratorio_cita on ordenes_laboratorio(cita_id);
+create index if not exists idx_orden_laboratorio_examenes_orden on orden_laboratorio_examenes(orden_id);
 
 -- ---------------------------------------------------------
 -- Restricciones unicas por clinica
@@ -302,7 +336,7 @@ do $$
 declare
     t text;
 begin
-    foreach t in array array['empresas','usuarios','usuarios_empresas_rol','especialidades','pacientes','pacientes_empresas','doctores','doctor_horarios','citas','historias_clinicas','signos_vitales','recetas']
+    foreach t in array array['empresas','usuarios','usuarios_empresas_rol','especialidades','pacientes','pacientes_empresas','doctores','doctor_horarios','citas','historias_clinicas','signos_vitales','recetas','ordenes_laboratorio']
     loop
         execute format('drop trigger if exists trg_set_updated_at on %I', t);
         execute format('create trigger trg_set_updated_at before update on %I for each row execute function set_updated_at()', t);

@@ -1,7 +1,8 @@
-# Actualizacion pendiente para Neon (produccion)
+# Actualizacion aplicada a Neon (produccion)
 
-Estado: `001` a `006` ya se aplicaron en Neon (verificado con comparacion
-completa de esquema contra `.19`, `006` aplicada 2026-09-02). Ver tambien
+Estado: `001` a `007` ya se aplicaron en Neon (verificado con
+comparacion completa de esquema contra `.19`; `007` certificada en
+desarrollo y promovida el 2026-09-03). Ver tambien
 [README.md](./README.md) para el registro vivo de que esta aplicado en
 cada entorno.
 
@@ -15,6 +16,7 @@ cada entorno.
 | 4 | `004_recetas_multiples.sql` | Permite varias recetas por cita | ✅ Aplicada |
 | 5 | `005_pacientes_globales.sql` | `pacientes` pasa a ser global (multi-clinica) | ✅ Aplicada |
 | 6 | `006_horarios_doctores.sql` | Tabla nueva `doctor_horarios` (horario semanal por doctor) | ✅ Aplicada |
+| 7 | `007_laboratorio.sql` | Tablas nuevas `ordenes_laboratorio` y `orden_laboratorio_examenes` | ✅ Aplicada 2026-09-03 |
 
 ---
 
@@ -111,6 +113,29 @@ correctamente su franja de las disponibles.
 
 ---
 
+## 7. `007_laboratorio.sql` — Modulo de laboratorio (certificado y promovido a Neon el 2026-09-03)
+
+Tablas nuevas `ordenes_laboratorio` (cabecera, N por cita) y
+`orden_laboratorio_examenes` (lineas de examenes solicitados), con el
+mismo patron ya usado en `recetas`/`receta_medicamentos`: se ata a
+`cita_id`, no a `historia_clinica_id`, y las lineas se reemplazan como
+conjunto en cada actualizacion (no se editan una a una).
+
+Se probo primero solo en `.19` (desarrollo) por instruccion explicita,
+incluyendo el card "Laboratorios pendientes" del tablero agregado
+despues. Una vez certificado, se aplico a Neon y se verifico el esquema
+contra `.19` (identico). Ver [LABORATORIO.md](../../../LABORATORIO.md)
+en la raiz del proyecto para el diseno completo, el detalle de
+endpoints y todo lo que se probo.
+
+**Alcance de esta version (MVP)**: `resultado` y `valor_referencia` son
+texto libre (soportan valores numericos y cualitativos, ej.
+"Positivo"/"Negativo"). **No incluye archivos adjuntos** (PDF de
+resultados, imagenes) — eso requiere definir almacenamiento de archivos
+primero, ver `MEJORAS-PROPUESTAS.md` seccion 6.
+
+---
+
 ## Como aplicarlo a Neon
 
 Necesitas la cadena de conexion de Neon (Project Settings → Database →
@@ -118,21 +143,21 @@ Necesitas la cadena de conexion de Neon (Project Settings → Database →
 
 ```bash
 docker run --rm -i -e PGPASSWORD='<password-neon>' postgres:16 \
-  psql -h <host-neon> -U <usuario-neon> -d <base-neon> < backend/database/migrations/006_horarios_doctores.sql
+  psql -h <host-neon> -U <usuario-neon> -d <base-neon> < backend/database/migrations/007_laboratorio.sql
 ```
 
 ## Verificacion despues de aplicar
 
 ```sql
-\d doctor_horarios   -- debe existir, con su fk a doctores y el chk_horario_doctor
+\d ordenes_laboratorio            -- debe existir, con sus fk a citas/pacientes/doctores y el check de estado
+\d orden_laboratorio_examenes     -- debe existir, con su fk a ordenes_laboratorio
 
-select count(*) from doctor_horarios;  -- 0 es normal (nadie ha cargado horarios todavia)
+select count(*) from ordenes_laboratorio;  -- 0 es normal (nadie ha cargado ordenes todavia)
 ```
 
 ## Riesgo / reversibilidad
 
-Migracion 100% aditiva: crea una tabla nueva, no toca ninguna existente.
-No hay riesgo de romper datos ni backend viejo — un doctor sin filas en
-`doctor_horarios` sigue funcionando exactamente igual que antes de esta
-migracion. Revertirla es un simple `drop table doctor_horarios;` si
-hiciera falta.
+Migracion 100% aditiva: crea 2 tablas nuevas, no toca ninguna existente.
+No hay riesgo de romper datos ni backend viejo. Revertirla es
+`drop table orden_laboratorio_examenes; drop table ordenes_laboratorio;`
+si hiciera falta (en ese orden, por la foreign key).

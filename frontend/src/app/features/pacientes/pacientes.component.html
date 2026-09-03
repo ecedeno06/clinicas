@@ -182,6 +182,14 @@
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 20.5 3.5 13.5a5 5 0 0 1 7-7l7 7a5 5 0 0 1-7 7Z"/><path d="m8.5 8.5 7 7"/></svg>
                           </button>
                         }
+                        @if (h.tiene_laboratorio) {
+                          <button type="button" class="btn-icon"
+                            [class.btn-icon-amber]="h.estado_laboratorio === 'pendiente'"
+                            [class.btn-icon-green]="h.estado_laboratorio === 'completada'"
+                            [title]="'Ver laboratorio (' + h.estado_laboratorio + ')'" aria-label="Ver laboratorio" (click)="verLaboratorioDeHistorial(h, $event)">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2v6L4 20a1 1 0 0 0 1 2h14a1 1 0 0 0 1-2L15 8V2"/><path d="M9 2h6"/><path d="M8.5 15h7"/></svg>
+                          </button>
+                        }
                       </td>
                     </tr>
                   } @empty {
@@ -201,10 +209,16 @@
                   <span class="tab-badge">{{ recetasSeleccionadas().length }}</span>
                 }
               </button>
+              <button type="button" class="tab-btn" [class.active]="tabInferior() === 'laboratorio'" (click)="tabInferior.set('laboratorio')">
+                Laboratorio
+                @if (ordenesLaboratorioSeleccionadas().length > 0) {
+                  <span class="tab-badge">{{ ordenesLaboratorioSeleccionadas().length }}</span>
+                }
+              </button>
             </div>
 
             @if (!historialSeleccionado()) {
-              <div class="empty-state">Selecciona una consulta de la lista para ver {{ tabInferior() === 'signos' ? 'sus signos vitales' : 'su receta' }}.</div>
+              <div class="empty-state">Selecciona una consulta de la lista para ver este detalle.</div>
             } @else {
               <div class="text-muted text-sm" style="margin-bottom:8px;">{{ historialSeleccionado()!.fecha_cita | date:'dd/MM/yyyy' }} &middot; {{ historialSeleccionado()!.doctor_nombre }}</div>
 
@@ -268,7 +282,7 @@
                     <div class="empty-state">No se registraron signos vitales para esta consulta.</div>
                   }
                 }
-              } @else {
+              } @else if (tabInferior() === 'receta') {
                 @if (cargandoRecetaSeleccionada()) {
                   <div class="empty-state">Cargando...</div>
                 } @else {
@@ -297,6 +311,44 @@
                     </div>
                   } @empty {
                     <div class="empty-state">No se registraron recetas para esta consulta.</div>
+                  }
+                }
+              } @else {
+                @if (cargandoLaboratorioSeleccionado()) {
+                  <div class="empty-state">Cargando...</div>
+                } @else {
+                  @for (o of ordenesLaboratorioSeleccionadas(); track o.id) {
+                    <div class="card mt-16">
+                      <div class="flex items-center" style="justify-content: space-between;">
+                        <div class="text-muted text-sm">{{ o.created_at | date:'dd/MM/yyyy HH:mm' }}</div>
+                        <span class="badge"
+                          [class.badge-slate]="o.estado === 'pendiente'"
+                          [class.badge-green]="o.estado === 'completada'"
+                          [class.badge-red]="o.estado === 'cancelada'">
+                          {{ o.estado }}
+                        </span>
+                      </div>
+                      <div class="table-wrap mt-16">
+                        <table class="data-table">
+                          <thead><tr><th>Examen</th><th>Valor de referencia</th><th>Resultado</th><th>Unidad</th></tr></thead>
+                          <tbody>
+                            @for (e of o.examenes; track e.id) {
+                              <tr>
+                                <td>{{ e.nombre_examen }}</td>
+                                <td>{{ e.valor_referencia || '-' }}</td>
+                                <td>{{ e.resultado || '-' }}</td>
+                                <td>{{ e.unidad || '-' }}</td>
+                              </tr>
+                            }
+                          </tbody>
+                        </table>
+                      </div>
+                      @if (o.observaciones) {
+                        <div class="text-muted text-sm mt-16">{{ o.observaciones }}</div>
+                      }
+                    </div>
+                  } @empty {
+                    <div class="empty-state">No se registraron ordenes de laboratorio para esta consulta.</div>
                   }
                 }
               }

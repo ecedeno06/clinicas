@@ -22,7 +22,44 @@
     <div class="label">Citas pendientes</div>
     <div class="value">{{ citasPendientes() }}</div>
   </div>
+  @if (puedeVerLaboratorio()) {
+    <button type="button" class="stat-card stat-card-clickable" (click)="mostrarPendientesLaboratorio.set(true)">
+      <div class="label">Laboratorios pendientes</div>
+      <div class="value">{{ laboratoriosPendientes().length }}</div>
+    </button>
+  }
 </div>
+
+@if (mostrarPendientesLaboratorio()) {
+  <div class="overlay">
+    <div class="drawer">
+      <div class="drawer-header">
+        <h2>Laboratorios pendientes</h2>
+        <button class="close" (click)="mostrarPendientesLaboratorio.set(false)">&times;</button>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Fecha</th><th>Paciente</th><th>Doctor</th><th></th></tr></thead>
+          <tbody>
+            @for (l of laboratoriosPendientes(); track l.orden_id) {
+              <tr>
+                <td style="white-space: nowrap;">{{ l.fecha | date:'dd/MM/yyyy' }}</td>
+                <td>{{ l.paciente_nombre }}</td>
+                <td>{{ l.doctor_nombre }} <div class="text-muted text-sm">{{ l.especialidad_nombre }}</div></td>
+                <td class="table-actions">
+                  <a class="btn btn-outline btn-sm" routerLink="/citas" [queryParams]="{ fecha: fechaParaFiltro(l.fecha), paciente: l.paciente_nombre }" (click)="mostrarPendientesLaboratorio.set(false)">Ir a la cita</a>
+                </td>
+              </tr>
+            } @empty {
+              <tr><td colspan="4"><div class="empty-state">No hay laboratorios pendientes.</div></td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+}
 
 <div class="page-header">
   <div>

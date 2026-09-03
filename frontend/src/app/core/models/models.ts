@@ -136,6 +136,7 @@ export interface Cita {
   tiene_historia?: boolean;
   tiene_signos_vitales?: boolean;
   tiene_receta?: boolean;
+  tiene_laboratorio?: boolean;
   created_at?: string;
 }
 
@@ -155,6 +156,8 @@ export interface HistoriaClinica {
   doctor_nombre?: string;
   especialidad_nombre?: string;
   tiene_receta?: boolean;
+  tiene_laboratorio?: boolean;
+  estado_laboratorio?: EstadoLaboratorio | null;
   created_at?: string;
 }
 
@@ -175,6 +178,41 @@ export interface Receta {
   doctor_id: string;
   indicaciones_generales?: string | null;
   medicamentos: RecetaMedicamento[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export type EstadoLaboratorio = 'pendiente' | 'completada' | 'cancelada';
+
+export interface ExamenLaboratorio {
+  id?: string;
+  nombre_examen: string;
+  valor_referencia?: string | null;
+  resultado?: string | null;
+  unidad?: string | null;
+}
+
+export interface LaboratorioPendiente {
+  orden_id: string;
+  cita_id: string;
+  fecha: string;
+  hora_inicio: string;
+  paciente_id: string;
+  paciente_nombre: string;
+  doctor_nombre: string;
+  especialidad_nombre: string;
+  created_at?: string;
+}
+
+export interface OrdenLaboratorio {
+  id: string;
+  empresa_id?: string;
+  cita_id: string;
+  paciente_id: string;
+  doctor_id: string;
+  estado: EstadoLaboratorio;
+  observaciones?: string | null;
+  examenes: ExamenLaboratorio[];
   created_at?: string;
   updated_at?: string;
 }
