@@ -153,7 +153,7 @@
           <button type="button" class="tab-btn" [class.active]="tabSuperior() === 'antecedentes'" (click)="tabSuperior.set('antecedentes')">
             Antecedentes
             @if (pacienteHistorial()?.alergias) {
-              <span class="tab-badge" style="background: var(--text-on-tint-amber);">!</span>
+              <span class="tab-badge" style="background: var(--text-on-tint-green);">!</span>
             }
           </button>
         </div>
@@ -204,16 +204,10 @@
             <div class="tabs">
               <button type="button" class="tab-btn" [class.active]="tabInferior() === 'signos'" (click)="tabInferior.set('signos')">Signos vitales</button>
               <button type="button" class="tab-btn" [class.active]="tabInferior() === 'receta'" (click)="tabInferior.set('receta')">
-                Receta
-                @if (recetasSeleccionadas().length > 0) {
-                  <span class="tab-badge">{{ recetasSeleccionadas().length }}</span>
-                }
+                Receta {{recetasSeleccionadas().length > 0 ? '(' + recetasSeleccionadas().length + ')' : '' }}                      
               </button>
               <button type="button" class="tab-btn" [class.active]="tabInferior() === 'laboratorio'" (click)="tabInferior.set('laboratorio')">
-                Laboratorio
-                @if (ordenesLaboratorioSeleccionadas().length > 0) {
-                  <span class="tab-badge">{{ ordenesLaboratorioSeleccionadas().length }}</span>
-                }
+                Laboratorio{{ ordenesLaboratorioSeleccionadas().length > 0 ? '(' + ordenesLaboratorioSeleccionadas().length + ')' : '' }}
               </button>
             </div>
 
