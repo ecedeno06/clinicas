@@ -1,10 +1,10 @@
 # Actualizacion aplicada a Neon (produccion)
 
-Estado: `001` a `007` ya se aplicaron en Neon (verificado con
+Estado: `001` a `008` ya se aplicaron en Neon (verificado con
 comparacion completa de esquema contra `.19`; `007` certificada en
-desarrollo y promovida el 2026-09-03). Ver tambien
-[README.md](./README.md) para el registro vivo de que esta aplicado en
-cada entorno.
+desarrollo y promovida el 2026-09-03; `008` aplicada el 2026-09-04). Ver
+tambien [README.md](./README.md) para el registro vivo de que esta
+aplicado en cada entorno.
 
 ## Resumen
 
@@ -17,6 +17,7 @@ cada entorno.
 | 5 | `005_pacientes_globales.sql` | `pacientes` pasa a ser global (multi-clinica) | ✅ Aplicada |
 | 6 | `006_horarios_doctores.sql` | Tabla nueva `doctor_horarios` (horario semanal por doctor) | ✅ Aplicada |
 | 7 | `007_laboratorio.sql` | Tablas nuevas `ordenes_laboratorio` y `orden_laboratorio_examenes` | ✅ Aplicada 2026-09-03 |
+| 8 | `008_paciente_foto.sql` | Columna nueva `foto` (base64) en `pacientes` | ✅ Aplicada 2026-09-04 |
 
 ---
 
@@ -133,6 +134,16 @@ texto libre (soportan valores numericos y cualitativos, ej.
 "Positivo"/"Negativo"). **No incluye archivos adjuntos** (PDF de
 resultados, imagenes) — eso requiere definir almacenamiento de archivos
 primero, ver `MEJORAS-PROPUESTAS.md` seccion 6.
+
+---
+
+## 8. `008_paciente_foto.sql` — Foto del paciente (base64)
+
+Columna aditiva `foto text` en `pacientes` (mismo patron ya usado en
+`usuarios.avatar` y `empresas.logo`). Se sube desde el formulario de
+Pacientes (camara, archivo del equipo o pegar) y solo se persiste al
+guardar el registro. Aplicada a Neon el 2026-09-04, verificada con
+`\d pacientes` (columna `foto | text` presente).
 
 ---
 

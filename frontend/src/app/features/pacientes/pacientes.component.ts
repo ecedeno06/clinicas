@@ -8,11 +8,12 @@ import { HistoriaClinica, OrdenLaboratorio, Paciente, Receta, SignosVitales } fr
 import { clasificarImc } from '../../core/utils/imc.util';
 import { clasificarPresion } from '../../core/utils/presion.util';
 import { clasificarGlucosa } from '../../core/utils/glucosa.util';
+import { SelectorFotoComponent } from '../../core/components/selector-foto/selector-foto.component';
 
 @Component({
   selector: 'app-pacientes',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, SelectorFotoComponent],
   templateUrl: './pacientes.component.html',
   styleUrl: './pacientes.component.css',
 })
@@ -73,6 +74,7 @@ export class PacientesComponent implements OnInit {
 
   form = this.fb.group({
     nombre: ['', Validators.required],
+    foto: [null as string | null],
     identificacion: [''],
     fecha_nacimiento: [''],
     sexo: [''],
@@ -119,6 +121,14 @@ export class PacientesComponent implements OnInit {
 
   cerrarPanel(): void { this.panelAbierto.set(false); }
 
+  // A diferencia de Citas (que edita un paciente ya existente y guarda la
+  // foto de inmediato), aqui solo se guarda cuando se envia el formulario
+  // completo -- por eso solo se actualiza el control, sin llamar al backend.
+  onFotoSeleccionada(base64: string): void {
+    this.form.patchValue({ foto: base64 });
+    this.form.get('foto')?.markAsDirty();
+  }
+
   // Solo aplica al registrar un paciente nuevo: busca en TODA la red (no
   // solo esta clinica) si la identificacion ya pertenece a alguien. Si es
   // asi, reutiliza sus datos globales (alergias, contacto de emergencia,
@@ -137,6 +147,7 @@ export class PacientesComponent implements OnInit {
           this.pacienteExistente.set(res.paciente);
           this.form.patchValue({
             nombre: res.paciente.nombre,
+            foto: res.paciente.foto ?? null,
             fecha_nacimiento: res.paciente.fecha_nacimiento?.substring(0, 10) ?? '',
             sexo: res.paciente.sexo ?? '',
             telefono: res.paciente.telefono ?? '',

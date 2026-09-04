@@ -54,7 +54,7 @@ async function crear(req, res, next) {
   try {
     const {
       nombre, identificacion, fecha_nacimiento, sexo, telefono, email,
-      direccion, contacto_emergencia, alergias, activo,
+      direccion, contacto_emergencia, alergias, activo, foto,
     } = req.body;
 
     await client.query('begin');
@@ -80,11 +80,11 @@ async function crear(req, res, next) {
         return res.status(400).json({ mensaje: 'nombre es requerido para un paciente nuevo' });
       }
       const ins = await client.query(
-        `insert into pacientes (nombre, identificacion, fecha_nacimiento, sexo, telefono, email, direccion, contacto_emergencia, alergias)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9) returning *`,
+        `insert into pacientes (nombre, identificacion, fecha_nacimiento, sexo, telefono, email, direccion, contacto_emergencia, alergias, foto)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning *`,
         [
           nombre, identificacion || null, fecha_nacimiento || null, sexo, telefono, email,
-          direccion, contacto_emergencia ? JSON.stringify(contacto_emergencia) : null, alergias,
+          direccion, contacto_emergencia ? JSON.stringify(contacto_emergencia) : null, alergias, foto || null,
         ]
       );
       paciente = ins.rows[0];
@@ -121,7 +121,7 @@ async function actualizar(req, res, next) {
   try {
     const {
       nombre, identificacion, fecha_nacimiento, sexo, telefono, email,
-      direccion, contacto_emergencia, alergias, activo,
+      direccion, contacto_emergencia, alergias, activo, foto,
     } = req.body;
 
     const vinculo = await pool.query(
@@ -140,11 +140,12 @@ async function actualizar(req, res, next) {
          email = coalesce($6, email),
          direccion = coalesce($7, direccion),
          contacto_emergencia = coalesce($8, contacto_emergencia),
-         alergias = coalesce($9, alergias)
-       where id = $10 returning *`,
+         alergias = coalesce($9, alergias),
+         foto = coalesce($10, foto)
+       where id = $11 returning *`,
       [
         nombre, identificacion, fecha_nacimiento || null, sexo, telefono, email,
-        direccion, contacto_emergencia ? JSON.stringify(contacto_emergencia) : null, alergias,
+        direccion, contacto_emergencia ? JSON.stringify(contacto_emergencia) : null, alergias, foto,
         req.params.id,
       ]
     );
@@ -242,4 +243,68 @@ async function signosVitalesHistorial(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { listar, obtener, crear, actualizar, eliminar, historial, buscarPorIdentificacion, signosVitalesHistorial };
+// GET /api/pacientes/:id/laboratorio-historial -> todas las ordenes de
+// laboratorio del paciente EN ESTA CLINICA (de cualquier cita), para
+// mostrarlas en un solo lugar sin tener que abrir cita por cita.
+async function laboratorioHistorial(req, res, next) {
+  try {
+    const vinculo = await pool.query(
+      'select 1 from pacientes_empresas where paciente_id = $1 and empresa_id = $2',
+      [req.params.id, req.empresaId]
+    );
+    if (!vinculo.rows[0]) return res.status(404).json({ mensaje: 'Paciente no encontrado' });
+
+    const { rows } = await pool.query(
+      `select ol.*, c.fecha as fecha_cita, c.hora_inicio as hora_cita, d.nombre as doctor_nombre
+       from ordenes_laboratorio ol
+       join citas c on c.id = ol.cita_id
+       join doctores d on d.id = ol.doctor_id
+       where ol.paciente_id = $1 and ol.empresa_id = $2
+       order by c.fecha desc, c.hora_inicio desc`,
+      [req.params.id, req.empresaId]
+    );
+
+    const ordenes = await Promise.all(rows.map(async (o) => {
+      const examenes = await pool.query(
+        'select * from orden_laboratorio_examenes where orden_id = $1 order by orden asc, created_at asc',
+        [o.id]
+      );
+      return { ...o, examenes: examenes.rows };
+    }));
+    res.json(ordenes);
+  } catch (err) { next(err); }
+}
+
+// GET /api/pacientes/:id/recetas-historial -> todas las recetas del
+// paciente EN ESTA CLINICA (de cualquier cita), para mostrarlas en un
+// solo lugar sin tener que abrir cita por cita.
+async function recetasHistorial(req, res, next) {
+  try {
+    const vinculo = await pool.query(
+      'select 1 from pacientes_empresas where paciente_id = $1 and empresa_id = $2',
+      [req.params.id, req.empresaId]
+    );
+    if (!vinculo.rows[0]) return res.status(404).json({ mensaje: 'Paciente no encontrado' });
+
+    const { rows } = await pool.query(
+      `select r.*, c.fecha as fecha_cita, c.hora_inicio as hora_cita, d.nombre as doctor_nombre
+       from recetas r
+       join citas c on c.id = r.cita_id
+       join doctores d on d.id = r.doctor_id
+       where r.paciente_id = $1 and r.empresa_id = $2
+       order by c.fecha desc, c.hora_inicio desc`,
+      [req.params.id, req.empresaId]
+    );
+
+    const recetas = await Promise.all(rows.map(async (r) => {
+      const medicamentos = await pool.query(
+        'select * from receta_medicamentos where receta_id = $1 order by orden asc, created_at asc',
+        [r.id]
+      );
+      return { ...r, medicamentos: medicamentos.rows };
+    }));
+    res.json(recetas);
+  } catch (err) { next(err); }
+}
+
+module.exports = { listar, obtener, crear, actualizar, eliminar, historial, buscarPorIdentificacion, signosVitalesHistorial, laboratorioHistorial, recetasHistorial };

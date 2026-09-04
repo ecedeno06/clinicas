@@ -1,3 +1,36 @@
+/* Solo el panel de "Consulta Medica" (5 tabs) necesita mas ancho que el
+   resto de los drawers de esta pantalla -- por eso es una clase aparte
+   en vez de tocar el .drawer global en styles.css. */
+.drawer.drawer-wide {
+  width: min(1100px, 95vw);
+}
+
+.consulta-layout {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.consulta-sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  text-align: center;
+}
+
+.consulta-sidebar .form-group { text-align: left; }
+
+.consulta-divider {
+  align-self: stretch;
+  width: 1px;
+  background: var(--slate-100);
+  flex-shrink: 0;
+}
+
+.consulta-main {
+  flex: 1;
+  min-width: 0;
+}
+
 .time12 {
   display: flex;
   gap: 6px;

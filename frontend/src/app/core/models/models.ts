@@ -66,6 +66,7 @@ export interface Paciente {
   direccion?: string;
   contacto_emergencia?: ContactoEmergencia | null;
   alergias?: string;
+  foto?: string | null;
   activo: boolean;
   created_at?: string;
 }
@@ -181,6 +182,10 @@ export interface Receta {
   medicamentos: RecetaMedicamento[];
   created_at?: string;
   updated_at?: string;
+  // Presentes solo cuando viene del historial de un paciente (join con la cita)
+  fecha_cita?: string;
+  hora_cita?: string;
+  doctor_nombre?: string;
 }
 
 export type EstadoLaboratorio = 'pendiente' | 'completada' | 'cancelada';
@@ -216,6 +221,10 @@ export interface OrdenLaboratorio {
   examenes: ExamenLaboratorio[];
   created_at?: string;
   updated_at?: string;
+  // Presentes solo cuando viene del historial de un paciente (join con la cita)
+  fecha_cita?: string;
+  hora_cita?: string;
+  doctor_nombre?: string;
 }
 
 export interface SignosVitales {
@@ -232,4 +241,7 @@ export interface SignosVitales {
   glucosa?: number | null;
   glucosa_glicosilada?: number | null;
   created_at?: string;
+  // Presentes solo cuando viene del historial de un paciente (join con la cita)
+  fecha_cita?: string;
+  hora_cita?: string;
 }

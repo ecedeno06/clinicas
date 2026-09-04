@@ -240,42 +240,257 @@
 
 @if (citaHistoria(); as c) {
   <div class="overlay">
-    <div class="drawer">
+    <div class="drawer drawer-wide">
       <div class="drawer-header">
         <h2>Consulta Médica</h2>
         <button class="close" (click)="cerrarHistoria()">&times;</button>
       </div>
 
-      <div class="text-muted text-sm">
-        {{ c.paciente_nombre }} &middot; {{ c.doctor_nombre }} &middot; {{ c.fecha | date:'dd/MM/yyyy' }}
-      </div>
+      <div class="consulta-layout">
+        <div class="consulta-sidebar card">
+          <app-selector-foto
+            [foto]="pacienteDeHistoria()?.foto"
+            [nombre]="c.paciente_nombre || ''"
+            [soloLectura]="true"
+          ></app-selector-foto>
+          <h3 class="mt-16" style="margin-bottom:0;">{{ c.paciente_nombre }}</h3>
 
-      @if (cargandoHistoria()) {
-        <div class="empty-state">Cargando...</div>
-      } @else {
-        <form [formGroup]="historiaForm" (ngSubmit)="guardarHistoria()" class="mt-16">
+          <div class="mt-16">
+            <div class="text-muted text-sm" style="text-transform:uppercase; letter-spacing:.04em; font-weight:600;">Datos generales</div>
+            <div class="form-group mt-16">
+              <label>Identificacion</label>
+              <div>{{ pacienteDeHistoria()?.identificacion || '-' }}</div>
+            </div>
+            <div class="form-group mt-16">
+              <label>Fecha de nacimiento</label>
+              <div>{{ (pacienteDeHistoria()?.fecha_nacimiento | date:'dd/MM/yyyy') || '-' }}</div>
+            </div>
+            <div class="form-group mt-16">
+              <label>Edad</label>
+              <div>{{ c.paciente_edad || '-' }}</div>
+            </div>
+            <div class="form-group mt-16">
+              <label>Sexo</label>
+              <div>{{ pacienteDeHistoria()?.sexo || '-' }}</div>
+            </div>
+            <div class="form-group mt-16">
+              <label>Telefono</label>
+              <div>{{ pacienteDeHistoria()?.telefono || '-' }}</div>
+            </div>
+            <div class="form-group mt-16">
+              <label>Email</label>
+              <div>{{ pacienteDeHistoria()?.email || '-' }}</div>
+            </div>
+            <div class="form-group mt-16">
+              <label>Direccion</label>
+              <div>{{ pacienteDeHistoria()?.direccion || '-' }}</div>
+            </div>
+            <div class="form-group mt-16">
+              <label>Ultimo peso</label>
+              @if (ultimoPeso(); as peso) {
+                <div>{{ peso }} kg ({{ pesoLibras(peso) }} lb)</div>
+              } @else {
+                <div>-</div>
+              }
+            </div>
+          </div>
+        </div>
+
+        <div class="consulta-divider"></div>
+
+        <div class="consulta-main">
+          <div class="text-muted text-sm">
+            {{ c.paciente_nombre }} &middot; {{ c.doctor_nombre }} &middot; {{ c.fecha | date:'dd/MM/yyyy' }}
+          </div>
+
+          <div class="card mt-16">
+            <div class="tabs">
+              <button type="button" class="tab-btn" [class.active]="tabHistoria() === 'consulta'" (click)="tabHistoria.set('consulta')">Consulta</button>
+          <button type="button" class="tab-btn" [class.active]="tabHistoria() === 'signos'" (click)="tabHistoria.set('signos')">Signos vitales</button>
+          <button type="button" class="tab-btn" [class.active]="tabHistoria() === 'antecedentes'" (click)="tabHistoria.set('antecedentes')">Antecedentes</button>
+          <button type="button" class="tab-btn" [class.active]="tabHistoria() === 'recetas'" (click)="tabHistoria.set('recetas')">Recetas</button>
+          <button type="button" class="tab-btn" [class.active]="tabHistoria() === 'laboratorios'" (click)="tabHistoria.set('laboratorios')">Laboratorios</button>
+        </div>
+
+        @if (tabHistoria() === 'consulta') {
+          @if (cargandoHistoria()) {
+            <div class="empty-state">Cargando...</div>
+          } @else {
+            <form [formGroup]="historiaForm" (ngSubmit)="guardarHistoria()">
+              <div class="form-group">
+                <label>Motivo de consulta</label>
+                <textarea class="input" rows="2" formControlName="motivo_consulta"></textarea>
+              </div>
+              <div class="form-group mt-16">
+                <label>Diagnostico</label>
+                <textarea class="input" rows="3" formControlName="diagnostico"></textarea>
+              </div>
+              <div class="form-group mt-16">
+                <label>Tratamiento</label>
+                <textarea class="input" rows="3" formControlName="tratamiento"></textarea>
+              </div>
+              <div class="form-group mt-16">
+                <label>Notas</label>
+                <textarea class="input" rows="3" formControlName="notas"></textarea>
+              </div>
+              <div class="form-actions">
+                <button type="submit" class="btn btn-primary">{{ historia() ? 'Guardar cambios' : 'Registrar consulta' }}</button>
+                <button type="button" class="btn btn-outline" (click)="cerrarHistoria()">Cerrar</button>
+              </div>
+            </form>
+          }
+        } @else if (tabHistoria() === 'signos') {
+          @if (cargandoSignosHistoria()) {
+            <div class="empty-state">Cargando...</div>
+          } @else {
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead><tr><th>Fecha</th><th>Hora</th><th>Temp.</th><th>Peso</th><th>Talla</th><th>IMC</th><th>Presion</th><th>Glucosa</th><th>HbA1c</th></tr></thead>
+                <tbody>
+                  @for (sv of signosVitalesDeHistoriaDesc(); track sv.id) {
+                    <tr>
+                      <td style="white-space: nowrap;">{{ sv.fecha_cita | date:'dd/MM/yyyy' }}</td>
+                      <td style="white-space: nowrap;">{{ sv.hora_cita ? formatoAmPm(sv.hora_cita) : '-' }}</td>
+                      <td>{{ sv.temperatura ?? '-' }}</td>
+                      <td>{{ sv.peso ?? '-' }}</td>
+                      <td>{{ sv.talla ?? '-' }}</td>
+                      <td>{{ sv.imc ?? '-' }}</td>
+                      <td>{{ sv.presion_sistolica ?? '-' }}/{{ sv.presion_diastolica ?? '-' }}</td>
+                      <td>{{ sv.glucosa ?? '-' }}</td>
+                      <td>{{ sv.glucosa_glicosilada ?? '-' }}</td>
+                    </tr>
+                  } @empty {
+                    <tr><td colspan="9"><div class="empty-state">Este paciente todavia no tiene signos vitales registrados.</div></td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        } @else if (tabHistoria() === 'antecedentes') {
           <div class="form-group">
-            <label>Motivo de consulta</label>
-            <textarea class="input" rows="2" formControlName="motivo_consulta"></textarea>
+            <label>Alergias</label>
+            <div>{{ pacienteDeHistoria()?.alergias || 'No se han registrado antecedentes.' }}</div>
           </div>
-          <div class="form-group mt-16">
-            <label>Diagnostico</label>
-            <textarea class="input" rows="3" formControlName="diagnostico"></textarea>
+        } @else if (tabHistoria() === 'recetas') {
+          @if (!mostrarFormularioReceta()) {
+            <div class="form-actions">
+              <button type="button" class="btn btn-primary" (click)="nuevaReceta()">+ Nueva receta</button>
+            </div>
+
+            @if (cargandoRecetasHistoria()) {
+              <div class="empty-state">Cargando...</div>
+            } @else {
+              @for (r of recetasDeHistoria(); track r.id) {
+                <div class="card mt-16">
+                  <div class="text-muted text-sm">{{ r.fecha_cita | date:'dd/MM/yyyy' }} &middot; {{ r.doctor_nombre }}</div>
+                  <ul style="margin:12px 0 0; padding-left:18px;">
+                    @for (m of r.medicamentos; track m.id) {
+                      <li>
+                        <strong>{{ m.medicamento }}</strong>
+                        @if (m.dosis) { &middot; {{ m.dosis }} }
+                        @if (m.frecuencia) { &middot; {{ m.frecuencia }} }
+                        @if (m.duracion) { &middot; {{ m.duracion }} }
+                      </li>
+                    }
+                  </ul>
+                  @if (r.indicaciones_generales) {
+                    <div class="text-muted text-sm mt-16">{{ r.indicaciones_generales }}</div>
+                  }
+                </div>
+              } @empty {
+                <div class="empty-state">Este paciente todavia no tiene recetas registradas.</div>
+              }
+            }
+          } @else {
+            <!-- Formulario para registrar una receta puntual para ESTA cita -->
+            <form [formGroup]="recetaForm" (ngSubmit)="guardarReceta()" class="mt-16">
+              <div formArrayName="medicamentos">
+                @for (m of medicamentosArray.controls; track $index; let i = $index) {
+                  <div class="card mt-16" [formGroupName]="i">
+                    <div class="flex items-center" style="justify-content: space-between;">
+                      <h3 style="margin:0;">Medicamento {{ i + 1 }}</h3>
+                      @if (medicamentosArray.length > 1) {
+                        <button type="button" class="btn btn-outline btn-sm" (click)="quitarMedicamento(i)">Quitar</button>
+                      }
+                    </div>
+                    <div class="form-group mt-16">
+                      <label>Medicamento *</label>
+                      <input class="input" formControlName="medicamento" />
+                    </div>
+                    <div class="form-group mt-16">
+                      <label>Dosis</label>
+                      <input class="input" formControlName="dosis" placeholder="ej. 500mg" />
+                    </div>
+                    <div class="form-group mt-16">
+                      <label>Frecuencia</label>
+                      <input class="input" formControlName="frecuencia" placeholder="ej. Cada 8 horas" />
+                    </div>
+                    <div class="form-group mt-16">
+                      <label>Duracion</label>
+                      <input class="input" formControlName="duracion" placeholder="ej. 7 dias" />
+                    </div>
+                    <div class="form-group mt-16">
+                      <label>Indicaciones</label>
+                      <textarea class="input" rows="2" formControlName="indicaciones" placeholder="ej. Tomar con alimentos"></textarea>
+                    </div>
+                  </div>
+                }
+              </div>
+              <button type="button" class="btn btn-outline mt-16" (click)="agregarMedicamento()">+ Agregar medicamento</button>
+
+              <div class="form-group mt-16">
+                <label>Indicaciones generales</label>
+                <textarea class="input" rows="2" formControlName="indicaciones_generales"></textarea>
+              </div>
+
+              <div class="form-actions">
+                <button type="submit" class="btn btn-primary" [disabled]="recetaForm.invalid || recetaForm.pristine">{{ recetaEditando() ? 'Guardar cambios' : 'Registrar receta' }}</button>
+                <button type="button" class="btn btn-outline" (click)="cancelarFormularioReceta()">Cancelar</button>
+              </div>
+            </form>
+          }
+        } @else {
+          @if (cargandoLaboratoriosHistoria()) {
+            <div class="empty-state">Cargando...</div>
+          } @else {
+            @for (o of laboratoriosDeHistoria(); track o.id) {
+              <div class="card mt-16">
+                <div class="flex items-center" style="justify-content: space-between;">
+                  <div class="text-muted text-sm">{{ o.fecha_cita | date:'dd/MM/yyyy' }} &middot; {{ o.doctor_nombre }}</div>
+                  <span class="badge"
+                    [class.badge-slate]="o.estado === 'pendiente'"
+                    [class.badge-green]="o.estado === 'completada'"
+                    [class.badge-red]="o.estado === 'cancelada'">
+                    {{ o.estado }}
+                  </span>
+                </div>
+                <div class="table-wrap mt-16">
+                  <table class="data-table">
+                    <thead><tr><th>Examen</th><th>Valor de referencia</th><th>Resultado</th><th>Unidad</th></tr></thead>
+                    <tbody>
+                      @for (e of o.examenes; track e.id) {
+                        <tr>
+                          <td>{{ e.nombre_examen }}</td>
+                          <td>{{ e.valor_referencia || '-' }}</td>
+                          <td>{{ e.resultado || '-' }}</td>
+                          <td>{{ e.unidad || '-' }}</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+                @if (o.observaciones) {
+                  <div class="text-muted text-sm mt-16">{{ o.observaciones }}</div>
+                }
+              </div>
+            } @empty {
+              <div class="empty-state">Este paciente todavia no tiene ordenes de laboratorio.</div>
+            }
+          }
+        }
           </div>
-          <div class="form-group mt-16">
-            <label>Tratamiento</label>
-            <textarea class="input" rows="3" formControlName="tratamiento"></textarea>
-          </div>
-          <div class="form-group mt-16">
-            <label>Notas</label>
-            <textarea class="input" rows="3" formControlName="notas"></textarea>
-          </div>
-          <div class="form-actions">
-            <button type="submit" class="btn btn-primary">{{ historia() ? 'Guardar cambios' : 'Registrar consulta' }}</button>
-            <button type="button" class="btn btn-outline" (click)="cerrarHistoria()">Cerrar</button>
-          </div>
-        </form>
-      }
+        </div>
+      </div>
     </div>
   </div>
 }

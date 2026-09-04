@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { EmpresasService } from '../../core/services/empresas.service';
 import { Empresa, UsuarioGlobal, UsuarioDeEmpresa, Rol } from '../../core/models/models';
+import { redimensionarImagen } from '../../core/utils/imagen.util';
 
 @Component({
   selector: 'app-empresas',
@@ -152,26 +153,4 @@ export class EmpresasComponent implements OnInit {
       error: (err) => alert(err?.error?.mensaje || 'No se pudo eliminar la clinica'),
     });
   }
-}
-
-function redimensionarImagen(archivo: File, maxDimension: number): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const lector = new FileReader();
-    lector.onerror = () => reject(lector.error);
-    lector.onload = () => {
-      const img = new Image();
-      img.onerror = () => reject(new Error('No se pudo leer la imagen'));
-      img.onload = () => {
-        const escala = Math.min(1, maxDimension / Math.max(img.width, img.height));
-        const canvas = document.createElement('canvas');
-        canvas.width = Math.round(img.width * escala);
-        canvas.height = Math.round(img.height * escala);
-        const ctx = canvas.getContext('2d')!;
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL('image/jpeg', 0.85));
-      };
-      img.src = lector.result as string;
-    };
-    lector.readAsDataURL(archivo);
-  });
 }

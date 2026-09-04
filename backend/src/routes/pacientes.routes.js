@@ -9,6 +9,8 @@ router.get('/buscar', ctrl.buscarPorIdentificacion);
 router.get('/:id', ctrl.obtener);
 router.get('/:id/historial', ctrl.historial);
 router.get('/:id/signos-vitales-historial', ctrl.signosVitalesHistorial);
+router.get('/:id/laboratorio-historial', ctrl.laboratorioHistorial);
+router.get('/:id/recetas-historial', ctrl.recetasHistorial);
 router.post('/', requireRol('admin', 'recepcionista'), ctrl.crear);
 router.put('/:id', requireRol('admin', 'recepcionista'), ctrl.actualizar);
 router.delete('/:id', requireRol('admin'), ctrl.eliminar);

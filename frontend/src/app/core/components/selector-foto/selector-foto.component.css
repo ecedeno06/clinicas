@@ -1,0 +1,102 @@
+.selector-foto-btn {
+  position: relative;
+  display: block;
+  width: 100px;
+  height: 100px;
+  padding: 0;
+  border: none;
+  background: none;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.selector-foto-btn:hover .selector-foto-avatar,
+.selector-foto-btn:hover .selector-foto-img { filter: brightness(0.93); }
+
+.selector-foto-btn-static { cursor: default; }
+.selector-foto-btn-static:hover .selector-foto-avatar,
+.selector-foto-btn-static:hover .selector-foto-img { filter: none; }
+
+.selector-foto-avatar {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background: var(--tint-teal-bg);
+  color: var(--text-on-tint-teal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 28px;
+}
+
+.selector-foto-img {
+  width: 100px;
+  height: 100px;
+  border-radius: 8%;
+  object-fit: cover;
+  object-position: 50% 20%;
+  display: block;
+}
+
+.selector-foto-camera {
+  position: absolute;
+  bottom: -10px;
+  right: -10px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--slate-700);
+  color: var(--white);
+  border: 2px solid var(--white);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.selector-foto-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 60;
+}
+
+.selector-foto-modal {
+  background: var(--white);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  padding: 22px;
+  width: 380px;
+  max-width: 92vw;
+}
+
+.selector-foto-opciones {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.selector-foto-opciones .btn { display: flex; align-items: center; justify-content: center; gap: 8px; }
+
+.selector-foto-paste {
+  border: 1px dashed var(--slate-300);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+  color: var(--slate-500);
+  font-size: 12.5px;
+  cursor: text;
+}
+.selector-foto-paste:focus { outline: 2px solid var(--teal-500); outline-offset: 2px; }
+
+.selector-foto-video {
+  width: 100%;
+  border-radius: 8px;
+  background: #000;
+}

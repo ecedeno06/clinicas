@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { HistoriaClinica, Paciente, SignosVitales } from '../models/models';
+import { HistoriaClinica, OrdenLaboratorio, Paciente, Receta, SignosVitales } from '../models/models';
 
 @Injectable({ providedIn: 'root' })
 export class PacientesService {
@@ -24,5 +24,16 @@ export class PacientesService {
 
   buscarPorIdentificacion(identificacion: string): Observable<{ existe: boolean; paciente?: Paciente }> {
     return this.http.get<{ existe: boolean; paciente?: Paciente }>(`${this.base}/buscar`, { params: { identificacion } });
+  }
+
+  // Todas las ordenes de laboratorio del paciente en esta clinica, de
+  // cualquier cita, ordenadas de la mas reciente a la mas antigua.
+  laboratorioHistorial(id: string): Observable<OrdenLaboratorio[]> {
+    return this.http.get<OrdenLaboratorio[]>(`${this.base}/${id}/laboratorio-historial`);
+  }
+
+  // Todas las recetas del paciente en esta clinica, de cualquier cita.
+  recetasHistorial(id: string): Observable<Receta[]> {
+    return this.http.get<Receta[]>(`${this.base}/${id}/recetas-historial`);
   }
 }

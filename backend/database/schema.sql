@@ -91,6 +91,8 @@ create table if not exists pacientes (
     -- Contacto de emergencia: { nombre, telefono, parentesco }
     contacto_emergencia jsonb,
     alergias            text,
+    -- Foto del paciente en base64 (data URI), igual que usuarios.avatar
+    foto                text,
     created_at          timestamptz not null default now(),
     updated_at          timestamptz not null default now()
 );

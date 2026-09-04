@@ -11,11 +11,12 @@ import { clasificarImc } from '../../core/utils/imc.util';
 import { clasificarPresion } from '../../core/utils/presion.util';
 import { clasificarGlucosa } from '../../core/utils/glucosa.util';
 import { combinar12, formatoAmPm, HORAS_12, MINUTOS_60, partes12 } from '../../core/utils/hora12.util';
+import { SelectorFotoComponent } from '../../core/components/selector-foto/selector-foto.component';
 
 @Component({
   selector: 'app-citas',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, SelectorFotoComponent],
   templateUrl: './citas.component.html',
   styleUrl: './citas.component.css',
 })
@@ -30,6 +31,31 @@ export class CitasComponent implements OnInit {
   citaHistoria = signal<Cita | null>(null);
   historia = signal<HistoriaClinica | null>(null);
   cargandoHistoria = signal(false);
+  tabHistoria = signal<'consulta' | 'signos' | 'antecedentes' | 'recetas' | 'laboratorios'>('consulta');
+  pacienteDeHistoria = signal<Paciente | null>(null);
+  signosVitalesDeHistoria = signal<SignosVitales[]>([]);
+  // El endpoint devuelve ascendente (para calcular tendencias en Pacientes);
+  // aqui se muestra como lista, mas reciente primero.
+  signosVitalesDeHistoriaDesc = computed(() => [...this.signosVitalesDeHistoria()].reverse());
+  cargandoSignosHistoria = signal(false);
+  // Ultimo registro (cronologicamente) que SI tenga peso -- puede no ser el
+  // mas reciente si esa consulta no tomo signos vitales. Mismo patron que
+  // tendenciaPeso() en Pacientes.
+  ultimoPeso = computed<number | null>(() => {
+    const lista = this.signosVitalesDeHistoria(); // asc por fecha
+    for (let i = lista.length - 1; i >= 0; i--) {
+      if (lista[i].peso != null) return lista[i].peso!;
+    }
+    return null;
+  });
+
+  pesoLibras(kg: number): number {
+    return Math.round(kg * 2.20462 * 10) / 10;
+  }
+  recetasDeHistoria = signal<Receta[]>([]);
+  cargandoRecetasHistoria = signal(false);
+  laboratoriosDeHistoria = signal<OrdenLaboratorio[]>([]);
+  cargandoLaboratoriosHistoria = signal(false);
 
   citaSignos = signal<Cita | null>(null);
   signosVitales = signal<SignosVitales | null>(null);
@@ -285,6 +311,7 @@ export class CitasComponent implements OnInit {
 
   abrirHistoria(c: Cita): void {
     this.citaHistoria.set(c);
+    this.tabHistoria.set('consulta');
     this.historia.set(null);
     this.historiaForm.reset();
     this.cargandoHistoria.set(true);
@@ -296,9 +323,52 @@ export class CitasComponent implements OnInit {
       },
       error: () => this.cargandoHistoria.set(false), // 404: todavia no tiene historia, se crea desde cero
     });
+
+    this.pacienteDeHistoria.set(null);
+    this.pacientesSrv.obtener(c.paciente_id).subscribe({
+      next: (data) => this.pacienteDeHistoria.set(data),
+      error: () => this.pacienteDeHistoria.set(null),
+    });
+
+    this.laboratoriosDeHistoria.set([]);
+    this.cargandoLaboratoriosHistoria.set(true);
+    this.pacientesSrv.laboratorioHistorial(c.paciente_id).subscribe({
+      next: (data) => { this.laboratoriosDeHistoria.set(data); this.cargandoLaboratoriosHistoria.set(false); },
+      error: () => this.cargandoLaboratoriosHistoria.set(false),
+    });
+
+    this.signosVitalesDeHistoria.set([]);
+    this.cargandoSignosHistoria.set(true);
+    this.pacientesSrv.signosVitalesHistorial(c.paciente_id).subscribe({
+      next: (data) => { this.signosVitalesDeHistoria.set(data); this.cargandoSignosHistoria.set(false); },
+      error: () => this.cargandoSignosHistoria.set(false),
+    });
+
+    this.recargarRecetasDeHistoria(c);
+    this.mostrarFormularioReceta.set(false);
+    this.recetaEditando.set(null);
   }
 
-  cerrarHistoria(): void { this.citaHistoria.set(null); }
+  private recargarRecetasDeHistoria(c: Cita): void {
+    this.recetasDeHistoria.set([]);
+    this.cargandoRecetasHistoria.set(true);
+    this.pacientesSrv.recetasHistorial(c.paciente_id).subscribe({
+      next: (data) => { this.recetasDeHistoria.set(data); this.cargandoRecetasHistoria.set(false); },
+      error: () => this.cargandoRecetasHistoria.set(false),
+    });
+  }
+
+  cerrarHistoria(): void {
+    this.citaHistoria.set(null);
+  }
+
+  inicialesPaciente(nombre: string | undefined): string {
+    return (nombre || '')
+      .split(' ')
+      .slice(0, 2)
+      .map((p) => p[0]?.toUpperCase())
+      .join('');
+  }
 
   guardarHistoria(): void {
     const cita = this.citaHistoria();
@@ -434,8 +504,13 @@ export class CitasComponent implements OnInit {
     this.recetaEditando.set(null);
   }
 
+  // El formulario de receta se reusa en dos lugares: el drawer dedicado
+  // "Receta" (citaReceta) y el tab "Recetas" dentro de "Consulta"
+  // (citaHistoria) -- solo uno de los dos esta abierto a la vez.
   guardarReceta(): void {
-    const cita = this.citaReceta();
+    const desdeDrawer = this.citaReceta();
+    const desdeConsulta = this.citaHistoria();
+    const cita = desdeDrawer ?? desdeConsulta;
     if (!cita || this.recetaForm.invalid) return;
     const data = this.recetaForm.getRawValue();
     const existente = this.recetaEditando();
@@ -444,7 +519,8 @@ export class CitasComponent implements OnInit {
       next: () => {
         this.mostrarFormularioReceta.set(false);
         this.recetaEditando.set(null);
-        this.abrirRecetas(cita);
+        if (desdeDrawer) this.abrirRecetas(desdeDrawer);
+        else if (desdeConsulta) this.recargarRecetasDeHistoria(desdeConsulta);
         this.cargar();
       },
       error: (err) => alert(err?.error?.mensaje || 'No se pudo guardar la receta'),
