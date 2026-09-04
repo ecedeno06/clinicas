@@ -8,6 +8,7 @@ import { DoctoresService } from '../../core/services/doctores.service';
 import { CitasService } from '../../core/services/citas.service';
 import { AuthService } from '../../core/services/auth.service';
 import { Cita, Doctor, LaboratorioPendiente, Paciente } from '../../core/models/models';
+import { formatoAmPm } from '../../core/utils/hora12.util';
 
 @Component({
   selector: 'app-dashboard',
@@ -40,6 +41,8 @@ export class DashboardComponent implements OnInit {
   );
 
   irAHoy(): void { this.fechaAgenda.set(hoyISO()); }
+
+  formatoAmPm = formatoAmPm;
 
   constructor(
     private pacientesSrv: PacientesService,

@@ -141,11 +141,13 @@ export class CitasComponent implements OnInit {
     this.form.get('doctor_id')!.valueChanges.subscribe(() => this.actualizarDisponibilidad());
     this.form.get('fecha')!.valueChanges.subscribe(() => this.actualizarDisponibilidad());
 
-    // Llegar aqui desde otra pantalla (ej. "Laboratorios pendientes" del
-    // tablero) puede traer ?fecha=dd/mm/aaaa&paciente=... para prefiltrar.
+    // Llegar aqui desde otra pantalla (ej. "Agenda del dia" o "Laboratorios
+    // pendientes" del tablero) puede traer ?fecha=dd/mm/aaaa&paciente=...
+    // &doctor=... para acotar la lista a esa cita puntual.
     const params = this.route.snapshot.queryParamMap;
     if (params.get('fecha')) this.filtroFecha.set(params.get('fecha')!);
     if (params.get('paciente')) this.filtroPaciente.set(params.get('paciente')!);
+    if (params.get('doctor')) this.filtroDoctor.set(params.get('doctor')!);
   }
 
   actualizarDisponibilidad(): void {

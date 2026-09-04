@@ -48,7 +48,7 @@
                 <td>{{ l.paciente_nombre }}</td>
                 <td>{{ l.doctor_nombre }} <div class="text-muted text-sm">{{ l.especialidad_nombre }}</div></td>
                 <td class="table-actions">
-                  <a class="btn btn-outline btn-sm" routerLink="/citas" [queryParams]="{ fecha: fechaParaFiltro(l.fecha), paciente: l.paciente_nombre }" (click)="mostrarPendientesLaboratorio.set(false)">Ir a la cita</a>
+                  <a class="btn btn-outline btn-sm" routerLink="/citas" [queryParams]="{ fecha: fechaParaFiltro(l.fecha), paciente: l.paciente_nombre, doctor: l.doctor_nombre }" (click)="mostrarPendientesLaboratorio.set(false)">Ir a la cita</a>
                 </td>
               </tr>
             } @empty {
@@ -88,7 +88,7 @@
     <tbody>
       @for (c of agendaDelDia(); track c.id) {
         <tr>
-          <td>{{ c.hora_inicio.substring(0,5) }} - {{ c.hora_fin.substring(0,5) }}</td>
+          <td>{{ formatoAmPm(c.hora_inicio) }} - {{ formatoAmPm(c.hora_fin) }}</td>
           <td>{{ c.paciente_nombre }}</td>
           <td>{{ c.doctor_nombre }} <div class="text-muted text-sm">{{ c.especialidad_nombre }}</div></td>
           <td>
@@ -101,7 +101,7 @@
             </span>
           </td>
           <td class="table-actions">
-            <a class="btn btn-outline btn-sm" routerLink="/citas">Ver en agenda</a>
+            <a class="btn btn-outline btn-sm" routerLink="/citas" [queryParams]="{ fecha: fechaParaFiltro(c.fecha), paciente: c.paciente_nombre, doctor: c.doctor_nombre }">Ver en agenda</a>
           </td>
         </tr>
       } @empty {
