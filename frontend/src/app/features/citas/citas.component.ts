@@ -270,13 +270,20 @@ export class CitasComponent implements OnInit {
 
   abrirNuevo(): void {
     this.editando.set(null);
-    this.form.reset({ fecha: new Date().toISOString().substring(0, 10), estado: 'pendiente' });
+    this.disponibilidad.set(null);
+    // emitEvent:false para no disparar actualizarDisponibilidad() a mitad del
+    // reset (doctor_id y fecha cambiarian en dos eventos separados, el
+    // primero con el otro campo todavia con el valor viejo) -- se llama una
+    // sola vez, ya con el formulario completo, justo debajo.
+    this.form.reset({ fecha: new Date().toISOString().substring(0, 10), estado: 'pendiente' }, { emitEvent: false });
     this.errorGuardar.set(null);
     this.panelAbierto.set(true);
+    this.actualizarDisponibilidad();
   }
 
   abrirEditar(c: Cita): void {
     this.editando.set(c);
+    this.disponibilidad.set(null);
     this.form.reset({
       paciente_id: c.paciente_id,
       doctor_id: c.doctor_id,
@@ -286,9 +293,10 @@ export class CitasComponent implements OnInit {
       motivo: c.motivo ?? '',
       observaciones: c.observaciones ?? '',
       estado: c.estado,
-    });
+    }, { emitEvent: false });
     this.errorGuardar.set(null);
     this.panelAbierto.set(true);
+    this.actualizarDisponibilidad();
   }
 
   cerrarPanel(): void { this.panelAbierto.set(false); }
