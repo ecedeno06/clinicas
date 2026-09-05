@@ -27,6 +27,8 @@ docker run --rm -i -e PGPASSWORD='<password>' postgres:16 \
 | `007_laboratorio.sql` | Nuevas tablas `ordenes_laboratorio` (cabecera) y `orden_laboratorio_examenes` (lineas) | ✅ Aplicada 2026-09-03 | ✅ Aplicada 2026-09-03 (certificado en desarrollo, promovido) |
 | `008_paciente_foto.sql` | Columna `foto` (base64) en `pacientes` | ✅ Aplicada 2026-09-04 | ✅ Aplicada 2026-09-04 |
 | `009_citas_reagendar.sql` | Agrega `'reagendar'` a los valores permitidos de `citas.estado` | ✅ Aplicada 2026-09-05 | ✅ Aplicada 2026-09-05 |
+| `010_citas_log.sql` | Columna `log` (jsonb array de `{fecha, usuario, nota}`) en `citas`: bitacora de auditoria | ✅ Aplicada 2026-09-05 | ✅ Aplicada 2026-09-05 |
+| `011_recetas_creado_por.sql` | Columna `creado_por` en `recetas`: solo el autor puede editar/eliminar | ✅ Aplicada 2026-09-05 | ✅ Aplicada 2026-09-05 |
 
 **Verificado 2026-09-02**: comparacion completa de esquema (tablas, columnas,
 indices, constraints, funciones, triggers) entre `.19` y Neon — identicos

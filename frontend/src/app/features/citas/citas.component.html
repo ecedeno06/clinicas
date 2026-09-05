@@ -117,6 +117,13 @@
         <h2>{{ editando() ? 'Editar cita' : 'Nueva cita' }}</h2>
         <button class="close" (click)="cerrarPanel()">&times;</button>
       </div>
+
+      <div class="tabs">
+        <button type="button" class="tab-btn" [class.active]="tabCita() === 'cita'" (click)="tabCita.set('cita')">Cita</button>
+        <button type="button" class="tab-btn" [class.active]="tabCita() === 'historial'" (click)="tabCita.set('historial')">Historial</button>
+      </div>
+
+      @if (tabCita() === 'cita') {
       <form [formGroup]="form" (ngSubmit)="guardar()">
         <div class="form-group">
           <label>Paciente *</label>
@@ -236,6 +243,31 @@
           <button type="button" class="btn btn-outline" (click)="cerrarPanel()">Cancelar</button>
         </div>
       </form>
+      } @else {
+        @if (logDeCitaDesc().length > 0) {
+          <div class="table-wrap log-cita-scroll">
+            <table class="data-table">
+              <thead><tr><th>Fecha</th><th>Usuario</th><th>Nota</th></tr></thead>
+              <tbody>
+                @for (ev of logDeCitaDesc(); track $index) {
+                  <tr>
+                    <td style="white-space: nowrap;">{{ ev.fecha | date:'dd/MM/yyyy HH:mm:ss' }}</td>
+                    <td style="white-space: nowrap;">{{ ev.usuario }}</td>
+                    <td>
+                      {{ ev.nota }}
+                      @if (ev.anterior || ev.nuevo) {
+                        <span class="text-muted">: {{ ev.anterior || '(vacio)' }} &rarr; {{ ev.nuevo || '(vacio)' }}</span>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        } @else {
+          <div class="empty-state">Todavia no hay eventos registrados para esta cita.</div>
+        }
+      }
     </div>
   </div>
 }
@@ -456,7 +488,22 @@
             } @else {
               @for (r of recetasDeHistoria(); track r.id) {
                 <div class="card mt-16">
-                  <div class="text-muted text-sm">{{ r.fecha_cita | date:'dd/MM/yyyy' }} &middot; {{ r.doctor_nombre }}</div>
+                  <div class="flex items-center" style="justify-content: space-between;">
+                    <div class="text-muted text-sm">{{ r.fecha_cita | date:'dd/MM/yyyy' }} &middot; {{ r.doctor_nombre }}</div>
+                    <div class="flex gap-6">
+                      <button type="button" class="btn-icon" title="Imprimir" aria-label="Imprimir" (click)="imprimirReceta(r)">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                      </button>
+                      @if (puedeModificarReceta(r)) {
+                        <button type="button" class="btn-icon" title="Editar" aria-label="Editar" (click)="editarReceta(r)">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                        </button>
+                        <button type="button" class="btn-icon btn-icon-danger" title="Eliminar" aria-label="Eliminar" (click)="eliminarReceta(r)">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+                        </button>
+                      }
+                    </div>
+                  </div>
                   <ul style="margin:12px 0 0; padding-left:18px;">
                     @for (m of r.medicamentos; track m.id) {
                       <li>
@@ -677,9 +724,17 @@
             <div class="flex items-center" style="justify-content: space-between;">
               <div class="text-muted text-sm">{{ r.created_at | date:'dd/MM/yyyy HH:mm' }}</div>
               <div class="flex gap-6">
-                <button type="button" class="btn btn-outline btn-sm" (click)="imprimirReceta(r)">Imprimir</button>
-                <button type="button" class="btn btn-outline btn-sm" (click)="editarReceta(r)">Editar</button>
-                <button type="button" class="btn btn-danger btn-sm" (click)="eliminarReceta(r)">Eliminar</button>
+                <button type="button" class="btn-icon" title="Imprimir" aria-label="Imprimir" (click)="imprimirReceta(r)">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                </button>
+                @if (puedeModificarReceta(r)) {
+                  <button type="button" class="btn-icon" title="Editar" aria-label="Editar" (click)="editarReceta(r)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                  </button>
+                  <button type="button" class="btn-icon btn-icon-danger" title="Eliminar" aria-label="Eliminar" (click)="eliminarReceta(r)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+                  </button>
+                }
               </div>
             </div>
             <ul style="margin:12px 0 0; padding-left:18px;">
@@ -872,8 +927,11 @@
 @if (recetaParaImprimir(); as r) {
   <div class="print-receta">
     <h2>Receta medica</h2>
-    <div>{{ citaReceta()?.doctor_nombre }} &middot; {{ citaReceta()?.especialidad_nombre }}</div>
-    <div>Paciente: {{ citaReceta()?.paciente_nombre }}</div>
+    <div>
+      {{ r.doctor_nombre || citaReceta()?.doctor_nombre }}
+      @if (citaReceta()?.especialidad_nombre) { &middot; {{ citaReceta()?.especialidad_nombre }} }
+    </div>
+    <div>Paciente: {{ citaReceta()?.paciente_nombre || pacienteDeHistoria()?.nombre }}</div>
     <div>Fecha: {{ r.created_at | date:'dd/MM/yyyy' }}</div>
     <table style="width:100%; margin-top:16px; border-collapse: collapse;">
       <thead>

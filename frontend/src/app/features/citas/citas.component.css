@@ -54,6 +54,22 @@
   font-weight: 700;
 }
 
+/* Historial (log) de la cita: ocupa el resto del alto del drawer (que
+   scrollea como un solo bloque -- ver .drawer en styles.css) en vez de un
+   alto fijo pequeno, mostrando las mas recientes primero. */
+.log-cita-scroll {
+  max-height: calc(100vh - 180px);
+  overflow-y: auto;
+}
+.log-cita-scroll table.data-table {
+  font-size: 10px;
+}
+.log-cita-scroll thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
 .time12 {
   display: flex;
   gap: 6px;

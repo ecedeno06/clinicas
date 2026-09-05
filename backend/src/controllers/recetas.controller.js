@@ -1,5 +1,12 @@
 const { pool } = require('../config/db');
 
+// Solo quien creo la receta puede editarla/eliminarla. Las recetas de
+// antes de este campo (creado_por null, autor desconocido) quedan sin
+// restriccion para no bloquear registros historicos.
+function puedeModificar(receta, usuario) {
+  return !receta.creado_por || receta.creado_por === usuario?.id;
+}
+
 async function cargarMedicamentos(recetaId) {
   const { rows } = await pool.query(
     'select * from receta_medicamentos where receta_id = $1 order by orden asc, created_at asc',
@@ -44,9 +51,9 @@ async function crear(req, res, next) {
 
     await client.query('begin');
     const { rows } = await client.query(
-      `insert into recetas (empresa_id, cita_id, paciente_id, doctor_id, indicaciones_generales)
-       values ($1,$2,$3,$4,$5) returning *`,
-      [req.empresaId, c.id, c.paciente_id, c.doctor_id, indicaciones_generales]
+      `insert into recetas (empresa_id, cita_id, paciente_id, doctor_id, indicaciones_generales, creado_por)
+       values ($1,$2,$3,$4,$5,$6) returning *`,
+      [req.empresaId, c.id, c.paciente_id, c.doctor_id, indicaciones_generales, req.usuario?.id]
     );
     const receta = rows[0];
 
@@ -84,6 +91,9 @@ async function actualizar(req, res, next) {
       [req.params.recetaId, req.empresaId]
     );
     if (!actual.rows[0]) return res.status(404).json({ mensaje: 'Receta no encontrada' });
+    if (!puedeModificar(actual.rows[0], req.usuario)) {
+      return res.status(403).json({ mensaje: 'Solo el usuario que creo esta receta puede editarla' });
+    }
 
     const { indicaciones_generales, medicamentos } = req.body;
     if (!Array.isArray(medicamentos) || medicamentos.length === 0) {
@@ -122,11 +132,18 @@ async function actualizar(req, res, next) {
 // DELETE /api/recetas/:recetaId
 async function eliminar(req, res, next) {
   try {
-    const { rowCount } = await pool.query(
-      `delete from recetas r using citas c
-       where r.cita_id = c.id and r.id = $1 and c.empresa_id = $2`,
+    const actual = await pool.query(
+      `select r.* from recetas r
+       join citas c on c.id = r.cita_id
+       where r.id = $1 and c.empresa_id = $2`,
       [req.params.recetaId, req.empresaId]
     );
+    if (!actual.rows[0]) return res.status(404).json({ mensaje: 'Receta no encontrada' });
+    if (!puedeModificar(actual.rows[0], req.usuario)) {
+      return res.status(403).json({ mensaje: 'Solo el usuario que creo esta receta puede eliminarla' });
+    }
+
+    const { rowCount } = await pool.query('delete from recetas where id = $1', [req.params.recetaId]);
     if (!rowCount) return res.status(404).json({ mensaje: 'Receta no encontrada' });
     res.status(204).send();
   } catch (err) { next(err); }

@@ -1,10 +1,11 @@
 # Actualizacion aplicada a Neon (produccion)
 
-Estado: `001` a `009` ya se aplicaron en Neon (verificado con
+Estado: `001` a `011` ya se aplicaron en Neon (verificado con
 comparacion completa de esquema contra `.19`; `007` certificada en
 desarrollo y promovida el 2026-09-03; `008` aplicada el 2026-09-04;
-`009` aplicada el 2026-09-05). Ver tambien [README.md](./README.md)
-para el registro vivo de que esta aplicado en cada entorno.
+`009`, `010` y `011` aplicadas el 2026-09-05). Ver tambien
+[README.md](./README.md) para el registro vivo de que esta aplicado en
+cada entorno.
 
 ## Resumen
 
@@ -19,6 +20,8 @@ para el registro vivo de que esta aplicado en cada entorno.
 | 7 | `007_laboratorio.sql` | Tablas nuevas `ordenes_laboratorio` y `orden_laboratorio_examenes` | ✅ Aplicada 2026-09-03 |
 | 8 | `008_paciente_foto.sql` | Columna nueva `foto` (base64) en `pacientes` | ✅ Aplicada 2026-09-04 |
 | 9 | `009_citas_reagendar.sql` | Agrega `'reagendar'` al check de `citas.estado` | ✅ Aplicada 2026-09-05 |
+| 10 | `010_citas_log.sql` | Columna nueva `log` (jsonb) en `citas`: bitacora de auditoria | ✅ Aplicada 2026-09-05 |
+| 11 | `011_recetas_creado_por.sql` | Columna nueva `creado_por` en `recetas` | ✅ Aplicada 2026-09-05 |
 
 ---
 
@@ -166,6 +169,48 @@ bloque eliminado paso a `reagendar`; una cita `atendida` y otra ya
 vencida dentro del mismo rango horario NO se tocaron. Aplicada a Neon
 el 2026-09-05, verificada con `pg_get_constraintdef` (constraint
 incluye `'reagendar'::text`).
+
+---
+
+## 10. `010_citas_log.sql` — Bitacora de auditoria de la cita
+
+Columna aditiva `log jsonb not null default '[]'::jsonb` en `citas`: un
+objeto `{fecha, usuario, nota}` por cada interaccion con la cita (crear,
+editar, reagendar, cambiar estado, y marcar `reagendar` cuando se elimina
+el bloque de horario del doctor que la cubria). Se agrega solo, nunca se
+edita ni se borra una entrada existente. Helper compartido en
+`backend/src/utils/citaLog.js` (`registrarEventoCita`/`primerEventoLog`),
+usado desde `citas.controller.js` (`crear`/`actualizar`) y
+`doctorHorarios.controller.js` (`eliminar`).
+
+Se muestra en el panel de "Editar cita" (frontend), en un card debajo de
+Observaciones, con las 3 entradas mas recientes visibles y scroll vertical
+para el resto.
+
+Probada con Postgres desechable (creacion limpia + re-ejecucion
+idempotente) y luego end-to-end contra `.19` via curl: crear cita, cambiar
+fecha/hora, cambiar estado, y eliminar un bloque de horario con una cita
+afectada -- las 4 notas quedaron con el texto y usuario esperados.
+Aplicada a Neon el 2026-09-05.
+
+---
+
+## 11. `011_recetas_creado_por.sql` — Autor de la receta
+
+Columna aditiva `creado_por uuid references usuarios(id)` en `recetas`:
+el usuario logueado que registro la receta (no el doctor al que se
+atribuye medicamente). Se guarda al crear (`recetas.controller.js#crear`)
+y se usa para restringir editar/eliminar solo a su autor -- tanto en el
+backend (403 si no coincide) como en el frontend (los botones "Editar"/
+"Eliminar" se ocultan; "Imprimir" sigue disponible para cualquiera).
+Recetas anteriores a este campo (`creado_por` null, autor desconocido)
+quedan sin restriccion para no bloquear registros historicos.
+
+Probada con Postgres desechable (creacion limpia + re-ejecucion
+idempotente) y luego end-to-end contra `.19`: un segundo usuario de la
+misma clinica recibe 403 al intentar editar/eliminar la receta de otro,
+y no ve esos botones en la UI; el autor si puede. Aplicada a Neon el
+2026-09-05.
 
 ---
 

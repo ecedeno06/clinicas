@@ -1,4 +1,5 @@
 const { pool } = require('../config/db');
+const { registrarEventosCita, primerEventoLog } = require('../utils/citaLog');
 
 // GET /api/citas?doctor_id=&paciente_id=&estado=&desde=&hasta=
 async function listar(req, res, next) {
@@ -102,10 +103,11 @@ async function crear(req, res, next) {
       return res.status(409).json({ mensaje: 'El doctor ya tiene una cita agendada que se cruza con ese horario.' });
     }
 
+    const log = primerEventoLog(req.usuario?.nombre, 'Cita creada');
     const { rows } = await pool.query(
-      `insert into citas (empresa_id, paciente_id, doctor_id, fecha, hora_inicio, hora_fin, motivo, observaciones, estado)
-       values ($1,$2,$3,$4,$5,$6,$7,$8, coalesce($9, 'pendiente')) returning *`,
-      [req.empresaId, paciente_id, doctor_id, fecha, hora_inicio, hora_fin, motivo, observaciones, estado]
+      `insert into citas (empresa_id, paciente_id, doctor_id, fecha, hora_inicio, hora_fin, motivo, observaciones, estado, log)
+       values ($1,$2,$3,$4,$5,$6,$7,$8, coalesce($9, 'pendiente'), $10::jsonb) returning *`,
+      [req.empresaId, paciente_id, doctor_id, fecha, hora_inicio, hora_fin, motivo, observaciones, estado, log]
     );
     res.status(201).json(rows[0]);
   } catch (err) { next(err); }
@@ -152,7 +154,7 @@ async function actualizar(req, res, next) {
       nuevoEstado = 'pendiente';
     }
 
-    const { rows } = await pool.query(
+    await pool.query(
       `update citas set
          fecha = coalesce($1, fecha),
          hora_inicio = coalesce($2, hora_inicio),
@@ -160,10 +162,32 @@ async function actualizar(req, res, next) {
          estado = coalesce($4, estado),
          motivo = coalesce($5, motivo),
          observaciones = coalesce($6, observaciones)
-       where id = $7 and empresa_id = $8 returning *`,
+       where id = $7 and empresa_id = $8`,
       [fecha, hora_inicio, hora_fin, nuevoEstado, motivo, observaciones, req.params.id, req.empresaId]
     );
-    res.json(rows[0]);
+
+    const eventos = [];
+    if (fechaCambio || horaCambio) {
+      eventos.push({
+        nota: 'Horario',
+        anterior: `${fechaComoTexto(cita.fecha)} ${cita.hora_inicio.substring(0, 5)}-${cita.hora_fin.substring(0, 5)}`,
+        nuevo: `${fecha || fechaComoTexto(cita.fecha)} ${nuevaHoraInicio.substring(0, 5)}-${nuevaHoraFin.substring(0, 5)}`,
+      });
+    }
+    if (nuevoEstado && nuevoEstado !== cita.estado) {
+      eventos.push({ nota: 'Estado', anterior: cita.estado, nuevo: nuevoEstado });
+    }
+    if (motivo !== undefined && motivo !== cita.motivo) {
+      eventos.push({ nota: 'Motivo', anterior: cita.motivo || '(vacio)', nuevo: motivo || '(vacio)' });
+    }
+    if (observaciones !== undefined && observaciones !== cita.observaciones) {
+      eventos.push({ nota: 'Observaciones', anterior: cita.observaciones || '(vacio)', nuevo: observaciones || '(vacio)' });
+    }
+    if (!eventos.length) eventos.push({ nota: 'Cita actualizada' });
+    await registrarEventosCita(pool, req.params.id, req.usuario?.nombre, eventos);
+
+    const final = await pool.query('select * from citas where id = $1', [req.params.id]);
+    res.json(final.rows[0]);
   } catch (err) { next(err); }
 }
 

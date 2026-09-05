@@ -165,6 +165,7 @@ create table if not exists citas (
     estado          text not null check (estado in ('pendiente', 'confirmada', 'atendida', 'cancelada', 'no_asistio', 'reagendar')) default 'pendiente',
     motivo          text,
     observaciones   text,
+    log             jsonb not null default '[]'::jsonb,
     created_at      timestamptz not null default now(),
     updated_at      timestamptz not null default now(),
     constraint chk_horario_cita check (hora_fin > hora_inicio)
@@ -243,6 +244,7 @@ create table if not exists recetas (
     paciente_id             uuid not null references pacientes(id) on delete restrict,
     doctor_id               uuid not null references doctores(id) on delete restrict,
     indicaciones_generales  text,
+    creado_por              uuid references usuarios(id),
     created_at              timestamptz not null default now(),
     updated_at              timestamptz not null default now()
 );

@@ -1,4 +1,5 @@
 const { pool } = require('../config/db');
+const { registrarEventoCita } = require('../utils/citaLog');
 
 const DURACION_SLOT_MINUTOS = 30;
 
@@ -167,8 +168,8 @@ async function eliminar(req, res, next) {
     }
     const h = horario.rows[0];
 
-    const afectadas = await client.query(
-      `update citas set estado = 'reagendar'
+    const objetivo = await client.query(
+      `select id, estado from citas
        where doctor_id = $1
          and empresa_id = $2
          and estado in ('pendiente', 'confirmada')
@@ -176,14 +177,22 @@ async function eliminar(req, res, next) {
          and extract(dow from fecha) = $3
          and hora_inicio >= $4
          and hora_fin <= $5
-       returning id`,
+       for update`,
       [h.doctor_id, req.empresaId, h.dia_semana, h.hora_inicio, h.hora_fin]
     );
 
+    for (const row of objetivo.rows) {
+      await client.query(`update citas set estado = 'reagendar' where id = $1`, [row.id]);
+      await registrarEventoCita(
+        client, row.id, req.usuario?.nombre,
+        'Marcada para reagendar: se elimino el bloque de horario del doctor que la cubria',
+        row.estado, 'reagendar'
+      );
+    }
     await client.query('delete from doctor_horarios where id = $1', [h.id]);
 
     await client.query('COMMIT');
-    res.json({ eliminado: true, citas_afectadas: afectadas.rowCount });
+    res.json({ eliminado: true, citas_afectadas: objetivo.rows.length });
   } catch (err) {
     await client.query('ROLLBACK');
     next(err);

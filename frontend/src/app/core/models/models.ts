@@ -119,6 +119,14 @@ export interface Disponibilidad {
 
 export type EstadoCita = 'pendiente' | 'confirmada' | 'atendida' | 'cancelada' | 'no_asistio' | 'reagendar';
 
+export interface EventoCitaLog {
+  fecha: string;
+  usuario: string;
+  nota: string;
+  anterior?: string | null;
+  nuevo?: string | null;
+}
+
 export interface Cita {
   id: string;
   empresa_id?: string;
@@ -139,6 +147,7 @@ export interface Cita {
   tiene_receta?: boolean;
   tiene_laboratorio?: boolean;
   estado_laboratorio?: EstadoLaboratorio | null;
+  log?: EventoCitaLog[];
   created_at?: string;
 }
 
@@ -180,6 +189,7 @@ export interface Receta {
   doctor_id: string;
   indicaciones_generales?: string | null;
   medicamentos: RecetaMedicamento[];
+  creado_por?: string | null;
   created_at?: string;
   updated_at?: string;
   // Presentes solo cuando viene del historial de un paciente (join con la cita)

@@ -25,7 +25,9 @@ export class CitasComponent implements OnInit {
   pacientes = signal<Paciente[]>([]);
   doctores = signal<Doctor[]>([]);
   panelAbierto = signal(false);
+  tabCita = signal<'cita' | 'historial'>('cita');
   editando = signal<Cita | null>(null);
+  logDeCitaDesc = computed(() => [...(this.editando()?.log ?? [])].reverse());
   errorGuardar = signal<string | null>(null);
 
   citaHistoria = signal<Cita | null>(null);
@@ -268,9 +270,17 @@ export class CitasComponent implements OnInit {
     return this.auth.esSuperAdmin() || rol === 'admin' || rol === 'doctor' || rol === 'recepcionista';
   }
 
+  // Solo quien creo la receta puede editarla/eliminarla. Las recetas de
+  // antes de este campo (creado_por null, autor desconocido) quedan sin
+  // restriccion para no bloquear registros historicos.
+  puedeModificarReceta(r: Receta): boolean {
+    return !r.creado_por || r.creado_por === this.auth.usuario()?.id;
+  }
+
   abrirNuevo(): void {
     this.editando.set(null);
     this.disponibilidad.set(null);
+    this.tabCita.set('cita');
     // emitEvent:false para no disparar actualizarDisponibilidad() a mitad del
     // reset (doctor_id y fecha cambiarian en dos eventos separados, el
     // primero con el otro campo todavia con el valor viejo) -- se llama una
@@ -284,6 +294,7 @@ export class CitasComponent implements OnInit {
   abrirEditar(c: Cita): void {
     this.editando.set(c);
     this.disponibilidad.set(null);
+    this.tabCita.set('cita');
     this.form.reset({
       paciente_id: c.paciente_id,
       doctor_id: c.doctor_id,
@@ -576,8 +587,10 @@ export class CitasComponent implements OnInit {
     if (!confirm('Eliminar esta receta?')) return;
     this.srv.eliminarReceta(r.id).subscribe({
       next: () => {
-        const cita = this.citaReceta();
-        if (cita) this.abrirRecetas(cita);
+        const desdeDrawer = this.citaReceta();
+        const desdeConsulta = this.citaHistoria();
+        if (desdeDrawer) this.abrirRecetas(desdeDrawer);
+        else if (desdeConsulta) this.recargarRecetasDeHistoria(desdeConsulta);
         this.cargar();
       },
       error: (err) => alert(err?.error?.mensaje || 'No se pudo eliminar la receta'),
