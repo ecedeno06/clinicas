@@ -1,0 +1,96 @@
+<button type="button" class="btn btn-outline" (click)="abrir()">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V5a2 2 0 0 1 2-2h2M4 17v2a2 2 0 0 0 2 2h2M20 7V5a2 2 0 0 0-2-2h-2M20 17v2a2 2 0 0 1-2 2h-2"/><line x1="7" y1="12" x2="17" y2="12"/></svg>
+  Escanear documento
+</button>
+
+@if (mostrarModal()) {
+  <div class="selector-foto-overlay">
+    <div class="selector-foto-modal escaner-doc-modal">
+      <div class="drawer-header">
+        <h2 style="font-size:16px;">Escanear documento</h2>
+        <button class="close" (click)="cerrar()">&times;</button>
+      </div>
+
+      @if (!imagenCapturada()) {
+        @if (!capturandoCamara()) {
+          <div class="selector-foto-opciones">
+            <button type="button" class="btn btn-outline" (click)="iniciarCamara()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2Z"/><circle cx="12" cy="13" r="4"/></svg>
+              Usar camara
+            </button>
+            <button type="button" class="btn btn-outline" (click)="elegirArchivo()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Buscar en el equipo
+            </button>
+            <div class="selector-foto-paste" tabindex="0" (paste)="onPasteDoc($event)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>
+              <span>Haz clic aqui y presiona Ctrl+V para pegar una imagen</span>
+            </div>
+            <input #fileInputDoc type="file" accept="image/*" style="display:none" (change)="onArchivoSeleccionado($event)" />
+          </div>
+        } @else {
+          <video #videoDoc autoplay playsinline class="selector-foto-video"></video>
+          <div class="form-actions mt-16">
+            <button type="button" class="btn btn-primary" (click)="capturarFoto()">Capturar</button>
+            <button type="button" class="btn btn-outline" (click)="detenerCamara()">Cancelar</button>
+          </div>
+        }
+      } @else {
+        <div class="escaner-doc-resultado">
+          <img [src]="imagenCapturada()" class="escaner-doc-preview" alt="Documento escaneado" />
+          <div class="escaner-doc-texto">
+            @if (procesando()) {
+              <div class="text-muted text-sm">Leyendo el documento...</div>
+            } @else if (errorOcr()) {
+              <div class="error-text">{{ errorOcr() }}</div>
+            } @else {
+              <div class="text-muted text-sm" style="text-transform:uppercase; letter-spacing:.04em; font-weight:600;">
+                Datos detectados &mdash; revisa antes de aplicar
+              </div>
+              <div class="form-group mt-16">
+                <label>Identificacion</label>
+                <input class="input" [ngModel]="campoIdentificacion()" (ngModelChange)="campoIdentificacion.set($event)" [ngModelOptions]="{standalone: true}" />
+              </div>
+              <div class="form-group mt-16">
+                <label>Nombre</label>
+                <input class="input" [ngModel]="campoNombre()" (ngModelChange)="campoNombre.set($event)" [ngModelOptions]="{standalone: true}" />
+              </div>
+              <div class="flex gap-12 mt-16">
+                <div class="form-group" style="flex:1;">
+                  <label>Fecha de nacimiento</label>
+                  <input class="input" type="date" [ngModel]="campoFechaNacimiento()" (ngModelChange)="campoFechaNacimiento.set($event)" [ngModelOptions]="{standalone: true}" />
+                </div>
+                <div class="form-group" style="flex:1;">
+                  <label>Sexo</label>
+                  <select class="input" [ngModel]="campoSexo()" (ngModelChange)="campoSexo.set($event)" [ngModelOptions]="{standalone: true}">
+                    <option value="">Sin especificar</option>
+                    <option value="M">Masculino</option>
+                    <option value="F">Femenino</option>
+                  </select>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+
+        @if (!procesando() && !errorOcr()) {
+          <details class="mt-16">
+            <summary class="text-muted text-sm">Ver texto crudo detectado</summary>
+            <textarea class="input mt-16" rows="8" readonly>{{ textoDetectado() }}</textarea>
+            <div class="form-actions mt-16">
+              <button type="button" class="btn btn-outline btn-sm" (click)="copiarTexto()">{{ copiado() ? 'Copiado' : 'Copiar texto' }}</button>
+            </div>
+          </details>
+        }
+
+        <div class="form-actions mt-16">
+          @if (!procesando() && !errorOcr()) {
+            <button type="button" class="btn btn-primary" (click)="usarEstosDatos()">Usar estos datos</button>
+          }
+          <button type="button" class="btn btn-outline" (click)="escanearOtro()">Escanear otro</button>
+          <button type="button" class="btn btn-outline" (click)="cerrar()">Cerrar</button>
+        </div>
+      }
+    </div>
+  </div>
+}

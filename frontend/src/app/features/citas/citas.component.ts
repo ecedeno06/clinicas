@@ -333,7 +333,11 @@ export class CitasComponent implements OnInit {
     this.citaHistoria.set(c);
     this.tabHistoria.set('consulta');
     this.historia.set(null);
-    this.historiaForm.reset();
+    // Si todavia no existe historia clinica para esta cita, se precarga el
+    // motivo que ya quedo anotado al agendarla (c.motivo) para que el
+    // doctor no tenga que volver a escribirlo -- si ya hay una historia
+    // guardada, se respeta tal cual lo que el doctor escribio ahi.
+    this.historiaForm.reset({ motivo_consulta: c.motivo ?? '' });
     this.cargandoHistoria.set(true);
     this.srv.obtenerHistoria(c.id).subscribe({
       next: (data) => {

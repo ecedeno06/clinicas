@@ -9,11 +9,12 @@ import { clasificarImc } from '../../core/utils/imc.util';
 import { clasificarPresion } from '../../core/utils/presion.util';
 import { clasificarGlucosa } from '../../core/utils/glucosa.util';
 import { SelectorFotoComponent } from '../../core/components/selector-foto/selector-foto.component';
+import { EscanerDocumentoComponent, DatosDocumentoDetectados } from '../../core/components/escaner-documento/escaner-documento.component';
 
 @Component({
   selector: 'app-pacientes',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule, SelectorFotoComponent],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, SelectorFotoComponent, EscanerDocumentoComponent],
   templateUrl: './pacientes.component.html',
   styleUrl: './pacientes.component.css',
 })
@@ -132,6 +133,22 @@ export class PacientesComponent implements OnInit {
   onFotoEliminada(): void {
     this.form.patchValue({ foto: null });
     this.form.get('foto')?.markAsDirty();
+  }
+
+  // Solo rellena los campos que el escaneo si detecto -- nunca borra lo
+  // que el usuario ya haya escrito a mano con un valor vacio.
+  onDatosEscaneados(datos: DatosDocumentoDetectados): void {
+    const cambios: Record<string, string> = {};
+    if (datos.identificacion) cambios['identificacion'] = datos.identificacion;
+    if (datos.nombre) cambios['nombre'] = datos.nombre;
+    if (datos.fecha_nacimiento) cambios['fecha_nacimiento'] = datos.fecha_nacimiento;
+    if (datos.sexo) cambios['sexo'] = datos.sexo;
+    if (Object.keys(cambios).length === 0) {
+      alert('No se detectaron datos reconocibles en el documento.');
+      return;
+    }
+    this.form.patchValue(cambios);
+    if (cambios['identificacion']) this.onIdentificacionBlur();
   }
 
   // Solo aplica al registrar un paciente nuevo: busca en TODA la red (no
