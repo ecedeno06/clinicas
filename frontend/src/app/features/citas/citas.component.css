@@ -31,6 +31,29 @@
   min-width: 0;
 }
 
+/* Historial de signos vitales dentro de Consulta: muestra ~5 filas y
+   scrollea en vertical en vez de estirar el modal indefinidamente. */
+.table-wrap-scroll-5 {
+  max-height: 260px;
+  overflow-y: auto;
+}
+.table-wrap-scroll-5 thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+/* La fila de la consulta en curso resalta en verde; el resto del
+   historial queda tenue para que se note cual fila edita el formulario
+   de abajo. */
+.table-wrap-scroll-5 tbody tr td {
+  color: var(--slate-500);
+}
+.table-wrap-scroll-5 tbody tr.fila-signos-actual td {
+  color: var(--text-on-tint-green);
+  font-weight: 700;
+}
+
 .time12 {
   display: flex;
   gap: 6px;

@@ -347,6 +347,25 @@ export class CitasComponent implements OnInit {
     this.recargarRecetasDeHistoria(c);
     this.mostrarFormularioReceta.set(false);
     this.recetaEditando.set(null);
+
+    // Signos vitales propios de esta cita (para el formulario de agregar/editar
+    // dentro del tab), separado de signosVitalesDeHistoria (lista de solo lectura
+    // con TODAS las citas del paciente).
+    this.signosVitales.set(null);
+    this.signosForm.reset();
+    this.srv.obtenerSignosVitales(c.id).subscribe({
+      next: (data) => { this.signosVitales.set(data); this.signosForm.reset({ ...data }); },
+      error: () => {}, // 404: esta cita todavia no tiene signos vitales
+    });
+  }
+
+  private recargarSignosDeHistoria(c: Cita): void {
+    this.signosVitalesDeHistoria.set([]);
+    this.cargandoSignosHistoria.set(true);
+    this.pacientesSrv.signosVitalesHistorial(c.paciente_id).subscribe({
+      next: (data) => { this.signosVitalesDeHistoria.set(data); this.cargandoSignosHistoria.set(false); },
+      error: () => this.cargandoSignosHistoria.set(false),
+    });
   }
 
   private recargarRecetasDeHistoria(c: Cita): void {
@@ -430,9 +449,25 @@ export class CitasComponent implements OnInit {
     return clasificarGlucosa(glucosa);
   }
 
+  // Solo se puede registrar/editar signos vitales el mismo dia de la
+  // consulta o el dia siguiente; pasado eso el backend tambien lo rechaza
+  // (esto es solo para deshabilitar el formulario antes de intentarlo).
+  diasDesdeConsulta(cita: Cita): number {
+    const hoy = new Date().toISOString().substring(0, 10);
+    const msPorDia = 24 * 60 * 60 * 1000;
+    return Math.round((new Date(hoy).getTime() - new Date(cita.fecha).getTime()) / msPorDia);
+  }
+
+  signosBloqueado(cita: Cita | null | undefined): boolean {
+    if (!cita) return false;
+    return this.diasDesdeConsulta(cita) > 1;
+  }
+
   guardarSignos(): void {
-    const cita = this.citaSignos();
-    if (!cita) return;
+    const desdeDrawer = this.citaSignos();
+    const desdeConsulta = this.citaHistoria();
+    const cita = desdeDrawer ?? desdeConsulta;
+    if (!cita || this.signosBloqueado(cita)) return;
     const data = this.signosForm.getRawValue();
     const existente = this.signosVitales();
     const req = existente ? this.srv.actualizarSignosVitales(cita.id, data) : this.srv.crearSignosVitales(cita.id, data);
@@ -440,7 +475,8 @@ export class CitasComponent implements OnInit {
       next: (sv) => {
         this.signosVitales.set(sv);
         this.cargar();
-        this.cerrarSignos();
+        if (desdeDrawer) this.cerrarSignos();
+        else if (desdeConsulta) this.recargarSignosDeHistoria(desdeConsulta);
       },
       error: (err) => alert(err?.error?.mensaje || 'No se pudieron guardar los signos vitales'),
     });
