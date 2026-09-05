@@ -1,11 +1,10 @@
 # Actualizacion aplicada a Neon (produccion)
 
-Estado: `001` a `008` ya se aplicaron en Neon (verificado con
+Estado: `001` a `009` ya se aplicaron en Neon (verificado con
 comparacion completa de esquema contra `.19`; `007` certificada en
-desarrollo y promovida el 2026-09-03; `008` aplicada el 2026-09-04).
-`009` esta aplicada solo en `.19` por ahora (pendiente de promover). Ver
-tambien [README.md](./README.md) para el registro vivo de que esta
-aplicado en cada entorno.
+desarrollo y promovida el 2026-09-03; `008` aplicada el 2026-09-04;
+`009` aplicada el 2026-09-05). Ver tambien [README.md](./README.md)
+para el registro vivo de que esta aplicado en cada entorno.
 
 ## Resumen
 
@@ -19,7 +18,7 @@ aplicado en cada entorno.
 | 6 | `006_horarios_doctores.sql` | Tabla nueva `doctor_horarios` (horario semanal por doctor) | ✅ Aplicada |
 | 7 | `007_laboratorio.sql` | Tablas nuevas `ordenes_laboratorio` y `orden_laboratorio_examenes` | ✅ Aplicada 2026-09-03 |
 | 8 | `008_paciente_foto.sql` | Columna nueva `foto` (base64) en `pacientes` | ✅ Aplicada 2026-09-04 |
-| 9 | `009_citas_reagendar.sql` | Agrega `'reagendar'` al check de `citas.estado` | ⬜ Pendiente |
+| 9 | `009_citas_reagendar.sql` | Agrega `'reagendar'` al check de `citas.estado` | ✅ Aplicada 2026-09-05 |
 
 ---
 
@@ -164,8 +163,9 @@ por reagendar" que enlaza a Citas filtrado por ese estado.
 Probada con Postgres desechable (creacion limpia + re-ejecucion
 idempotente) y luego end-to-end contra `.19`: una cita activa dentro del
 bloque eliminado paso a `reagendar`; una cita `atendida` y otra ya
-vencida dentro del mismo rango horario NO se tocaron. Aplicada solo en
-`.19` por ahora -- pendiente de promover a Neon.
+vencida dentro del mismo rango horario NO se tocaron. Aplicada a Neon
+el 2026-09-05, verificada con `pg_get_constraintdef` (constraint
+incluye `'reagendar'::text`).
 
 ---
 
