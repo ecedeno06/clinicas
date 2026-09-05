@@ -45,7 +45,8 @@
               [class.badge-slate]="c.estado === 'pendiente'"
               [class.badge-amber]="c.estado === 'confirmada'"
               [class.badge-green]="c.estado === 'atendida'"
-              [class.badge-red]="c.estado === 'cancelada' || c.estado === 'no_asistio'">
+              [class.badge-red]="c.estado === 'cancelada' || c.estado === 'no_asistio'"
+              [class.badge-violet]="c.estado === 'reagendar'">
               {{ c.estado }}
             </span>
           </td>
@@ -218,6 +219,7 @@
               <option value="atendida">Atendida</option>
               <option value="cancelada">Cancelada</option>
               <option value="no_asistio">No asistio</option>
+              <option value="reagendar">Reagendar</option>
             </select>
           </div>
         }

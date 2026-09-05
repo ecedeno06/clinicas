@@ -129,6 +129,11 @@ export class PacientesComponent implements OnInit {
     this.form.get('foto')?.markAsDirty();
   }
 
+  onFotoEliminada(): void {
+    this.form.patchValue({ foto: null });
+    this.form.get('foto')?.markAsDirty();
+  }
+
   // Solo aplica al registrar un paciente nuevo: busca en TODA la red (no
   // solo esta clinica) si la identificacion ya pertenece a alguien. Si es
   // asi, reutiliza sus datos globales (alergias, contacto de emergencia,

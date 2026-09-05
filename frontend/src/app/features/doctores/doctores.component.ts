@@ -165,6 +165,17 @@ export class DoctoresComponent implements OnInit {
   eliminarHorario(h: DoctorHorario): void {
     const doctor = this.horarioDoctor();
     if (!doctor) return;
-    this.srv.eliminarHorario(h.id).subscribe(() => this.cargarHorarios(doctor.id));
+    if (!confirm('Eliminar este bloque de horario?')) return;
+    this.srv.eliminarHorario(h.id).subscribe({
+      next: (res) => {
+        this.cargarHorarios(doctor.id);
+        if (res.citas_afectadas > 0) {
+          alert(
+            `Se elimino el bloque de horario. ${res.citas_afectadas} cita(s) quedaron sin disponibilidad y se marcaron como "Por reagendar".`
+          );
+        }
+      },
+      error: (err) => alert(err?.error?.mensaje || 'No se pudo eliminar el horario'),
+    });
   }
 }

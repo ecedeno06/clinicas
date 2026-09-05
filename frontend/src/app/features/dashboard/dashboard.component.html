@@ -22,6 +22,12 @@
     <div class="label">Citas pendientes</div>
     <div class="value">{{ citasPendientes() }}</div>
   </div>
+  @if (citasPorReagendar() > 0) {
+    <a class="stat-card stat-card-clickable" routerLink="/citas" [queryParams]="{ estado: 'reagendar' }">
+      <div class="label">Citas por reagendar</div>
+      <div class="value">{{ citasPorReagendar() }}</div>
+    </a>
+  }
   @if (puedeVerLaboratorio()) {
     <button type="button" class="stat-card stat-card-clickable" (click)="mostrarPendientesLaboratorio.set(true)">
       <div class="label">Laboratorios pendientes</div>
@@ -96,7 +102,8 @@
               [class.badge-slate]="c.estado === 'pendiente'"
               [class.badge-amber]="c.estado === 'confirmada'"
               [class.badge-green]="c.estado === 'atendida'"
-              [class.badge-red]="c.estado === 'cancelada' || c.estado === 'no_asistio'">
+              [class.badge-red]="c.estado === 'cancelada' || c.estado === 'no_asistio'"
+              [class.badge-violet]="c.estado === 'reagendar'">
               {{ c.estado }}
             </span>
           </td>

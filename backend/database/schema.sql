@@ -162,7 +162,7 @@ create table if not exists citas (
     fecha           date not null,
     hora_inicio     time not null,
     hora_fin        time not null,
-    estado          text not null check (estado in ('pendiente', 'confirmada', 'atendida', 'cancelada', 'no_asistio')) default 'pendiente',
+    estado          text not null check (estado in ('pendiente', 'confirmada', 'atendida', 'cancelada', 'no_asistio', 'reagendar')) default 'pendiente',
     motivo          text,
     observaciones   text,
     created_at      timestamptz not null default now(),

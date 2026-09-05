@@ -2,7 +2,8 @@
 
 Estado: `001` a `008` ya se aplicaron en Neon (verificado con
 comparacion completa de esquema contra `.19`; `007` certificada en
-desarrollo y promovida el 2026-09-03; `008` aplicada el 2026-09-04). Ver
+desarrollo y promovida el 2026-09-03; `008` aplicada el 2026-09-04).
+`009` esta aplicada solo en `.19` por ahora (pendiente de promover). Ver
 tambien [README.md](./README.md) para el registro vivo de que esta
 aplicado en cada entorno.
 
@@ -18,6 +19,7 @@ aplicado en cada entorno.
 | 6 | `006_horarios_doctores.sql` | Tabla nueva `doctor_horarios` (horario semanal por doctor) | ✅ Aplicada |
 | 7 | `007_laboratorio.sql` | Tablas nuevas `ordenes_laboratorio` y `orden_laboratorio_examenes` | ✅ Aplicada 2026-09-03 |
 | 8 | `008_paciente_foto.sql` | Columna nueva `foto` (base64) en `pacientes` | ✅ Aplicada 2026-09-04 |
+| 9 | `009_citas_reagendar.sql` | Agrega `'reagendar'` al check de `citas.estado` | ⬜ Pendiente |
 
 ---
 
@@ -144,6 +146,26 @@ Columna aditiva `foto text` en `pacientes` (mismo patron ya usado en
 Pacientes (camara, archivo del equipo o pegar) y solo se persiste al
 guardar el registro. Aplicada a Neon el 2026-09-04, verificada con
 `\d pacientes` (columna `foto | text` presente).
+
+---
+
+## 9. `009_citas_reagendar.sql` — Estado `reagendar` en citas
+
+Agrega `'reagendar'` a los valores permitidos del check de `citas.estado`
+(dropea y vuelve a crear `citas_estado_check`, ya que es un check inline,
+no un tipo enum). Se usa cuando un admin elimina un bloque de horario de
+un doctor (`DELETE /api/horarios/:id`): antes de borrar el bloque, el
+backend marca como `reagendar` las citas que quedarian sin disponibilidad
+(activas -- pendiente/confirmada --, no vencidas, y cuyo horario cae
+dentro del bloque eliminado), y devuelve cuantas fueron afectadas para
+que el frontend avise al usuario. El tablero muestra una pastilla "Citas
+por reagendar" que enlaza a Citas filtrado por ese estado.
+
+Probada con Postgres desechable (creacion limpia + re-ejecucion
+idempotente) y luego end-to-end contra `.19`: una cita activa dentro del
+bloque eliminado paso a `reagendar`; una cita `atendida` y otra ya
+vencida dentro del mismo rango horario NO se tocaron. Aplicada solo en
+`.19` por ahora -- pendiente de promover a Neon.
 
 ---
 

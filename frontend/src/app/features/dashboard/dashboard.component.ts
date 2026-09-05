@@ -31,6 +31,7 @@ export class DashboardComponent implements OnInit {
   doctoresActivos = computed(() => this.doctores().filter((d) => d.activo).length);
   citasHoy = computed(() => this.citas().filter((c) => c.fecha.substring(0, 10) === hoyISO()).length);
   citasPendientes = computed(() => this.citas().filter((c) => c.estado === 'pendiente' || c.estado === 'confirmada').length);
+  citasPorReagendar = computed(() => this.citas().filter((c) => c.estado === 'reagendar').length);
 
   esHoy = computed(() => this.fechaAgenda() === hoyISO());
 

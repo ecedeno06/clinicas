@@ -23,6 +23,7 @@ export class SelectorFotoComponent implements OnDestroy {
   // edita desde el registro del paciente).
   @Input() soloLectura = false;
   @Output() fotoCambiada = new EventEmitter<string>();
+  @Output() fotoEliminada = new EventEmitter<void>();
 
   mostrarSelector = signal(false);
   capturandoCamara = signal(false);
@@ -105,6 +106,12 @@ export class SelectorFotoComponent implements OnDestroy {
       }
     }
     alert('No se encontro ninguna imagen en el portapapeles.');
+  }
+
+  eliminarFoto(): void {
+    if (!confirm('Eliminar esta foto?')) return;
+    this.fotoEliminada.emit();
+    this.cerrarSelector();
   }
 
   ngOnDestroy(): void {

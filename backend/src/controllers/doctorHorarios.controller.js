@@ -143,15 +143,53 @@ async function actualizar(req, res, next) {
 }
 
 // DELETE /api/doctores/horarios/:id
+// Antes de borrar el bloque, marca como 'reagendar' las citas que quedarian
+// sin disponibilidad: activas (pendiente/confirmada), no vencidas (fecha >=
+// hoy) y cuyo horario cae dentro de este bloque (los bloques del mismo dia
+// no se superponen -- ver hayChoqueDeBloque -- asi que ninguna otra franja
+// las cubre). Se devuelve cuantas fueron afectadas para que el frontend
+// avise al usuario.
 async function eliminar(req, res, next) {
+  const client = await pool.connect();
   try {
-    const { rowCount } = await pool.query(
-      `delete from doctor_horarios where id = $1 and doctor_id in (select id from doctores where empresa_id = $2)`,
+    await client.query('BEGIN');
+
+    const horario = await client.query(
+      `select h.* from doctor_horarios h
+       join doctores d on d.id = h.doctor_id
+       where h.id = $1 and d.empresa_id = $2
+       for update`,
       [req.params.id, req.empresaId]
     );
-    if (!rowCount) return res.status(404).json({ mensaje: 'Horario no encontrado' });
-    res.status(204).send();
-  } catch (err) { next(err); }
+    if (!horario.rows[0]) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ mensaje: 'Horario no encontrado' });
+    }
+    const h = horario.rows[0];
+
+    const afectadas = await client.query(
+      `update citas set estado = 'reagendar'
+       where doctor_id = $1
+         and empresa_id = $2
+         and estado in ('pendiente', 'confirmada')
+         and fecha >= current_date
+         and extract(dow from fecha) = $3
+         and hora_inicio >= $4
+         and hora_fin <= $5
+       returning id`,
+      [h.doctor_id, req.empresaId, h.dia_semana, h.hora_inicio, h.hora_fin]
+    );
+
+    await client.query('delete from doctor_horarios where id = $1', [h.id]);
+
+    await client.query('COMMIT');
+    res.json({ eliminado: true, citas_afectadas: afectadas.rowCount });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    next(err);
+  } finally {
+    client.release();
+  }
 }
 
 // GET /api/doctores/:id/disponibilidad?fecha=YYYY-MM-DD

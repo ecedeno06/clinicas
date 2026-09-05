@@ -34,6 +34,9 @@
   --green-600: #16a34a;
   --green-100: #dcfce7;
 
+  --violet-600: #7c3aed;
+  --violet-100: #ede9fe;
+
   /* Fondos "tinte" + texto de acento para badges y botones de peligro.
      Estos si se redefinen en modo oscuro (fondos translucidos, texto
      mas brillante) para mantener buen contraste sobre superficies oscuras. */
@@ -41,10 +44,12 @@
   --tint-green-bg: var(--green-100);
   --tint-amber-bg: var(--amber-100);
   --tint-teal-bg: var(--teal-100);
+  --tint-violet-bg: var(--violet-100);
   --text-on-tint-red: var(--red-600);
   --text-on-tint-green: var(--green-600);
   --text-on-tint-amber: var(--amber-500);
   --text-on-tint-teal: var(--teal-600);
+  --text-on-tint-violet: var(--violet-600);
 
   /* Tipografia */
   --font-display: 'Space Grotesk', 'Inter', sans-serif;
@@ -77,10 +82,12 @@
   --tint-green-bg: rgba(74, 222, 128, 0.16);
   --tint-amber-bg: rgba(251, 191, 36, 0.16);
   --tint-teal-bg: rgba(45, 212, 191, 0.16);
+  --tint-violet-bg: rgba(167, 139, 250, 0.2);
   --text-on-tint-red: #f87171;
   --text-on-tint-green: #4ade80;
   --text-on-tint-amber: #fbbf24;
   --text-on-tint-teal: #5eead4;
+  --text-on-tint-violet: #c4b5fd;
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.45);
@@ -397,6 +404,31 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; colo
 .btn-icon-green { background: var(--tint-green-bg); color: var(--text-on-tint-green); border-color: var(--tint-green-bg); }
 .btn-icon-green:hover { filter: brightness(0.96); }
 
+/* Boton de cambio de tema: brillo verde fluorescente (en vez del gris
+   generico de .btn-icon), igual para el icono de sol o de luna, en ambos
+   temas -- varias capas de box-shadow para un halo tipo neon. */
+.theme-toggle {
+  transition: background 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+  background: rgba(57, 255, 20, 0.14);
+  border-color: rgba(57, 255, 20, 0.45);
+  color: #16a34a;
+  box-shadow:
+    0 0 0 1px rgba(57, 255, 20, 0.4),
+    0 0 10px 2px rgba(57, 255, 20, 0.55),
+    0 0 22px 6px rgba(57, 255, 20, 0.3);
+}
+.theme-toggle:hover { filter: brightness(1.08); }
+
+[data-theme="dark"] .theme-toggle {
+  background: rgba(57, 255, 20, 0.18);
+  border-color: rgba(57, 255, 20, 0.55);
+  color: #39ff14;
+  box-shadow:
+    0 0 0 1px rgba(57, 255, 20, 0.55),
+    0 0 14px 3px rgba(57, 255, 20, 0.75),
+    0 0 28px 9px rgba(57, 255, 20, 0.4);
+}
+
 .user-pill-btn {
   background: none;
   border: none;
@@ -682,6 +714,7 @@ table.data-table {
 .badge-amber { background: var(--tint-amber-bg); color: var(--text-on-tint-amber); }
 .badge-red { background: var(--tint-red-bg); color: var(--text-on-tint-red); }
 .badge-slate { background: var(--slate-100); color: var(--slate-500); }
+.badge-violet { background: var(--tint-violet-bg); color: var(--text-on-tint-violet); }
 
 /* ---------- Formularios ---------- */
 .form-grid {

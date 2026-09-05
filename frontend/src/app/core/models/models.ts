@@ -117,7 +117,7 @@ export interface Disponibilidad {
   libres: FranjaHoraria[];
 }
 
-export type EstadoCita = 'pendiente' | 'confirmada' | 'atendida' | 'cancelada' | 'no_asistio';
+export type EstadoCita = 'pendiente' | 'confirmada' | 'atendida' | 'cancelada' | 'no_asistio' | 'reagendar';
 
 export interface Cita {
   id: string;

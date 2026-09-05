@@ -137,6 +137,21 @@ async function actualizar(req, res, next) {
       }
     }
 
+    // El formulario de edicion siempre reenvia el estado con el que cargo
+    // (incluyendo 'reagendar'), aunque el usuario solo haya venido a
+    // cambiarle la fecha/hora. Si de verdad le da una fecha u horario
+    // nuevo y no eligio explicitamente otro estado, se considera
+    // reagendada y vuelve sola a 'pendiente' -- si el usuario si eligio
+    // otro estado (confirmada, cancelada, etc.) se respeta tal cual.
+    let nuevoEstado = estado;
+    const fechaCambio = fecha && fecha !== fechaComoTexto(cita.fecha);
+    const horaCambio =
+      (hora_inicio && hora_inicio.substring(0, 5) !== cita.hora_inicio.substring(0, 5)) ||
+      (hora_fin && hora_fin.substring(0, 5) !== cita.hora_fin.substring(0, 5));
+    if (cita.estado === 'reagendar' && estado === 'reagendar' && (fechaCambio || horaCambio)) {
+      nuevoEstado = 'pendiente';
+    }
+
     const { rows } = await pool.query(
       `update citas set
          fecha = coalesce($1, fecha),
@@ -146,10 +161,15 @@ async function actualizar(req, res, next) {
          motivo = coalesce($5, motivo),
          observaciones = coalesce($6, observaciones)
        where id = $7 and empresa_id = $8 returning *`,
-      [fecha, hora_inicio, hora_fin, estado, motivo, observaciones, req.params.id, req.empresaId]
+      [fecha, hora_inicio, hora_fin, nuevoEstado, motivo, observaciones, req.params.id, req.empresaId]
     );
     res.json(rows[0]);
   } catch (err) { next(err); }
+}
+
+function fechaComoTexto(fecha) {
+  if (typeof fecha === 'string') return fecha.substring(0, 10);
+  return fecha.toISOString().substring(0, 10);
 }
 
 async function eliminar(req, res, next) {

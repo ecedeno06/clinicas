@@ -174,6 +174,7 @@ export class CitasComponent implements OnInit {
     if (params.get('fecha')) this.filtroFecha.set(params.get('fecha')!);
     if (params.get('paciente')) this.filtroPaciente.set(params.get('paciente')!);
     if (params.get('doctor')) this.filtroDoctor.set(params.get('doctor')!);
+    if (params.get('estado')) this.filtroEstado.set(params.get('estado')!);
   }
 
   actualizarDisponibilidad(): void {
