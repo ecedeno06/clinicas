@@ -68,6 +68,15 @@ export class LayoutComponent {
     input.value = '';
   }
 
+  eliminarFotoPerfil(): void {
+    this.menuAbierto.set(false);
+    if (!confirm('Eliminar tu foto de perfil?')) return;
+    this.auth.actualizarAvatar(null).subscribe({
+      next: () => {},
+      error: (err) => alert(err?.error?.mensaje || 'No se pudo eliminar la foto de perfil'),
+    });
+  }
+
   abrirCambioPassword(): void {
     this.menuAbierto.set(false);
     this.passwordForm.reset();

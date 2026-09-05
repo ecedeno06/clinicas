@@ -118,6 +118,9 @@
             <div class="dropdown-backdrop" (click)="menuAbierto.set(false)"></div>
             <div class="dropdown-menu">
               <button type="button" class="dropdown-item" (click)="fileInput.click()">Cambiar foto de perfil</button>
+              @if (auth.usuario()?.avatar) {
+                <button type="button" class="dropdown-item dropdown-item-danger" (click)="eliminarFotoPerfil()">Eliminar foto de perfil</button>
+              }
               <button type="button" class="dropdown-item" (click)="abrirCambioPassword()">Cambiar contrasena</button>
               <button type="button" class="dropdown-item dropdown-item-danger" (click)="auth.logout()">Salir</button>
             </div>
