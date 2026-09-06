@@ -1,11 +1,12 @@
 const { pool } = require('../config/db');
 const { registrarEventosCita, primerEventoLog } = require('../utils/citaLog');
 const { resolverSucursal } = require('../utils/sucursales');
+const { hayChoqueCampanaParaCita } = require('../utils/choqueCampana');
 
-// GET /api/citas?doctor_id=&paciente_id=&estado=&desde=&hasta=&sucursal_id=
+// GET /api/citas?doctor_id=&paciente_id=&estado=&desde=&hasta=&sucursal_id=&campana_id=
 async function listar(req, res, next) {
   try {
-    const { doctor_id, paciente_id, estado, desde, hasta, sucursal_id } = req.query;
+    const { doctor_id, paciente_id, estado, desde, hasta, sucursal_id, campana_id } = req.query;
     const condiciones = ['c.empresa_id = $1'];
     const valores = [req.empresaId];
 
@@ -15,6 +16,7 @@ async function listar(req, res, next) {
     if (desde) { valores.push(desde); condiciones.push(`c.fecha >= $${valores.length}`); }
     if (hasta) { valores.push(hasta); condiciones.push(`c.fecha <= $${valores.length}`); }
     if (sucursal_id) { valores.push(sucursal_id); condiciones.push(`c.sucursal_id = $${valores.length}`); }
+    if (campana_id) { valores.push(campana_id); condiciones.push(`c.campana_id = $${valores.length}`); }
 
     const where = `where ${condiciones.join(' and ')}`;
 
@@ -23,6 +25,7 @@ async function listar(req, res, next) {
               d.nombre as doctor_nombre, e.nombre as especialidad_nombre,
               s.nombre as sucursal_nombre, s.direccion as sucursal_direccion, s.google_maps_url as sucursal_google_maps_url,
               s.hora_apertura as sucursal_hora_apertura, s.hora_cierre as sucursal_hora_cierre,
+              camp.nombre as campana_nombre,
               (hc.id is not null) as tiene_historia,
               (sv.id is not null) as tiene_signos_vitales,
               exists(select 1 from recetas r where r.cita_id = c.id) as tiene_receta,
@@ -38,6 +41,7 @@ async function listar(req, res, next) {
        join doctores d on d.id = c.doctor_id
        join especialidades e on e.id = d.especialidad_id
        join sucursales s on s.id = c.sucursal_id
+       left join campanas camp on camp.id = c.campana_id
        left join historias_clinicas hc on hc.cita_id = c.id
        left join signos_vitales sv on sv.cita_id = c.id
        ${where}
@@ -54,12 +58,14 @@ async function obtener(req, res, next) {
       `select c.*, p.nombre as paciente_nombre, p.telefono as paciente_telefono, p.acepta_whatsapp as paciente_acepta_whatsapp,
               d.nombre as doctor_nombre, e.nombre as especialidad_nombre,
               s.nombre as sucursal_nombre, s.direccion as sucursal_direccion, s.google_maps_url as sucursal_google_maps_url,
-              s.hora_apertura as sucursal_hora_apertura, s.hora_cierre as sucursal_hora_cierre
+              s.hora_apertura as sucursal_hora_apertura, s.hora_cierre as sucursal_hora_cierre,
+              camp.nombre as campana_nombre
        from citas c
        join pacientes p on p.id = c.paciente_id
        join doctores d on d.id = c.doctor_id
        join especialidades e on e.id = d.especialidad_id
        join sucursales s on s.id = c.sucursal_id
+       left join campanas camp on camp.id = c.campana_id
        where c.id = $1 and c.empresa_id = $2`,
       [req.params.id, req.empresaId]
     );
@@ -119,7 +125,7 @@ async function hayChoqueDePaciente({ empresaId, pacienteId, fecha, horaInicio, h
 // POST /api/citas
 async function crear(req, res, next) {
   try {
-    const { paciente_id, doctor_id, fecha, hora_inicio, hora_fin, motivo, observaciones, estado, sucursal_id } = req.body;
+    const { paciente_id, doctor_id, fecha, hora_inicio, hora_fin, motivo, observaciones, estado, sucursal_id, campana_id } = req.body;
 
     if (!paciente_id || !doctor_id || !fecha || !hora_inicio || !hora_fin) {
       return res.status(400).json({ mensaje: 'paciente, doctor, fecha y horario son requeridos' });
@@ -144,14 +150,43 @@ async function crear(req, res, next) {
       return res.status(409).json({ mensaje: 'El paciente ya tiene otra cita agendada que se cruza con ese horario.' });
     }
 
+    // El doctor no puede tener un compromiso de campana confirmado que se
+    // cruce con este horario (si esta cita es en si de una campana, no
+    // choca contra el compromiso de esa misma campana). Ver
+    // DISENO-CAMPANAS-MEDICAS.md seccion 9.
+    const choqueCampana = await hayChoqueCampanaParaCita({ doctorId: doctor_id, fecha, horaInicio: hora_inicio, horaFin: hora_fin, excluirCampanaId: campana_id || null });
+    if (choqueCampana) {
+      return res.status(409).json({ mensaje: 'El doctor tiene un compromiso de campana confirmado que se cruza con ese horario.' });
+    }
+
     const sucursalId = await resolverSucursal(sucursal_id, req.empresaId);
     if (!sucursalId) return res.status(400).json({ mensaje: 'La sucursal indicada no existe o no pertenece a esta clinica.' });
 
+    // Una cita de campana sigue siendo una cita normal (mismo insert de
+    // siempre) -- solo se valida que la campana este en_curso y que el
+    // doctor este invitado a ella (invitado o confirmado, no rechazado),
+    // para no dejar agendar a nombre de una campana a un doctor que nunca
+    // fue convocado. Ver DISENO-CAMPANAS-MEDICAS.md secciones 6 y 9.
+    if (campana_id) {
+      const campana = await pool.query('select estado from campanas where id = $1 and empresa_id = $2', [campana_id, req.empresaId]);
+      if (!campana.rows[0]) return res.status(400).json({ mensaje: 'La campana indicada no existe o no pertenece a esta clinica.' });
+      if (campana.rows[0].estado !== 'en_curso') {
+        return res.status(400).json({ mensaje: 'Solo se pueden crear citas para una campana que este en curso.' });
+      }
+      const invitado = await pool.query(
+        `select 1 from campana_doctores where campana_id = $1 and doctor_id = $2 and estado <> 'rechazado'`,
+        [campana_id, doctor_id]
+      );
+      if (!invitado.rows[0]) {
+        return res.status(400).json({ mensaje: 'El doctor no esta invitado a esta campana.' });
+      }
+    }
+
     const log = primerEventoLog(req.usuario?.nombre, 'Cita creada');
     const { rows } = await pool.query(
-      `insert into citas (empresa_id, sucursal_id, paciente_id, doctor_id, fecha, hora_inicio, hora_fin, motivo, observaciones, estado, log)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9, coalesce($10, 'pendiente'), $11::jsonb) returning *`,
-      [req.empresaId, sucursalId, paciente_id, doctor_id, fecha, hora_inicio, hora_fin, motivo, observaciones, estado, log]
+      `insert into citas (empresa_id, sucursal_id, paciente_id, doctor_id, campana_id, fecha, hora_inicio, hora_fin, motivo, observaciones, estado, log)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10, coalesce($11, 'pendiente'), $12::jsonb) returning *`,
+      [req.empresaId, sucursalId, paciente_id, doctor_id, campana_id || null, fecha, hora_inicio, hora_fin, motivo, observaciones, estado, log]
     );
     res.status(201).json(rows[0]);
   } catch (err) { next(err); }
@@ -188,6 +223,14 @@ async function actualizar(req, res, next) {
       });
       if (choquePaciente) {
         return res.status(409).json({ mensaje: 'El paciente ya tiene otra cita agendada que se cruza con ese horario.' });
+      }
+
+      const choqueCampana = await hayChoqueCampanaParaCita({
+        doctorId: cita.doctor_id, fecha: nuevaFecha, horaInicio: nuevaHoraInicio, horaFin: nuevaHoraFin,
+        excluirCampanaId: cita.campana_id,
+      });
+      if (choqueCampana) {
+        return res.status(409).json({ mensaje: 'El doctor tiene un compromiso de campana confirmado que se cruza con ese horario.' });
       }
     }
 

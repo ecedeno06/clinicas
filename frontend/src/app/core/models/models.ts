@@ -42,6 +42,46 @@ export interface Sucursal {
   created_at?: string;
 }
 
+export type EstadoCampana = 'borrador' | 'pendiente_aprobacion' | 'aprobada' | 'rechazada' | 'en_curso' | 'finalizada' | 'cancelada';
+export type EstadoInvitacionDoctor = 'invitado' | 'confirmado' | 'rechazado';
+
+export interface CampanaDoctor {
+  id: string;
+  doctor_id: string;
+  doctor_nombre?: string;
+  especialidad_nombre?: string;
+  doctor_telefono?: string | null;
+  doctor_acepta_whatsapp?: boolean;
+  estado: EstadoInvitacionDoctor;
+  notas?: string | null;
+}
+
+export interface Campana {
+  id: string;
+  empresa_id?: string;
+  sucursal_id?: string | null;
+  sucursal_nombre?: string | null;
+  nombre: string;
+  lugar: string;
+  contacto_lugar?: string | null;
+  google_maps_url?: string | null;
+  fecha_inicio: string;
+  fecha_fin: string;
+  hora_inicio?: string | null;
+  hora_fin?: string | null;
+  descripcion?: string | null;
+  estado: EstadoCampana;
+  aprobado_por?: string | null;
+  fecha_aprobacion?: string | null;
+  motivo_rechazo?: string | null;
+  creado_por?: string | null;
+  doctores_invitados?: number;
+  doctores_confirmados?: number;
+  doctores?: CampanaDoctor[];
+  log?: EventoCitaLog[];
+  created_at?: string;
+}
+
 // Clinica a la que pertenece el usuario autenticado, con su rol en ella
 export interface EmpresaSeleccionable {
   empresa_id: string;
@@ -104,6 +144,7 @@ export interface Doctor {
   nombre: string;
   numero_colegiado?: string;
   telefono?: string;
+  acepta_whatsapp?: boolean;
   email?: string;
   activo: boolean;
   created_at?: string;
@@ -160,6 +201,8 @@ export interface Cita {
   sucursal_google_maps_url?: string | null;
   sucursal_hora_apertura?: string | null;
   sucursal_hora_cierre?: string | null;
+  campana_id?: string | null;
+  campana_nombre?: string | null;
   paciente_id: string;
   paciente_nombre?: string;
   paciente_edad?: number | null;

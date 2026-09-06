@@ -4,7 +4,7 @@ import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angu
 import { SucursalesService } from '../../core/services/sucursales.service';
 import { AuthService } from '../../core/services/auth.service';
 import { Sucursal } from '../../core/models/models';
-import { MapaSelectorComponent, UbicacionSeleccionada } from '../../core/components/mapa-selector/mapa-selector.component';
+import { MapaSelectorComponent, UbicacionSeleccionada, extraerLatLng } from '../../core/components/mapa-selector/mapa-selector.component';
 
 // Catalogo acotado de zonas horarias frecuentes en la region -- se guarda
 // como identificador IANA (America/Panama, etc.), no como offset fijo.
@@ -97,8 +97,12 @@ export class SucursalesComponent implements OnInit {
   // wa.me abre WhatsApp Web/app con el mensaje precargado -- no requiere
   // API ni cuenta de WhatsApp Business, solo funciona como un enlace normal.
   whatsappUrl(s: Sucursal): string {
-    const mensaje = `Ubicacion de ${s.nombre}: ${s.google_maps_url}`;
-    return `https://wa.me/?text=${encodeURIComponent(mensaje)}`;
+    const lineas = [`Ubicacion de ${s.nombre} (Google Maps): ${s.google_maps_url}`];
+    const coords = extraerLatLng(s.google_maps_url);
+    if (coords) {
+      lineas.push(`Abrir con Waze: https://waze.com/ul?ll=${coords[0]},${coords[1]}&navigate=yes`);
+    }
+    return `https://wa.me/?text=${encodeURIComponent(lineas.join('\n'))}`;
   }
 
   guardar(): void {

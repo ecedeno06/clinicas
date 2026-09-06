@@ -64,11 +64,16 @@ async function listarPorDoctor(req, res, next) {
     if (!(await verificarDoctorDeLaEmpresa(req.params.doctorId, req.empresaId))) {
       return res.status(404).json({ mensaje: 'Doctor no encontrado' });
     }
+    // Trae tambien los bloques deshabilitados (activo = false) -- se
+    // siguen mostrando en el tablero (atenuados, con boton para volver a
+    // habilitarlos), solo dejan de contar para el calculo de disponibilidad
+    // en Citas (ver disponibilidad() mas abajo, que si sigue filtrando por
+    // activo = true) y para el chequeo de choque de horario.
     const { rows } = await pool.query(
       `select dh.*, s.nombre as sucursal_nombre
        from doctor_horarios dh
        join sucursales s on s.id = dh.sucursal_id
-       where dh.doctor_id = $1 and dh.activo = true
+       where dh.doctor_id = $1
        order by dh.dia_semana asc, dh.hora_inicio asc`,
       [req.params.doctorId]
     );

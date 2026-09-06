@@ -6,14 +6,16 @@ import { CitasService } from '../../core/services/citas.service';
 import { PacientesService } from '../../core/services/pacientes.service';
 import { DoctoresService } from '../../core/services/doctores.service';
 import { SucursalesService } from '../../core/services/sucursales.service';
+import { CampanasService } from '../../core/services/campanas.service';
 import { AuthService } from '../../core/services/auth.service';
-import { Cita, Disponibilidad, Doctor, EstadoCita, EstadoLaboratorio, FranjaHoraria, HistoriaClinica, OrdenLaboratorio, Paciente, Receta, SignosVitales, Sucursal } from '../../core/models/models';
+import { Campana, CampanaDoctor, Cita, Disponibilidad, Doctor, EstadoCita, EstadoLaboratorio, FranjaHoraria, HistoriaClinica, OrdenLaboratorio, Paciente, Receta, SignosVitales, Sucursal } from '../../core/models/models';
 import { clasificarImc } from '../../core/utils/imc.util';
 import { clasificarPresion } from '../../core/utils/presion.util';
 import { clasificarGlucosa } from '../../core/utils/glucosa.util';
 import { combinar12, formatoAmPm, HORAS_12, MINUTOS_60, partes12 } from '../../core/utils/hora12.util';
 import { hoyISO } from '../../core/utils/fecha.util';
 import { SelectorFotoComponent } from '../../core/components/selector-foto/selector-foto.component';
+import { extraerLatLng } from '../../core/components/mapa-selector/mapa-selector.component';
 
 @Component({
   selector: 'app-citas',
@@ -27,6 +29,12 @@ export class CitasComponent implements OnInit {
   pacientes = signal<Paciente[]>([]);
   doctores = signal<Doctor[]>([]);
   sucursales = signal<Sucursal[]>([]);
+  campanasEnCurso = signal<Campana[]>([]);
+  // Doctores invitados (invitado o confirmado, no rechazado) de la
+  // campana elegida en el formulario -- si hay una campana seleccionada,
+  // solo ellos pueden agendarse; el backend vuelve a validar esto de
+  // todas formas, este filtro es solo comodidad de UI.
+  doctoresConfirmadosCampana = signal<CampanaDoctor[] | null>(null);
   panelAbierto = signal(false);
   tabCita = signal<'cita' | 'historial'>('cita');
   editando = signal<Cita | null>(null);
@@ -102,14 +110,16 @@ export class CitasComponent implements OnInit {
   filtroFecha = signal('');
   filtroPaciente = signal('');
   filtroDoctor = signal('');
+  filtroCampana = signal('');
   filtroEstado = signal('');
 
-  hayFiltros = computed(() => !!(this.filtroFecha() || this.filtroPaciente() || this.filtroDoctor() || this.filtroEstado()));
+  hayFiltros = computed(() => !!(this.filtroFecha() || this.filtroPaciente() || this.filtroDoctor() || this.filtroCampana() || this.filtroEstado()));
 
   limpiarFiltros(): void {
     this.filtroFecha.set('');
     this.filtroPaciente.set('');
     this.filtroDoctor.set('');
+    this.filtroCampana.set('');
     this.filtroEstado.set('');
   }
 
@@ -117,12 +127,14 @@ export class CitasComponent implements OnInit {
     const fecha = this.filtroFecha().trim().toLowerCase();
     const paciente = this.filtroPaciente().trim().toLowerCase();
     const doctor = this.filtroDoctor().trim().toLowerCase();
+    const campana = this.filtroCampana().trim().toLowerCase();
     const estado = this.filtroEstado().trim().toLowerCase();
 
     return this.citas().filter((c) => {
       if (fecha && !formatearFecha(c.fecha).includes(fecha)) return false;
       if (paciente && !(c.paciente_nombre ?? '').toLowerCase().includes(paciente)) return false;
       if (doctor && !(c.doctor_nombre ?? '').toLowerCase().includes(doctor)) return false;
+      if (campana && !(c.campana_nombre || 'Normal').toLowerCase().includes(campana)) return false;
       if (estado && !c.estado.toLowerCase().includes(estado)) return false;
       return true;
     });
@@ -132,6 +144,7 @@ export class CitasComponent implements OnInit {
     paciente_id: ['', Validators.required],
     doctor_id: ['', Validators.required],
     sucursal_id: ['', Validators.required],
+    campana_id: [''],
     fecha: [hoyISO(), Validators.required],
     hora_inicio: ['', Validators.required],
     hora_fin: ['', Validators.required],
@@ -174,6 +187,7 @@ export class CitasComponent implements OnInit {
     private pacientesSrv: PacientesService,
     private doctoresSrv: DoctoresService,
     private sucursalesSrv: SucursalesService,
+    private campanasSrv: CampanasService,
     private route: ActivatedRoute,
     public auth: AuthService
   ) {}
@@ -183,9 +197,11 @@ export class CitasComponent implements OnInit {
     this.pacientesSrv.listar().subscribe((data) => this.pacientes.set(data));
     this.doctoresSrv.listar().subscribe((data) => this.doctores.set(data));
     this.sucursalesSrv.listar().subscribe((data) => this.sucursales.set(data.filter((s) => s.activo)));
+    this.campanasSrv.listar({ estado: 'en_curso' }).subscribe((data) => this.campanasEnCurso.set(data));
 
     this.form.get('doctor_id')!.valueChanges.subscribe(() => this.actualizarDisponibilidad());
     this.form.get('fecha')!.valueChanges.subscribe(() => this.actualizarDisponibilidad());
+    this.form.get('campana_id')!.valueChanges.subscribe((campanaId) => this.onCambioCampana(campanaId));
 
     // Llegar aqui desde otra pantalla (ej. "Agenda del dia" o "Laboratorios
     // pendientes" del tablero) puede traer ?fecha=dd/mm/aaaa&paciente=...
@@ -206,6 +222,41 @@ export class CitasComponent implements OnInit {
       next: (data) => { this.disponibilidad.set(data); this.cargandoDisponibilidad.set(false); },
       error: () => { this.disponibilidad.set(null); this.cargandoDisponibilidad.set(false); },
     });
+  }
+
+  // Cuando el usuario elige/quita una campana a proposito, el doctor
+  // seleccionado se limpia siempre. No es solo prolijidad: al cambiar la
+  // lista de opciones del <select> de Doctor, el navegador puede quedarse
+  // mostrando visualmente la primera opcion disponible aunque Angular
+  // nunca haya registrado ese cambio -- el formulario queda con
+  // doctor_id desactualizado (invalido) sin que se note, y ni el boton
+  // Guardar ni la disponibilidad reaccionan hasta que el usuario hace
+  // clic de verdad en algun campo. Limpiar el control fuerza una eleccion
+  // real y evita ese "fantasma".
+  onCambioCampana(campanaId: string | null): void {
+    this.form.patchValue({ doctor_id: '' });
+    this.cargarDoctoresCampana(campanaId);
+  }
+
+  // Solo carga la lista de doctores invitados (incluye "invitado" y
+  // "confirmado", excluye "rechazado"), sin tocar el doctor ya elegido --
+  // para usar desde abrirNuevo()/abrirEditar(), donde el doctor_id que se
+  // acaba de fijar (o que viene de una cita existente) debe conservarse.
+  private cargarDoctoresCampana(campanaId: string | null): void {
+    if (!campanaId) { this.doctoresConfirmadosCampana.set(null); return; }
+    this.campanasSrv.listarDoctores(campanaId).subscribe({
+      next: (data) => this.doctoresConfirmadosCampana.set(data.filter((d) => d.estado !== 'rechazado')),
+      error: () => this.doctoresConfirmadosCampana.set([]),
+    });
+  }
+
+  // Si hay una campana elegida, solo sus doctores invitados aparecen como
+  // opcion -- el backend vuelve a exigir esto al guardar, esto es solo UI.
+  doctoresParaCita(): Doctor[] {
+    const confirmados = this.doctoresConfirmadosCampana();
+    if (!confirmados) return this.doctores();
+    const idsConfirmados = new Set(confirmados.map((d) => d.doctor_id));
+    return this.doctores().filter((d) => idsConfirmados.has(d.id));
   }
 
   elegirFranja(f: FranjaHoraria): void {
@@ -241,7 +292,14 @@ export class CitasComponent implements OnInit {
   // sucursal elegida, o ya esta completo ahi. Un doctor sin ningun horario
   // cargado todavia sigue pudiendo recibir citas con total libertad, como
   // antes de este tablero.
+  //
+  // Si la cita es de una campana, este chequeo NO aplica: una campana
+  // puede reclutar doctores que no trabajan regularmente en esa sucursal
+  // (ver DISENO-CAMPANAS-MEDICAS.md seccion 9) -- lo que manda ahi es que
+  // el doctor este confirmado en la campana, ya validado por el backend
+  // (y el chequeo de choque campana-vs-horario, ver choqueCampana.js).
   sinDisponibilidad(): boolean {
+    if (this.form.get('campana_id')?.value) return false;
     if (this.horarioSinCambios()) return false;
     const disp = this.disponibilidad();
     if (!disp || !disp.tiene_horario_configurado) return false;
@@ -323,7 +381,15 @@ export class CitasComponent implements OnInit {
     if (c.sucursal_hora_apertura && c.sucursal_hora_cierre) {
       lineas.push(`Horario de atencion de la sucursal: ${formatoAmPm(c.sucursal_hora_apertura)} - ${formatoAmPm(c.sucursal_hora_cierre)}`);
     }
-    lineas.push('', `Ubicacion: ${c.sucursal_google_maps_url}`);
+    lineas.push('', `Ubicacion (Google Maps): ${c.sucursal_google_maps_url}`);
+
+    // Waze es muy usado en la region junto a Google Maps -- si se puede
+    // extraer lat/lng del enlace guardado, se ofrece tambien el link
+    // directo para abrir la navegacion en Waze.
+    const coords = extraerLatLng(c.sucursal_google_maps_url);
+    if (coords) {
+      lineas.push(`Abrir con Waze: https://waze.com/ul?ll=${coords[0]},${coords[1]}&navigate=yes`);
+    }
 
     return `https://wa.me/${telefono}?text=${encodeURIComponent(lineas.join('\n'))}`;
   }
@@ -336,10 +402,11 @@ export class CitasComponent implements OnInit {
     // reset (doctor_id y fecha cambiarian en dos eventos separados, el
     // primero con el otro campo todavia con el valor viejo) -- se llama una
     // sola vez, ya con el formulario completo, justo debajo.
-    this.form.reset({ sucursal_id: this.sucursales()[0]?.id ?? '', fecha: hoyISO(), estado: 'pendiente' }, { emitEvent: false });
+    this.form.reset({ sucursal_id: this.sucursales()[0]?.id ?? '', campana_id: '', fecha: hoyISO(), estado: 'pendiente' }, { emitEvent: false });
     this.errorGuardar.set(null);
     this.panelAbierto.set(true);
     this.actualizarDisponibilidad();
+    this.cargarDoctoresCampana(null);
   }
 
   abrirEditar(c: Cita): void {
@@ -350,6 +417,7 @@ export class CitasComponent implements OnInit {
       paciente_id: c.paciente_id,
       doctor_id: c.doctor_id,
       sucursal_id: c.sucursal_id ?? this.sucursales()[0]?.id ?? '',
+      campana_id: c.campana_id ?? '',
       fecha: c.fecha.substring(0, 10),
       hora_inicio: c.hora_inicio?.substring(0, 5),
       hora_fin: c.hora_fin?.substring(0, 5),
@@ -360,6 +428,7 @@ export class CitasComponent implements OnInit {
     this.errorGuardar.set(null);
     this.panelAbierto.set(true);
     this.actualizarDisponibilidad();
+    this.cargarDoctoresCampana(c.campana_id ?? null);
   }
 
   cerrarPanel(): void { this.panelAbierto.set(false); }

@@ -130,6 +130,9 @@ create table if not exists doctores (
     nombre              text not null,
     numero_colegiado    text,                 -- numero de colegiatura/licencia medica
     telefono            text,
+    -- Indica si "telefono" recibe WhatsApp, mismo patron que
+    -- pacientes.acepta_whatsapp.
+    acepta_whatsapp     boolean not null default false,
     email               text,
     activo              boolean not null default true,
     created_at          timestamptz not null default now(),
@@ -180,6 +183,56 @@ create table if not exists doctor_horarios (
 );
 
 -- ---------------------------------------------------------
+-- Tabla: campanas (visitas medicas puntuales a un lugar externo -- oficina
+-- de un cliente, feria de salud, evento comunitario). NO es un tipo de
+-- sucursal: es puntual y en un lugar de un tercero ("lugar" es texto
+-- libre); sucursal_id indica solo que sede de la clinica la organiza
+-- administrativamente. Las citas que resulten de ella son citas normales
+-- (ver mas abajo, citas.campana_id) -- todo el flujo clinico posterior
+-- sigue igual, sin ningun cambio.
+-- ---------------------------------------------------------
+create table if not exists campanas (
+    id                  uuid primary key default gen_random_uuid(),
+    empresa_id          uuid not null references empresas(id) on delete cascade,
+    sucursal_id         uuid references sucursales(id),
+    nombre              text not null,
+    lugar               text not null,
+    contacto_lugar      text,
+    google_maps_url     text,
+    fecha_inicio        date not null,
+    fecha_fin           date not null,
+    hora_inicio         time,
+    hora_fin            time,
+    descripcion         text,
+    estado              text not null default 'borrador'
+                        check (estado in (
+                          'borrador', 'pendiente_aprobacion', 'aprobada',
+                          'rechazada', 'en_curso', 'finalizada', 'cancelada'
+                        )),
+    aprobado_por        uuid references usuarios(id),
+    fecha_aprobacion    timestamptz,
+    motivo_rechazo      text,
+    creado_por          uuid references usuarios(id),
+    log                 jsonb not null default '[]'::jsonb,
+    created_at          timestamptz not null default now(),
+    updated_at          timestamptz not null default now(),
+    constraint chk_fechas_campana check (fecha_fin >= fecha_inicio)
+);
+
+-- Reclutamiento: que doctores estan invitados/confirmados para la campana.
+create table if not exists campana_doctores (
+    id            uuid primary key default gen_random_uuid(),
+    campana_id    uuid not null references campanas(id) on delete cascade,
+    doctor_id     uuid not null references doctores(id) on delete cascade,
+    estado        text not null default 'invitado'
+                  check (estado in ('invitado', 'confirmado', 'rechazado')),
+    notas         text,
+    created_at    timestamptz not null default now(),
+    updated_at    timestamptz not null default now(),
+    unique (campana_id, doctor_id)
+);
+
+-- ---------------------------------------------------------
 -- Tabla: citas (agenda de citas paciente <-> doctor)
 -- ---------------------------------------------------------
 create table if not exists citas (
@@ -188,6 +241,7 @@ create table if not exists citas (
     sucursal_id     uuid not null references sucursales(id),
     paciente_id     uuid not null references pacientes(id) on delete restrict,
     doctor_id       uuid not null references doctores(id) on delete restrict,
+    campana_id      uuid references campanas(id),
     fecha           date not null,
     hora_inicio     time not null,
     hora_fin        time not null,
@@ -334,6 +388,9 @@ create index if not exists idx_sucursales_empresa on sucursales(empresa_id);
 create index if not exists idx_doctores_empresa on doctores(empresa_id);
 create index if not exists idx_doctor_horarios_doctor on doctor_horarios(doctor_id);
 create index if not exists idx_doctor_horarios_sucursal on doctor_horarios(sucursal_id);
+create index if not exists idx_campanas_empresa on campanas(empresa_id);
+create index if not exists idx_campana_doctores_campana on campana_doctores(campana_id);
+create index if not exists idx_campana_doctores_doctor on campana_doctores(doctor_id);
 create index if not exists idx_citas_empresa on citas(empresa_id);
 create index if not exists idx_citas_sucursal on citas(sucursal_id);
 create index if not exists idx_citas_doctor_fecha on citas(doctor_id, fecha);
@@ -372,7 +429,7 @@ do $$
 declare
     t text;
 begin
-    foreach t in array array['empresas','usuarios','usuarios_empresas_rol','especialidades','pacientes','pacientes_empresas','sucursales','doctores','doctor_horarios','citas','historias_clinicas','signos_vitales','recetas','ordenes_laboratorio']
+    foreach t in array array['empresas','usuarios','usuarios_empresas_rol','especialidades','pacientes','pacientes_empresas','sucursales','doctores','doctor_horarios','campanas','campana_doctores','citas','historias_clinicas','signos_vitales','recetas','ordenes_laboratorio']
     loop
         execute format('drop trigger if exists trg_set_updated_at on %I', t);
         execute format('create trigger trg_set_updated_at before update on %I for each row execute function set_updated_at()', t);

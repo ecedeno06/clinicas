@@ -55,6 +55,7 @@ export class DoctoresComponent implements OnInit {
     especialidad_id: ['', Validators.required],
     numero_colegiado: [''],
     telefono: [''],
+    acepta_whatsapp: [false],
     email: [''],
     activo: [true],
   });
@@ -137,6 +138,10 @@ export class DoctoresComponent implements OnInit {
       .sort((a, b) => a.hora_inicio.localeCompare(b.hora_inicio));
   }
 
+  tieneHorarioActivo(dia: number): boolean {
+    return this.horariosPorDia(dia).some((h) => h.activo);
+  }
+
   abrirHorario(d: Doctor): void {
     this.horarioDoctor.set(d);
     this.horarioForm.reset({ sucursal_id: this.sucursales()[0]?.id ?? '', dia_semana: 1, hora_inicio: '', hora_fin: '' });
@@ -182,6 +187,19 @@ export class DoctoresComponent implements OnInit {
         }
       },
       error: (err) => alert(err?.error?.mensaje || 'No se pudo eliminar el horario'),
+    });
+  }
+
+  // Deshabilitar un bloque (en vez de eliminarlo) lo saca del calculo de
+  // disponibilidad en Citas sin perder el bloque -- util cuando el doctor
+  // esta en una campana y no se quiere que su horario regular aparezca
+  // como disponible mientras tanto. Se puede volver a habilitar despues.
+  toggleActivoHorario(h: DoctorHorario): void {
+    const doctor = this.horarioDoctor();
+    if (!doctor) return;
+    this.srv.actualizarHorario(h.id, { activo: !h.activo }).subscribe({
+      next: () => this.cargarHorarios(doctor.id),
+      error: (err) => alert(err?.error?.mensaje || 'No se pudo actualizar el bloque'),
     });
   }
 }

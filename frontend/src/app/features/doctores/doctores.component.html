@@ -77,7 +77,10 @@
         </div>
         <div class="form-group mt-16">
           <label>Telefono</label>
-          <input class="input" formControlName="telefono" />
+          <div class="flex items-center gap-12">
+            <input class="input" formControlName="telefono" style="flex:1" />
+            <label class="flex items-center gap-8" style="white-space:nowrap;"><input type="checkbox" formControlName="acepta_whatsapp" /> Recibe WhatsApp</label>
+          </div>
         </div>
         <div class="form-group mt-16">
           <label>Email</label>
@@ -105,15 +108,31 @@
 
       <div class="horario-week-grid">
         @for (dia of diasSemana; track dia; let i = $index) {
-          <div class="horario-day-col" [class.on]="horariosPorDia(i).length > 0">
+          <div class="horario-day-col" [class.on]="tieneHorarioActivo(i)">
             <div class="horario-day-head">{{ dia.substring(0, 3) }}</div>
             <div class="horario-day-body">
               @for (h of horariosPorDia(i); track h.id) {
-                <div class="horario-slot-block">
+                <div class="horario-slot-block" [class.horario-slot-inactivo]="!h.activo">
                   {{ formatoAmPm(h.hora_inicio) }}&ndash;{{ formatoAmPm(h.hora_fin) }}
                   <div class="text-muted text-sm">{{ h.sucursal_nombre }}</div>
+                  @if (!h.activo) {
+                    <div class="text-muted text-sm">Deshabilitado</div>
+                  }
                   @if (esAdmin()) {
-                    <button type="button" class="horario-slot-remove" title="Eliminar" aria-label="Eliminar" (click)="eliminarHorario(h)">&times;</button>
+                    <div class="horario-slot-acciones">
+                      @if (h.activo) {
+                        <button type="button" class="horario-slot-icon" title="Deshabilitar (no contar en disponibilidad)" aria-label="Deshabilitar" (click)="toggleActivoHorario(h)">
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                        </button>
+                      } @else {
+                        <button type="button" class="horario-slot-icon" title="Habilitar" aria-label="Habilitar" (click)="toggleActivoHorario(h)">
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                        </button>
+                      }
+                      <button type="button" class="horario-slot-icon" title="Eliminar" aria-label="Eliminar" (click)="eliminarHorario(h)">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+                      </button>
+                    </div>
                   }
                 </div>
               } @empty {

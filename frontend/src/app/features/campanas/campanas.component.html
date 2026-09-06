@@ -1,0 +1,288 @@
+<div class="page-header">
+  <div>
+    <h1>Campañas</h1>
+    <div class="desc">Visitas médicas a lugares externos (oficinas, eventos)</div>
+  </div>
+  @if (esAdmin()) {
+    <button class="btn btn-accent" (click)="abrirNuevo()">+ Nueva campaña</button>
+  }
+</div>
+
+<div class="table-wrap">
+  <table class="data-table">
+    <thead>
+      <tr><th>Nombre</th><th>Lugar</th><th>Fechas</th><th>Sucursal</th><th>Doctores</th><th>Estado</th><th></th></tr>
+      <tr class="filter-row">
+        <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroNombre()" (ngModelChange)="filtroNombre.set($event)" /></th>
+        <th></th>
+        <th></th>
+        <th></th>
+        <th></th>
+        <th>
+          <select class="input" [ngModel]="filtroEstado()" (ngModelChange)="filtroEstado.set($event)">
+            <option value="">Todos</option>
+            <option value="borrador">Borrador</option>
+            <option value="pendiente_aprobacion">Pendiente de aprobación</option>
+            <option value="aprobada">Aprobada</option>
+            <option value="rechazada">Rechazada</option>
+            <option value="en_curso">En curso</option>
+            <option value="finalizada">Finalizada</option>
+            <option value="cancelada">Cancelada</option>
+          </select>
+        </th>
+        <th>
+          @if (hayFiltros()) { <button class="btn btn-outline btn-sm" (click)="limpiarFiltros()">Limpiar</button> }
+        </th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (c of campanasFiltradas(); track c.id) {
+        <tr>
+          <td>{{ c.nombre }}</td>
+          <td>
+            {{ c.lugar }}
+            @if (c.google_maps_url) {
+              <a [href]="c.google_maps_url" target="_blank" rel="noopener" class="text-sm" style="margin-left:6px;">Ver en el mapa</a>
+              <a [href]="whatsappUrl(c)" target="_blank" rel="noopener" class="btn-icon" title="Compartir ubicacion por WhatsApp" aria-label="Compartir ubicacion por WhatsApp" style="margin-left:4px; color:#25D366;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.29-1.39a9.9 9.9 0 0 0 4.7 1.2h.01c5.46 0 9.91-4.45 9.91-9.91C21.96 6.45 17.5 2 12.04 2Zm5.83 14.02c-.24.68-1.4 1.3-1.93 1.38-.49.08-1.11.11-1.79-.11-.41-.13-.94-.31-1.62-.6-2.85-1.23-4.71-4.1-4.85-4.29-.14-.19-1.16-1.54-1.16-2.94 0-1.4.73-2.09.99-2.38.26-.29.57-.36.76-.36.19 0 .38 0 .55.01.18.01.41-.07.64.49.24.58.81 2 .88 2.14.07.14.12.31.02.5-.1.19-.15.31-.29.48-.15.17-.31.38-.44.51-.15.15-.3.31-.13.6.17.29.75 1.24 1.62 2.01 1.11.99 2.05 1.3 2.34 1.44.29.15.46.13.63-.07.17-.2.72-.84.91-1.13.19-.29.38-.24.64-.14.26.09 1.65.78 1.94.92.29.14.48.21.55.33.07.12.07.68-.17 1.36Z"/></svg>
+              </a>
+            }
+          </td>
+          <td>
+            {{ c.fecha_inicio | date:'dd/MM/yyyy':'UTC' }}
+            @if (c.fecha_fin !== c.fecha_inicio) { – {{ c.fecha_fin | date:'dd/MM/yyyy':'UTC' }} }
+          </td>
+          <td>{{ c.sucursal_nombre || '-' }}</td>
+          <td>{{ c.doctores_confirmados ?? 0 }} / {{ c.doctores_invitados ?? 0 }}</td>
+          <td>
+            <span class="badge"
+              [class.badge-slate]="c.estado === 'borrador' || c.estado === 'finalizada'"
+              [class.badge-amber]="c.estado === 'pendiente_aprobacion'"
+              [class.badge-green]="c.estado === 'aprobada'"
+              [class.badge-violet]="c.estado === 'en_curso'"
+              [class.badge-red]="c.estado === 'rechazada' || c.estado === 'cancelada'">
+              {{ etiquetaEstado(c.estado) }}
+            </span>
+          </td>
+          <td class="table-actions">
+            @if (esAdmin()) {
+              <button type="button" class="btn-icon" title="Ver / editar" aria-label="Ver / editar" (click)="abrirEditar(c)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+              </button>
+            }
+          </td>
+        </tr>
+      } @empty {
+        <tr><td colspan="7"><div class="empty-state">{{ hayFiltros() ? 'Ninguna campaña coincide con los filtros.' : 'No hay campañas registradas.' }}</div></td></tr>
+      }
+    </tbody>
+  </table>
+</div>
+
+@if (panelAbierto()) {
+  <div class="overlay">
+    <div class="drawer">
+      <div class="drawer-header">
+        <h2>{{ editando() ? 'Campaña · ' + editando()!.nombre : 'Nueva campaña' }}</h2>
+        <button class="close" (click)="cerrarPanel()">&times;</button>
+      </div>
+
+      @if (editando(); as c) {
+        <div class="flex items-center gap-8" style="margin-bottom:16px;">
+          <span class="badge"
+            [class.badge-slate]="c.estado === 'borrador' || c.estado === 'finalizada'"
+            [class.badge-amber]="c.estado === 'pendiente_aprobacion'"
+            [class.badge-green]="c.estado === 'aprobada'"
+            [class.badge-violet]="c.estado === 'en_curso'"
+            [class.badge-red]="c.estado === 'rechazada' || c.estado === 'cancelada'">
+            {{ etiquetaEstado(c.estado) }}
+          </span>
+          @if (c.motivo_rechazo) {
+            <span class="text-muted text-sm">Motivo del rechazo: {{ c.motivo_rechazo }}</span>
+          }
+        </div>
+        @if (transicionesDisponibles().length > 0) {
+          <div class="flex gap-8" style="margin-bottom:16px;">
+            @for (t of transicionesDisponibles(); track t) {
+              <button type="button" class="btn btn-outline btn-sm" (click)="cambiarEstado(t)">{{ etiquetaTransicion(t) }}</button>
+            }
+          </div>
+        }
+      }
+
+      <form [formGroup]="form" (ngSubmit)="guardar()">
+        <div class="form-group">
+          <label>Nombre *</label>
+          <input class="input" formControlName="nombre" placeholder="Jornada de salud - Oficinas Acme" />
+        </div>
+        <div class="form-group mt-16">
+          <label>Lugar *</label>
+          <input class="input" formControlName="lugar" placeholder="Direccion del lugar externo" />
+        </div>
+        <div class="form-group mt-16">
+          <label>Contacto en el lugar</label>
+          <input class="input" formControlName="contacto_lugar" placeholder="Nombre y telefono de contacto" />
+        </div>
+        <div class="form-group mt-16">
+          <label>Enlace de Google Maps</label>
+          <div class="flex gap-8">
+            <input class="input" type="url" formControlName="google_maps_url" placeholder="https://maps.google.com/..." style="flex:1" />
+            <button type="button" class="btn-icon" title="Elegir en el mapa" aria-label="Elegir en el mapa" (click)="abrirMapa()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            </button>
+          </div>
+          <div class="text-muted text-sm mt-8">Pega el enlace de Google Maps o usa el boton para elegir el punto en un mapa.</div>
+          @if (!puedeEditarCampos()) {
+            <button type="button" class="btn btn-outline btn-sm mt-8" (click)="guardarUbicacion()">Guardar ubicación</button>
+          }
+        </div>
+        <div class="form-group mt-16">
+          <label>Sucursal organizadora</label>
+          <select class="input" formControlName="sucursal_id">
+            <option value="">Sin especificar</option>
+            @for (s of sucursales(); track s.id) { <option [value]="s.id">{{ s.nombre }}</option> }
+          </select>
+        </div>
+        <div class="flex gap-16 mt-16">
+          <div class="form-group" style="flex:1">
+            <label>Fecha de inicio *</label>
+            <input class="input" type="date" formControlName="fecha_inicio" />
+          </div>
+          <div class="form-group" style="flex:1">
+            <label>Fecha de fin *</label>
+            <input class="input" type="date" formControlName="fecha_fin" />
+          </div>
+        </div>
+        <div class="flex gap-16 mt-16">
+          <div class="form-group" style="flex:1">
+            <label>Hora de inicio</label>
+            <input class="input" type="time" formControlName="hora_inicio" />
+          </div>
+          <div class="form-group" style="flex:1">
+            <label>Hora de fin</label>
+            <input class="input" type="time" formControlName="hora_fin" />
+          </div>
+        </div>
+        <div class="form-group mt-16">
+          <label>Descripcion</label>
+          <textarea class="input" rows="3" formControlName="descripcion" placeholder="Que se va a ofrecer (chequeos, vacunas, etc.)"></textarea>
+        </div>
+
+        @if (!puedeEditarCampos()) {
+          <p class="text-muted text-sm mt-16">Esta campaña ya no se puede editar libremente en su estado actual.</p>
+        }
+
+        <div class="form-actions">
+          @if (puedeEditarCampos()) {
+            <button type="submit" class="btn btn-primary" [disabled]="form.invalid">Guardar</button>
+          }
+          <button type="button" class="btn btn-outline" (click)="cerrarPanel()">Cerrar</button>
+        </div>
+      </form>
+
+      @if (editando(); as c) {
+        <div class="card mt-16">
+          <h3 style="margin:0;">Doctores invitados</h3>
+
+          <div class="table-wrap mt-16">
+            <table class="data-table">
+              <thead><tr><th>Doctor</th><th>Estado</th><th></th></tr></thead>
+              <tbody>
+                @for (cd of doctoresDeCampana(); track cd.id) {
+                  <tr>
+                    <td>{{ cd.doctor_nombre }} <div class="text-muted text-sm">{{ cd.especialidad_nombre }}</div></td>
+                    <td>
+                      <span class="badge"
+                        [class.badge-slate]="cd.estado === 'invitado'"
+                        [class.badge-green]="cd.estado === 'confirmado'"
+                        [class.badge-red]="cd.estado === 'rechazado'">
+                        {{ cd.estado }}
+                      </span>
+                    </td>
+                    <td class="table-actions">
+                      @if (!campanaCerrada(c)) {
+                        @if (puedeCompartirUbicacionDoctor(cd)) {
+                          <a [href]="whatsappUrlDoctor(cd)" target="_blank" rel="noopener" class="btn-icon" title="Compartir ubicacion por WhatsApp" aria-label="Compartir ubicacion por WhatsApp" style="color:#25D366;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.29-1.39a9.9 9.9 0 0 0 4.7 1.2h.01c5.46 0 9.91-4.45 9.91-9.91C21.96 6.45 17.5 2 12.04 2Zm5.83 14.02c-.24.68-1.4 1.3-1.93 1.38-.49.08-1.11.11-1.79-.11-.41-.13-.94-.31-1.62-.6-2.85-1.23-4.71-4.1-4.85-4.29-.14-.19-1.16-1.54-1.16-2.94 0-1.4.73-2.09.99-2.38.26-.29.57-.36.76-.36.19 0 .38 0 .55.01.18.01.41-.07.64.49.24.58.81 2 .88 2.14.07.14.12.31.02.5-.1.19-.15.31-.29.48-.15.17-.31.38-.44.51-.15.15-.3.31-.13.6.17.29.75 1.24 1.62 2.01 1.11.99 2.05 1.3 2.34 1.44.29.15.46.13.63-.07.17-.2.72-.84.91-1.13.19-.29.38-.24.64-.14.26.09 1.65.78 1.94.92.29.14.48.21.55.33.07.12.07.68-.17 1.36Z"/></svg>
+                          </a>
+                        }
+                        @if (cd.estado !== 'confirmado') {
+                          <button type="button" class="btn-icon" title="Confirmar" aria-label="Confirmar" (click)="actualizarEstadoDoctor(cd, 'confirmado')">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                          </button>
+                        }
+                        @if (cd.estado !== 'rechazado') {
+                          <button type="button" class="btn-icon btn-icon-danger" title="Rechazar" aria-label="Rechazar" (click)="actualizarEstadoDoctor(cd, 'rechazado')">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                          </button>
+                        }
+                        <button type="button" class="btn-icon btn-icon-danger" title="Quitar" aria-label="Quitar" (click)="quitarDoctor(cd)">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+                        </button>
+                      }
+                    </td>
+                  </tr>
+                } @empty {
+                  <tr><td colspan="3"><div class="empty-state">Todavia no se ha invitado a ningun doctor.</div></td></tr>
+                }
+              </tbody>
+            </table>
+          </div>
+
+          <div class="form-group mt-16">
+            <label>Invitar doctor</label>
+            <select class="input" [(ngModel)]="doctorParaInvitar" [ngModelOptions]="{ standalone: true }">
+              <option [ngValue]="''" disabled>Selecciona un doctor</option>
+              @for (d of doctoresDisponibles(); track d.id) {
+                <option [ngValue]="d.id">{{ d.nombre }} &middot; {{ d.especialidad_nombre }}</option>
+              }
+            </select>
+          </div>
+          <button type="button" class="btn btn-outline btn-sm mt-16" [disabled]="!doctorParaInvitar()" (click)="invitarDoctor()">
+            + Invitar doctor
+          </button>
+        </div>
+
+        <div class="card mt-16">
+          <h3 style="margin:0;">Pacientes atendidos</h3>
+
+          <div class="table-wrap mt-16">
+            <table class="data-table">
+              <thead><tr><th>Fecha</th><th>Hora</th><th>Paciente</th><th>Doctor</th><th>Campaña</th></tr></thead>
+              <tbody>
+                @for (cita of citasAtendidas(); track cita.id) {
+                  <tr>
+                    <td>{{ cita.fecha | date:'dd/MM/yyyy':'UTC' }}</td>
+                    <td>{{ formatoAmPm(cita.hora_inicio) }} - {{ formatoAmPm(cita.hora_fin) }}</td>
+                    <td>{{ cita.paciente_nombre }}</td>
+                    <td>{{ cita.doctor_nombre }} <div class="text-muted text-sm">{{ cita.especialidad_nombre }}</div></td>
+                    <td>{{ cita.campana_nombre }}</td>
+                  </tr>
+                } @empty {
+                  <tr><td colspan="5"><div class="empty-state">Todavia no hay pacientes atendidos en esta campaña.</div></td></tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        @if (c.log && c.log.length > 0) {
+          <div class="card mt-16">
+            <h3 style="margin:0;">Historial</h3>
+            <div class="mt-16" style="max-height:200px; overflow-y:auto;">
+              @for (ev of logDesc(c); track $index) {
+                <div class="text-sm" style="margin-bottom:8px;">
+                  <strong>{{ ev.nota }}</strong>
+                  @if (ev.anterior || ev.nuevo) { : {{ ev.anterior || '(vacio)' }} → {{ ev.nuevo || '(vacio)' }} }
+                  <div class="text-muted">{{ ev.usuario }} — {{ ev.fecha | date:'dd/MM/yyyy HH:mm:ss' }}</div>
+                </div>
+              }
+            </div>
+          </div>
+        }
+      }
+    </div>
+  </div>
+}
+
+<app-mapa-selector (ubicacionSeleccionada)="onUbicacionElegida($event)"></app-mapa-selector>

@@ -50,6 +50,14 @@
         </a>
       }
       @if (auth.esSuperAdmin() || auth.usuario()?.rol === 'admin') {
+        <a routerLink="/campanas" routerLinkActive="active" title="Campañas">
+          <span class="nav-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 0 1-5.8-1.6"/></svg>
+          </span>
+          <span class="nav-label">Campañas</span>
+        </a>
+      }
+      @if (auth.esSuperAdmin() || auth.usuario()?.rol === 'admin') {
         <a routerLink="/usuarios" routerLinkActive="active" title="Usuarios">
           <span class="nav-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg>

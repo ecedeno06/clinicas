@@ -30,15 +30,15 @@ async function obtener(req, res, next) {
 
 async function crear(req, res, next) {
   try {
-    const { nombre, especialidad_id, numero_colegiado, telefono, email, activo } = req.body;
+    const { nombre, especialidad_id, numero_colegiado, telefono, acepta_whatsapp, email, activo } = req.body;
 
     const especialidad = await pool.query('select id from especialidades where id = $1 and empresa_id = $2', [especialidad_id, req.empresaId]);
     if (!especialidad.rows[0]) return res.status(400).json({ mensaje: 'La especialidad indicada no pertenece a esta clinica' });
 
     const { rows } = await pool.query(
-      `insert into doctores (empresa_id, especialidad_id, nombre, numero_colegiado, telefono, email, activo)
-       values ($1,$2,$3,$4,$5,$6, coalesce($7, true)) returning *`,
-      [req.empresaId, especialidad_id, nombre, numero_colegiado, telefono, email, activo]
+      `insert into doctores (empresa_id, especialidad_id, nombre, numero_colegiado, telefono, acepta_whatsapp, email, activo)
+       values ($1,$2,$3,$4,$5, coalesce($6, false),$7, coalesce($8, true)) returning *`,
+      [req.empresaId, especialidad_id, nombre, numero_colegiado, telefono, acepta_whatsapp, email, activo]
     );
     res.status(201).json(rows[0]);
   } catch (err) { next(err); }
@@ -46,7 +46,7 @@ async function crear(req, res, next) {
 
 async function actualizar(req, res, next) {
   try {
-    const { nombre, especialidad_id, numero_colegiado, telefono, email, activo } = req.body;
+    const { nombre, especialidad_id, numero_colegiado, telefono, acepta_whatsapp, email, activo } = req.body;
 
     if (especialidad_id) {
       const especialidad = await pool.query('select id from especialidades where id = $1 and empresa_id = $2', [especialidad_id, req.empresaId]);
@@ -59,10 +59,11 @@ async function actualizar(req, res, next) {
          especialidad_id = coalesce($2, especialidad_id),
          numero_colegiado = coalesce($3, numero_colegiado),
          telefono = coalesce($4, telefono),
-         email = coalesce($5, email),
-         activo = coalesce($6, activo)
-       where id = $7 and empresa_id = $8 returning *`,
-      [nombre, especialidad_id, numero_colegiado, telefono, email, activo, req.params.id, req.empresaId]
+         acepta_whatsapp = coalesce($5, acepta_whatsapp),
+         email = coalesce($6, email),
+         activo = coalesce($7, activo)
+       where id = $8 and empresa_id = $9 returning *`,
+      [nombre, especialidad_id, numero_colegiado, telefono, acepta_whatsapp, email, activo, req.params.id, req.empresaId]
     );
     if (!rows[0]) return res.status(404).json({ mensaje: 'Doctor no encontrado' });
     res.json(rows[0]);

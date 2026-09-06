@@ -17,6 +17,7 @@
         <th>Paciente</th>
         <th>Edad</th>
         <th>Doctor</th>
+        <th>Campaña</th>
         <th>Estado</th>
         <th></th>
       </tr>
@@ -26,6 +27,7 @@
         <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroPaciente()" (ngModelChange)="filtroPaciente.set($event)" /></th>
         <th></th>
         <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroDoctor()" (ngModelChange)="filtroDoctor.set($event)" /></th>
+        <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroCampana()" (ngModelChange)="filtroCampana.set($event)" /></th>
         <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroEstado()" (ngModelChange)="filtroEstado.set($event)" /></th>
         <th>
           @if (hayFiltros()) { <button class="btn btn-outline btn-sm" (click)="limpiarFiltros()">Limpiar</button> }
@@ -40,6 +42,11 @@
           <td>{{ c.paciente_nombre }}</td>
           <td>{{ c.paciente_edad ?? '-' }}</td>
           <td>{{ c.doctor_nombre }} <div class="text-muted text-sm">{{ c.especialidad_nombre }}</div></td>
+          <td>
+            @if (c.campana_nombre) {
+              <span class="badge badge-violet">{{ c.campana_nombre }}</span>
+            }
+          </td>
           <td>
             <span class="badge"
               [class.badge-slate]="c.estado === 'pendiente'"
@@ -109,7 +116,7 @@
           </td>
         </tr>
       } @empty {
-        <tr><td colspan="7"><div class="empty-state">{{ hayFiltros() ? 'Ninguna cita coincide con los filtros.' : 'No hay citas agendadas todavia.' }}</div></td></tr>
+        <tr><td colspan="8"><div class="empty-state">{{ hayFiltros() ? 'Ninguna cita coincide con los filtros.' : 'No hay citas agendadas todavia.' }}</div></td></tr>
       }
     </tbody>
   </table>
@@ -137,11 +144,23 @@
             @for (p of pacientes(); track p.id) { <option [value]="p.id">{{ p.nombre }}</option> }
           </select>
         </div>
+        @if (campanasEnCurso().length > 0) {
+          <div class="form-group mt-16">
+            <label>Campaña (opcional)</label>
+            <select class="input" formControlName="campana_id">
+              <option value="">Ninguna — cita normal</option>
+              @for (camp of campanasEnCurso(); track camp.id) { <option [value]="camp.id">{{ camp.nombre }} &middot; {{ camp.lugar }}</option> }
+            </select>
+            @if (form.get('campana_id')?.value && doctoresParaCita().length === 0) {
+              <div class="error-text mt-8">Esta campaña todavía no tiene doctores invitados.</div>
+            }
+          </div>
+        }
         <div class="form-group mt-16">
           <label>Doctor *</label>
           <select class="input" formControlName="doctor_id">
             <option value="" disabled>Selecciona un doctor</option>
-            @for (d of doctores(); track d.id) { <option [value]="d.id">{{ d.nombre }} &middot; {{ d.especialidad_nombre }}</option> }
+            @for (d of doctoresParaCita(); track d.id) { <option [value]="d.id">{{ d.nombre }} &middot; {{ d.especialidad_nombre }}</option> }
           </select>
         </div>
         <div class="form-group mt-16">
@@ -197,7 +216,17 @@
         @if (form.get('doctor_id')?.value && form.get('fecha')?.value) {
           <div class="form-group mt-16">
             <label>Disponibilidad</label>
-            @if (cargandoDisponibilidad()) {
+            @if (form.get('campana_id')?.value) {
+              <div class="text-muted text-sm">
+                Esta cita es de una campaña: el horario regular del doctor en la sucursal no aplica aquí —
+                lo que importa es que este confirmado en la campaña (ya validado al elegirlo arriba).
+              </div>
+              @if (disponibilidad(); as disp) {
+                @if (disp.ocupados.length > 0) {
+                  <div class="text-muted text-sm mt-8">Ocupado (cualquier sucursal): {{ ocupadosTexto(disp) }}</div>
+                }
+              }
+            } @else if (cargandoDisponibilidad()) {
               <div class="text-muted text-sm">Calculando...</div>
             } @else {
               @if (disponibilidad(); as disp) {

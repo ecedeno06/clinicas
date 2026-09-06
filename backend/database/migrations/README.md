@@ -33,6 +33,9 @@ docker run --rm -i -e PGPASSWORD='<password>' postgres:16 \
 | `013_sucursales_telefono.sql` | Columna `telefono` en `sucursales` | ✅ Aplicada 2026-09-06 | ✅ Aplicada 2026-09-06 |
 | `014_sucursales_google_maps.sql` | Columna `google_maps_url` en `sucursales` | ✅ Aplicada 2026-09-06 | ✅ Aplicada 2026-09-06 |
 | `015_pacientes_acepta_whatsapp.sql` | Columna `acepta_whatsapp` en `pacientes` | ✅ Aplicada 2026-09-06 | ✅ Aplicada 2026-09-06 |
+| `016_campanas.sql` | Tablas `campanas` y `campana_doctores` (Fase 1 de campañas médicas) + `citas.campana_id` | ✅ Aplicada 2026-09-06 | ✅ Aplicada 2026-09-06 |
+| `017_campanas_google_maps.sql` | Columna `google_maps_url` en `campanas` | ✅ Aplicada 2026-09-06 | ✅ Aplicada 2026-09-06 |
+| `018_doctores_acepta_whatsapp.sql` | Columna `acepta_whatsapp` en `doctores` | ✅ Aplicada 2026-09-06 | ✅ Aplicada 2026-09-06 |
 
 **Verificado 2026-09-02**: comparacion completa de esquema (tablas, columnas,
 indices, constraints, funciones, triggers) entre `.19` y Neon — identicos

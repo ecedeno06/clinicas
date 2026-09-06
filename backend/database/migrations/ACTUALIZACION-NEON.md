@@ -1,13 +1,13 @@
 # Actualizacion aplicada a Neon (produccion)
 
-Estado: `001` a `015` ya se aplicaron en Neon (verificado con
+Estado: `001` a `018` ya se aplicaron en Neon (verificado con
 comparacion completa de esquema contra `.19`/`.17`; `007` certificada en
 desarrollo y promovida el 2026-09-03; `008` aplicada el 2026-09-04;
-`009`, `010` y `011` aplicadas el 2026-09-05; `012`-`015` aplicadas el
+`009`, `010` y `011` aplicadas el 2026-09-05; `012`-`018` aplicadas el
 2026-09-06, comparacion de columnas de `sucursales`/`pacientes`/
-`doctor_horarios`/`citas` entre `.17` y Neon confirmada identica). Ver
-tambien [README.md](./README.md) para el registro vivo de que esta
-aplicado en cada entorno.
+`doctor_horarios`/`citas`/`campanas`/`campana_doctores`/`doctores` entre
+`.17` y Neon confirmada identica). Ver tambien [README.md](./README.md)
+para el registro vivo de que esta aplicado en cada entorno.
 
 ## Resumen
 
@@ -28,6 +28,9 @@ aplicado en cada entorno.
 | 13 | `013_sucursales_telefono.sql` | Columna nueva `telefono` en `sucursales` | ✅ Aplicada 2026-09-06 |
 | 14 | `014_sucursales_google_maps.sql` | Columna nueva `google_maps_url` en `sucursales` | ✅ Aplicada 2026-09-06 |
 | 15 | `015_pacientes_acepta_whatsapp.sql` | Columna nueva `acepta_whatsapp` en `pacientes` | ✅ Aplicada 2026-09-06 |
+| 16 | `016_campanas.sql` | Tablas nuevas `campanas` y `campana_doctores`, columna `campana_id` en `citas` | ✅ Aplicada 2026-09-06 |
+| 17 | `017_campanas_google_maps.sql` | Columna nueva `google_maps_url` en `campanas` | ✅ Aplicada 2026-09-06 |
+| 18 | `018_doctores_acepta_whatsapp.sql` | Columna nueva `acepta_whatsapp` en `doctores` | ✅ Aplicada 2026-09-06 |
 
 ---
 
@@ -280,6 +283,63 @@ Registros existentes quedan en `false` por defecto (no se asume nada hasta
 que alguien lo marque explicitamente en el formulario de Pacientes).
 Probada con Postgres desechable (creacion limpia + re-ejecucion
 idempotente). Aplicada a `.17` y a Neon el 2026-09-06.
+
+---
+
+## 16. `016_campanas.sql` — Campañas de visitas médicas (Fase 1)
+
+Fase 1 de [DISENO-CAMPANAS-MEDICAS.md](../../../DISENO-CAMPANAS-MEDICAS.md).
+Tablas nuevas `campanas` (visita puntual a un lugar externo: oficina de un
+cliente, feria de salud, evento comunitario -- con ciclo de vida
+`borrador -> pendiente_aprobacion -> aprobada/rechazada -> en_curso ->
+finalizada`, mas `cancelada`) y `campana_doctores` (reclutamiento:
+invitado/confirmado/rechazado). Columna aditiva `citas.campana_id`
+(nullable): una cita de campaña sigue siendo una cita normal, solo marcada
+con de dónde vino -- ningún cambio en historias_clinicas/signos_vitales/
+recetas/laboratorio.
+
+CRUD backend completo para esta fase: crear/editar (solo en borrador o
+rechazada)/listar/obtener campañas, transición de estado validada contra
+el grafo de estados permitido (con motivo obligatorio al rechazar, y
+`aprobado_por`/`fecha_aprobacion` registrados al aprobar), y reclutamiento
+de doctores (invitar/confirmar-rechazar/quitar). Todo detrás de
+`requireRol('admin')` — sin UI todavía (Fase 2 del diseño).
+
+Probada con Postgres desechable (creación limpia + re-ejecución
+idempotente, incluyendo el constraint `fecha_fin >= fecha_inicio`) y
+luego end-to-end contra `.17` vía el controlador real: crear campaña,
+invitar y confirmar un doctor, rechazar una transición de estado inválida
+(borrador -> aprobada directo), aplicar la transición válida completa
+(borrador -> pendiente_aprobacion -> aprobada), y verificar el log de
+auditoría completo. Aplicada a `.17` y a Neon el 2026-09-06 (esquema
+verificado idéntico).
+
+---
+
+## 17. `017_campanas_google_maps.sql` — Enlace a Google Maps de la campaña
+
+Columna aditiva `google_maps_url text` en `campanas`, mismo patrón que
+`sucursales.google_maps_url` (migración 014): el selector de ubicación en
+mapa (Leaflet + OpenStreetMap + Nominatim, sin API key) ya construido para
+Sucursales se reutilizó tal cual para el campo "Lugar" de una campaña —
+mismo componente `app-mapa-selector`, mismo botón "Ver en el mapa" y
+mismo botón de compartir por WhatsApp (con enlace de Waze incluido si se
+pueden extraer coordenadas). Probada con Postgres desechable (creación
+limpia + re-ejecución idempotente) y verificada end-to-end contra `.17`
+(crear y actualizar una campaña con `google_maps_url`). Aplicada a `.17`
+y a Neon el 2026-09-06.
+
+---
+
+## 18. `018_doctores_acepta_whatsapp.sql` — Telefono del doctor valido para WhatsApp
+
+Columna aditiva `acepta_whatsapp boolean not null default false` en
+`doctores`, mismo patrón que `pacientes.acepta_whatsapp` (migración 015).
+Checkbox "Recibe WhatsApp" agregado junto al campo Teléfono en el
+formulario de Doctores. Registros existentes quedan en `false` por
+defecto. Probada con Postgres desechable (creación limpia + re-ejecución
+idempotente) y verificada contra `.17`. Aplicada a `.17` y a Neon el
+2026-09-06.
 
 ---
 
