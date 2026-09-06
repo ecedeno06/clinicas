@@ -1,0 +1,45 @@
+@if (visible()) {
+  <div class="mapa-selector-overlay">
+    <div class="mapa-selector-modal">
+      <div class="drawer-header">
+        <h2>Elegir ubicacion en el mapa</h2>
+        <button class="close" (click)="cerrar()">&times;</button>
+      </div>
+
+      <div class="mapa-selector-buscador">
+        <input
+          class="input"
+          type="text"
+          placeholder="Buscar direccion o lugar..."
+          [ngModel]="busqueda()"
+          (ngModelChange)="onBusquedaInput($event)"
+          (keydown.enter)="buscarAhora(); $event.preventDefault()"
+        />
+        @if (buscando()) {
+          <div class="mapa-selector-resultados"><div class="text-muted text-sm" style="padding:8px 10px;">Buscando...</div></div>
+        } @else if (resultadosBusqueda().length > 0) {
+          <div class="mapa-selector-resultados">
+            @for (r of resultadosBusqueda(); track r.display_name) {
+              <button type="button" class="mapa-selector-resultado" (click)="elegirResultado(r)">{{ r.display_name }}</button>
+            }
+          </div>
+        }
+      </div>
+
+      <p class="text-muted text-sm mt-8">O haz clic directamente en el mapa para colocar el punto.</p>
+
+      <div #mapaContainer class="mapa-selector-mapa"></div>
+
+      @if (puntoElegido(); as p) {
+        <p class="text-muted text-sm mt-8">Punto elegido: {{ p[0].toFixed(6) }}, {{ p[1].toFixed(6) }}</p>
+      } @else {
+        <p class="text-muted text-sm mt-8">Todavia no has elegido un punto.</p>
+      }
+
+      <div class="form-actions">
+        <button type="button" class="btn btn-primary" [disabled]="!puntoElegido()" (click)="guardar()">Guardar ubicacion</button>
+        <button type="button" class="btn btn-outline" (click)="cerrar()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+}

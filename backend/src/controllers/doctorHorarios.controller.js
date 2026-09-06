@@ -1,5 +1,6 @@
 const { pool } = require('../config/db');
 const { registrarEventoCita } = require('../utils/citaLog');
+const { resolverSucursal } = require('../utils/sucursales');
 
 const DURACION_SLOT_MINUTOS = 30;
 
@@ -64,7 +65,11 @@ async function listarPorDoctor(req, res, next) {
       return res.status(404).json({ mensaje: 'Doctor no encontrado' });
     }
     const { rows } = await pool.query(
-      `select * from doctor_horarios where doctor_id = $1 and activo = true order by dia_semana asc, hora_inicio asc`,
+      `select dh.*, s.nombre as sucursal_nombre
+       from doctor_horarios dh
+       join sucursales s on s.id = dh.sucursal_id
+       where dh.doctor_id = $1 and dh.activo = true
+       order by dh.dia_semana asc, dh.hora_inicio asc`,
       [req.params.doctorId]
     );
     res.json(rows);
@@ -74,7 +79,7 @@ async function listarPorDoctor(req, res, next) {
 // POST /api/doctores/:doctorId/horarios
 async function crear(req, res, next) {
   try {
-    const { dia_semana, hora_inicio, hora_fin } = req.body;
+    const { dia_semana, hora_inicio, hora_fin, sucursal_id } = req.body;
     if (dia_semana == null || !hora_inicio || !hora_fin) {
       return res.status(400).json({ mensaje: 'dia_semana, hora_inicio y hora_fin son requeridos' });
     }
@@ -85,15 +90,23 @@ async function crear(req, res, next) {
       return res.status(404).json({ mensaje: 'Doctor no encontrado' });
     }
 
+    // El choque se compara por doctor_id + dia_semana a traves de TODAS sus
+    // sucursales (sin filtrar por sucursal_id): un doctor no puede estar
+    // agendado en dos sedes a la vez, aunque el bloque nuevo sea en una sede
+    // distinta a la del bloque existente. Ver DISENO-ZONA-HORARIA-SUCURSALES.md
+    // seccion 4.1.b -- no reducir este chequeo por sucursal.
     const choque = await hayChoqueDeBloque({ doctorId: req.params.doctorId, diaSemana: dia_semana, horaInicio: hora_inicio, horaFin: hora_fin });
     if (choque) {
-      return res.status(409).json({ mensaje: 'Ese bloque se cruza con otro horario ya registrado para ese dia.' });
+      return res.status(409).json({ mensaje: 'Ese bloque se cruza con otro horario ya registrado para ese dia (en cualquier sucursal).' });
     }
 
+    const sucursalId = await resolverSucursal(sucursal_id, req.empresaId);
+    if (!sucursalId) return res.status(400).json({ mensaje: 'La sucursal indicada no existe o no pertenece a esta clinica.' });
+
     const { rows } = await pool.query(
-      `insert into doctor_horarios (doctor_id, dia_semana, hora_inicio, hora_fin)
-       values ($1,$2,$3,$4) returning *`,
-      [req.params.doctorId, dia_semana, hora_inicio, hora_fin]
+      `insert into doctor_horarios (doctor_id, sucursal_id, dia_semana, hora_inicio, hora_fin)
+       values ($1,$2,$3,$4,$5) returning *`,
+      [req.params.doctorId, sucursalId, dia_semana, hora_inicio, hora_fin]
     );
     res.status(201).json(rows[0]);
   } catch (err) {
@@ -105,7 +118,7 @@ async function crear(req, res, next) {
 // PUT /api/doctores/horarios/:id
 async function actualizar(req, res, next) {
   try {
-    const { dia_semana, hora_inicio, hora_fin, activo } = req.body;
+    const { dia_semana, hora_inicio, hora_fin, activo, sucursal_id } = req.body;
 
     const actual = await pool.query(
       `select dh.* from doctor_horarios dh join doctores d on d.id = dh.doctor_id
@@ -122,19 +135,28 @@ async function actualizar(req, res, next) {
       return res.status(400).json({ mensaje: 'La hora de fin debe ser posterior a la hora de inicio.' });
     }
 
+    // Ver nota en crear(): el choque se compara a traves de todas las
+    // sucursales del doctor, no solo la de este bloque.
     const choque = await hayChoqueDeBloque({ doctorId: horario.doctor_id, diaSemana: nuevoDia, horaInicio: nuevoInicio, horaFin: nuevoFin, excluirId: horario.id });
     if (choque) {
-      return res.status(409).json({ mensaje: 'Ese bloque se cruza con otro horario ya registrado para ese dia.' });
+      return res.status(409).json({ mensaje: 'Ese bloque se cruza con otro horario ya registrado para ese dia (en cualquier sucursal).' });
+    }
+
+    let sucursalId = null;
+    if (sucursal_id) {
+      sucursalId = await resolverSucursal(sucursal_id, req.empresaId);
+      if (!sucursalId) return res.status(400).json({ mensaje: 'La sucursal indicada no existe o no pertenece a esta clinica.' });
     }
 
     const { rows } = await pool.query(
       `update doctor_horarios set
-         dia_semana = coalesce($1, dia_semana),
-         hora_inicio = coalesce($2, hora_inicio),
-         hora_fin = coalesce($3, hora_fin),
-         activo = coalesce($4, activo)
-       where id = $5 returning *`,
-      [dia_semana, hora_inicio, hora_fin, activo, req.params.id]
+         sucursal_id = coalesce($1, sucursal_id),
+         dia_semana = coalesce($2, dia_semana),
+         hora_inicio = coalesce($3, hora_inicio),
+         hora_fin = coalesce($4, hora_fin),
+         activo = coalesce($5, activo)
+       where id = $6 returning *`,
+      [sucursalId, dia_semana, hora_inicio, hora_fin, activo, req.params.id]
     );
     res.json(rows[0]);
   } catch (err) {
@@ -206,6 +228,12 @@ async function eliminar(req, res, next) {
 // horario semanal, las citas ya agendadas ese dia, y las franjas libres
 // resultantes (en incrementos de DURACION_SLOT_MINUTOS) para elegir con un
 // clic en vez de escribir la hora a mano. No bloquea nada: es informativo.
+//
+// Los bloques/libres se agrupan por sucursal (un doctor puede atender en mas
+// de una, en horarios que nunca se cruzan entre si -- hayChoqueDeBloque ya lo
+// garantiza sin importar la sucursal). "ocupados" es a nivel de doctor
+// completo (no por sucursal): una cita ya agendada ocupa al doctor sin
+// importar en que sede fisica este, no puede estar en dos a la vez.
 async function disponibilidad(req, res, next) {
   try {
     const { fecha } = req.query;
@@ -224,9 +252,11 @@ async function disponibilidad(req, res, next) {
     );
 
     const bloquesResult = await pool.query(
-      `select hora_inicio, hora_fin from doctor_horarios
-       where doctor_id = $1 and dia_semana = $2 and activo = true
-       order by hora_inicio asc`,
+      `select dh.sucursal_id, s.nombre as sucursal_nombre, dh.hora_inicio, dh.hora_fin
+       from doctor_horarios dh
+       join sucursales s on s.id = dh.sucursal_id
+       where dh.doctor_id = $1 and dh.dia_semana = $2 and dh.activo = true
+       order by s.nombre asc, dh.hora_inicio asc`,
       [req.params.id, diaSemana]
     );
 
@@ -239,24 +269,40 @@ async function disponibilidad(req, res, next) {
 
     const ocupados = citasResult.rows.map((c) => ({ inicio: aMinutos(c.hora_inicio), fin: aMinutos(c.hora_fin) }));
 
-    const libres = [];
-    for (const bloque of bloquesResult.rows) {
-      const bloqueMinutos = { inicio: aMinutos(bloque.hora_inicio), fin: aMinutos(bloque.hora_fin) };
-      const libresBloque = restarOcupados(bloqueMinutos, ocupados);
-      for (const { inicio, fin } of libresBloque) {
-        for (let t = inicio; t + DURACION_SLOT_MINUTOS <= fin; t += DURACION_SLOT_MINUTOS) {
-          libres.push({ hora_inicio: aTexto(t), hora_fin: aTexto(t + DURACION_SLOT_MINUTOS) });
-        }
+    const porSucursal = new Map();
+    for (const b of bloquesResult.rows) {
+      if (!porSucursal.has(b.sucursal_id)) {
+        porSucursal.set(b.sucursal_id, { sucursal_id: b.sucursal_id, sucursal_nombre: b.sucursal_nombre, bloques: [] });
       }
+      porSucursal.get(b.sucursal_id).bloques.push(b);
     }
 
+    const sucursales = [...porSucursal.values()].map(({ sucursal_id, sucursal_nombre, bloques }) => {
+      const libres = [];
+      for (const bloque of bloques) {
+        const bloqueMinutos = { inicio: aMinutos(bloque.hora_inicio), fin: aMinutos(bloque.hora_fin) };
+        const libresBloque = restarOcupados(bloqueMinutos, ocupados);
+        for (const { inicio, fin } of libresBloque) {
+          for (let t = inicio; t + DURACION_SLOT_MINUTOS <= fin; t += DURACION_SLOT_MINUTOS) {
+            libres.push({ hora_inicio: aTexto(t), hora_fin: aTexto(t + DURACION_SLOT_MINUTOS) });
+          }
+        }
+      }
+      return {
+        sucursal_id,
+        sucursal_nombre,
+        atiende: bloques.length > 0,
+        bloques: bloques.map((b) => ({ hora_inicio: b.hora_inicio.substring(0, 5), hora_fin: b.hora_fin.substring(0, 5) })),
+        libres,
+      };
+    });
+
     res.json({
-      atiende: bloquesResult.rows.length > 0,
+      atiende: sucursales.some((s) => s.atiende),
       tiene_horario_configurado: tieneHorarioResult.rows[0].existe,
       dia_semana: diaSemana,
-      bloques: bloquesResult.rows.map((b) => ({ hora_inicio: b.hora_inicio.substring(0, 5), hora_fin: b.hora_fin.substring(0, 5) })),
       ocupados: citasResult.rows.map((c) => ({ hora_inicio: c.hora_inicio.substring(0, 5), hora_fin: c.hora_fin.substring(0, 5) })),
-      libres,
+      sucursales,
     });
   } catch (err) { next(err); }
 }

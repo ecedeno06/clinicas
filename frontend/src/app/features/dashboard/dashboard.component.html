@@ -3,6 +3,15 @@
     <h1>Resumen general</h1>
     <div class="desc">Estado actual de pacientes, doctores y la agenda de hoy</div>
   </div>
+  @if (mostrarFiltroSucursal()) {
+    <div class="form-group" style="min-width:220px;">
+      <label>Sucursal</label>
+      <select class="input" [ngModel]="sucursalFiltro()" (ngModelChange)="sucursalFiltro.set($event)">
+        <option value="">Todas</option>
+        @for (s of sucursales(); track s.id) { <option [value]="s.id">{{ s.nombre }}</option> }
+      </select>
+    </div>
+  }
 </div>
 
 <div class="stats-grid">
@@ -87,6 +96,7 @@
         <th>Horario</th>
         <th>Paciente</th>
         <th>Doctor</th>
+        <th>Sucursal</th>
         <th>Estado</th>
         <th></th>
       </tr>
@@ -97,6 +107,7 @@
           <td>{{ formatoAmPm(c.hora_inicio) }} - {{ formatoAmPm(c.hora_fin) }}</td>
           <td>{{ c.paciente_nombre }}</td>
           <td>{{ c.doctor_nombre }} <div class="text-muted text-sm">{{ c.especialidad_nombre }}</div></td>
+          <td>{{ c.sucursal_nombre }}</td>
           <td>
             <span class="badge"
               [class.badge-slate]="c.estado === 'pendiente'"
@@ -112,7 +123,7 @@
           </td>
         </tr>
       } @empty {
-        <tr><td colspan="5"><div class="empty-state">{{ esHoy() ? 'No hay citas agendadas para hoy.' : 'No hay citas agendadas para esta fecha.' }}</div></td></tr>
+        <tr><td colspan="6"><div class="empty-state">{{ esHoy() ? 'No hay citas agendadas para hoy.' : 'No hay citas agendadas para esta fecha.' }}</div></td></tr>
       }
     </tbody>
   </table>

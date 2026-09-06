@@ -42,6 +42,14 @@
         <span class="nav-label">Especialidades</span>
       </a>
       @if (auth.esSuperAdmin() || auth.usuario()?.rol === 'admin') {
+        <a routerLink="/sucursales" routerLinkActive="active" title="Sucursales">
+          <span class="nav-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M6 21V10l6-6 6 6v11"/><path d="M10 21v-6h4v6"/></svg>
+          </span>
+          <span class="nav-label">Sucursales</span>
+        </a>
+      }
+      @if (auth.esSuperAdmin() || auth.usuario()?.rol === 'admin') {
         <a routerLink="/usuarios" routerLinkActive="active" title="Usuarios">
           <span class="nav-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg>

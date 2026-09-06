@@ -111,6 +111,7 @@
               @for (h of horariosPorDia(i); track h.id) {
                 <div class="horario-slot-block">
                   {{ formatoAmPm(h.hora_inicio) }}&ndash;{{ formatoAmPm(h.hora_fin) }}
+                  <div class="text-muted text-sm">{{ h.sucursal_nombre }}</div>
                   @if (esAdmin()) {
                     <button type="button" class="horario-slot-remove" title="Eliminar" aria-label="Eliminar" (click)="eliminarHorario(h)">&times;</button>
                   }
@@ -125,6 +126,12 @@
 
       @if (esAdmin()) {
         <form class="horario-add-form" [formGroup]="horarioForm" (ngSubmit)="agregarHorario()">
+          <div class="form-group">
+            <label>Sucursal</label>
+            <select class="input" formControlName="sucursal_id">
+              @for (s of sucursales(); track s.id) { <option [value]="s.id">{{ s.nombre }}</option> }
+            </select>
+          </div>
           <div class="form-group">
             <label>Dia</label>
             <select class="input" formControlName="dia_semana">

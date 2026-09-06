@@ -28,6 +28,20 @@ export interface Empresa {
   created_at?: string;
 }
 
+export interface Sucursal {
+  id: string;
+  empresa_id?: string;
+  nombre: string;
+  direccion?: string | null;
+  telefono?: string | null;
+  google_maps_url?: string | null;
+  zona_horaria: string;
+  hora_apertura?: string | null;
+  hora_cierre?: string | null;
+  activo: boolean;
+  created_at?: string;
+}
+
 // Clinica a la que pertenece el usuario autenticado, con su rol en ella
 export interface EmpresaSeleccionable {
   empresa_id: string;
@@ -62,6 +76,7 @@ export interface Paciente {
   fecha_nacimiento?: string | null;
   sexo?: Sexo | null;
   telefono?: string;
+  acepta_whatsapp?: boolean;
   email?: string;
   direccion?: string;
   contacto_emergencia?: ContactoEmergencia | null;
@@ -97,6 +112,8 @@ export interface Doctor {
 export interface DoctorHorario {
   id: string;
   doctor_id: string;
+  sucursal_id: string;
+  sucursal_nombre?: string;
   dia_semana: number; // 0=domingo … 6=sabado
   hora_inicio: string;
   hora_fin: string;
@@ -108,13 +125,20 @@ export interface FranjaHoraria {
   hora_fin: string;
 }
 
+export interface DisponibilidadSucursal {
+  sucursal_id: string;
+  sucursal_nombre: string;
+  atiende: boolean;
+  bloques: FranjaHoraria[];
+  libres: FranjaHoraria[];
+}
+
 export interface Disponibilidad {
   atiende: boolean;
   tiene_horario_configurado: boolean;
   dia_semana: number;
-  bloques: FranjaHoraria[];
   ocupados: FranjaHoraria[];
-  libres: FranjaHoraria[];
+  sucursales: DisponibilidadSucursal[];
 }
 
 export type EstadoCita = 'pendiente' | 'confirmada' | 'atendida' | 'cancelada' | 'no_asistio' | 'reagendar';
@@ -130,9 +154,17 @@ export interface EventoCitaLog {
 export interface Cita {
   id: string;
   empresa_id?: string;
+  sucursal_id?: string;
+  sucursal_nombre?: string;
+  sucursal_direccion?: string | null;
+  sucursal_google_maps_url?: string | null;
+  sucursal_hora_apertura?: string | null;
+  sucursal_hora_cierre?: string | null;
   paciente_id: string;
   paciente_nombre?: string;
   paciente_edad?: number | null;
+  paciente_telefono?: string | null;
+  paciente_acepta_whatsapp?: boolean;
   doctor_id: string;
   doctor_nombre?: string;
   especialidad_nombre?: string;

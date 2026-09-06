@@ -3,8 +3,9 @@ import { CommonModule } from '@angular/common';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { DoctoresService } from '../../core/services/doctores.service';
 import { EspecialidadesService } from '../../core/services/especialidades.service';
+import { SucursalesService } from '../../core/services/sucursales.service';
 import { AuthService } from '../../core/services/auth.service';
-import { Doctor, DoctorHorario, Especialidad } from '../../core/models/models';
+import { Doctor, DoctorHorario, Especialidad, Sucursal } from '../../core/models/models';
 import { combinar12, formatoAmPm, HORAS_12, MINUTOS_60, partes12 } from '../../core/utils/hora12.util';
 
 @Component({
@@ -62,12 +63,14 @@ export class DoctoresComponent implements OnInit {
     private fb: FormBuilder,
     private srv: DoctoresService,
     private especialidadesSrv: EspecialidadesService,
+    private sucursalesSrv: SucursalesService,
     public auth: AuthService
   ) {}
 
   ngOnInit(): void {
     this.cargar();
     this.especialidadesSrv.listar().subscribe((data) => this.especialidades.set(data));
+    this.sucursalesSrv.listar().subscribe((data) => this.sucursales.set(data.filter((s) => s.activo)));
   }
 
   cargar(): void { this.srv.listar().subscribe((data) => this.doctores.set(data)); }
@@ -99,8 +102,10 @@ export class DoctoresComponent implements OnInit {
 
   horarioDoctor = signal<Doctor | null>(null);
   horarios = signal<DoctorHorario[]>([]);
+  sucursales = signal<Sucursal[]>([]);
 
   horarioForm = this.fb.group({
+    sucursal_id: ['', Validators.required],
     dia_semana: [1, Validators.required],
     hora_inicio: ['', Validators.required],
     hora_fin: ['', Validators.required],
@@ -134,7 +139,7 @@ export class DoctoresComponent implements OnInit {
 
   abrirHorario(d: Doctor): void {
     this.horarioDoctor.set(d);
-    this.horarioForm.reset({ dia_semana: 1, hora_inicio: '', hora_fin: '' });
+    this.horarioForm.reset({ sucursal_id: this.sucursales()[0]?.id ?? '', dia_semana: 1, hora_inicio: '', hora_fin: '' });
     this.cargarHorarios(d.id);
   }
 
@@ -153,6 +158,7 @@ export class DoctoresComponent implements OnInit {
       dia_semana: Number(data.dia_semana),
       hora_inicio: data.hora_inicio!,
       hora_fin: data.hora_fin!,
+      sucursal_id: data.sucursal_id || undefined,
     }).subscribe({
       next: () => {
         this.horarioForm.patchValue({ hora_inicio: '', hora_fin: '' });

@@ -29,10 +29,18 @@ docker run --rm -i -e PGPASSWORD='<password>' postgres:16 \
 | `009_citas_reagendar.sql` | Agrega `'reagendar'` a los valores permitidos de `citas.estado` | ✅ Aplicada 2026-09-05 | ✅ Aplicada 2026-09-05 |
 | `010_citas_log.sql` | Columna `log` (jsonb array de `{fecha, usuario, nota}`) en `citas`: bitacora de auditoria | ✅ Aplicada 2026-09-05 | ✅ Aplicada 2026-09-05 |
 | `011_recetas_creado_por.sql` | Columna `creado_por` en `recetas`: solo el autor puede editar/eliminar | ✅ Aplicada 2026-09-05 | ✅ Aplicada 2026-09-05 |
+| `012_sucursales.sql` | Tabla `sucursales` + `sucursal_id` en `doctor_horarios`/`citas`, con backfill automatico ("Sede Principal" por empresa) | ✅ Aplicada 2026-09-06 | ✅ Aplicada 2026-09-06 |
+| `013_sucursales_telefono.sql` | Columna `telefono` en `sucursales` | ✅ Aplicada 2026-09-06 | ✅ Aplicada 2026-09-06 |
+| `014_sucursales_google_maps.sql` | Columna `google_maps_url` en `sucursales` | ✅ Aplicada 2026-09-06 | ✅ Aplicada 2026-09-06 |
+| `015_pacientes_acepta_whatsapp.sql` | Columna `acepta_whatsapp` en `pacientes` | ✅ Aplicada 2026-09-06 | ✅ Aplicada 2026-09-06 |
 
 **Verificado 2026-09-02**: comparacion completa de esquema (tablas, columnas,
 indices, constraints, funciones, triggers) entre `.19` y Neon — identicos
 (antes de aplicar la migracion 005).
+
+**Verificado 2026-09-06**: comparacion de columnas de `sucursales`,
+`pacientes`, `doctor_horarios` y `citas` entre `.17` y Neon tras aplicar
+`012`-`015` — identicas.
 
 Actualizar esta tabla cada vez que se agregue una migracion nueva o se
 aplique una existente a un entorno adicional.

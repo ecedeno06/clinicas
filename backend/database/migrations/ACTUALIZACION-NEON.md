@@ -1,11 +1,13 @@
 # Actualizacion aplicada a Neon (produccion)
 
-Estado: `001` a `011` ya se aplicaron en Neon (verificado con
-comparacion completa de esquema contra `.19`; `007` certificada en
+Estado: `001` a `015` ya se aplicaron en Neon (verificado con
+comparacion completa de esquema contra `.19`/`.17`; `007` certificada en
 desarrollo y promovida el 2026-09-03; `008` aplicada el 2026-09-04;
-`009`, `010` y `011` aplicadas el 2026-09-05). Ver tambien
-[README.md](./README.md) para el registro vivo de que esta aplicado en
-cada entorno.
+`009`, `010` y `011` aplicadas el 2026-09-05; `012`-`015` aplicadas el
+2026-09-06, comparacion de columnas de `sucursales`/`pacientes`/
+`doctor_horarios`/`citas` entre `.17` y Neon confirmada identica). Ver
+tambien [README.md](./README.md) para el registro vivo de que esta
+aplicado en cada entorno.
 
 ## Resumen
 
@@ -22,6 +24,10 @@ cada entorno.
 | 9 | `009_citas_reagendar.sql` | Agrega `'reagendar'` al check de `citas.estado` | ✅ Aplicada 2026-09-05 |
 | 10 | `010_citas_log.sql` | Columna nueva `log` (jsonb) en `citas`: bitacora de auditoria | ✅ Aplicada 2026-09-05 |
 | 11 | `011_recetas_creado_por.sql` | Columna nueva `creado_por` en `recetas` | ✅ Aplicada 2026-09-05 |
+| 12 | `012_sucursales.sql` | Tabla nueva `sucursales`, columna `sucursal_id` en `doctor_horarios` y `citas` | ✅ Aplicada 2026-09-06 |
+| 13 | `013_sucursales_telefono.sql` | Columna nueva `telefono` en `sucursales` | ✅ Aplicada 2026-09-06 |
+| 14 | `014_sucursales_google_maps.sql` | Columna nueva `google_maps_url` en `sucursales` | ✅ Aplicada 2026-09-06 |
+| 15 | `015_pacientes_acepta_whatsapp.sql` | Columna nueva `acepta_whatsapp` en `pacientes` | ✅ Aplicada 2026-09-06 |
 
 ---
 
@@ -211,6 +217,69 @@ idempotente) y luego end-to-end contra `.19`: un segundo usuario de la
 misma clinica recibe 403 al intentar editar/eliminar la receta de otro,
 y no ve esos botones en la UI; el autor si puede. Aplicada a Neon el
 2026-09-05.
+
+---
+
+## 12. `012_sucursales.sql` — Sucursales (sedes) por empresa
+
+Fase 1 de [DISENO-ZONA-HORARIA-SUCURSALES.md](../../../DISENO-ZONA-HORARIA-SUCURSALES.md).
+Tabla nueva `sucursales` (id, empresa_id, nombre, direccion, zona_horaria
+default `America/Panama`, hora_apertura/cierre nullable, activo). Columna
+`sucursal_id` nueva en `doctor_horarios` (un doctor puede atender en mas
+de una sucursal de su empresa, por eso vive ahi y no en `doctores`) y en
+`citas` (no se puede heredar del doctor porque el mismo doctor puede
+atender en varias sedes).
+
+**Backfill automatico, sin pedir nada al usuario**: por cada empresa que
+todavia no tenga ninguna sucursal, crea una `'Sede Principal'` (heredando
+la `direccion` de la empresa), y reapunta todo `doctor_horarios`/`citas`
+existente sin `sucursal_id` hacia ella. Una vez respaldado, ambas columnas
+pasan a `not null`. El sistema sigue funcionando exactamente igual que
+hoy para toda clinica de una sola sede — no hay cambios visibles en la UI
+todavia (eso es Fase 2/3 del diseno).
+
+Probada con Postgres desechable: creacion limpia + re-ejecucion
+idempotente (sin duplicar sedes ni reprocesar backfill ya hecho), y con
+datos sinteticos (empresa + doctor + horario + cita) para confirmar que
+el backfill efectivamente reapunta las filas existentes y no solo corre
+en vacio. Aplicada a `.17` el 2026-09-06 (2 empresas existentes, cada una
+recibio su `Sede Principal`, 0 filas quedaron sin `sucursal_id`).
+**Aplicada a Neon el 2026-09-06** (1 empresa existente, backfill correcto,
+0 filas sin `sucursal_id`, esquema verificado identico contra `.17`).
+
+---
+
+## 13. `013_sucursales_telefono.sql` — Telefono de la sucursal
+
+Columna aditiva `telefono text` en `sucursales` (mismo patron que
+`empresas.telefono`/`doctores.telefono`). Probada con Postgres desechable
+(creacion limpia + re-ejecucion idempotente). Aplicada a `.17` y a Neon
+el 2026-09-06.
+
+---
+
+## 14. `014_sucursales_google_maps.sql` — Enlace a Google Maps de la sucursal
+
+Columna aditiva `google_maps_url text` en `sucursales`: enlace que el
+administrador pega desde el boton "Compartir" de Google Maps. Texto libre,
+sin validacion de formato -- solo se usa para mostrar un link "Ver en el
+mapa" junto a la direccion. Probada con Postgres desechable (creacion
+limpia + re-ejecucion idempotente). Aplicada a `.17` y a Neon el
+2026-09-06.
+
+---
+
+## 15. `015_pacientes_acepta_whatsapp.sql` — Telefono valido para WhatsApp
+
+Columna aditiva `acepta_whatsapp boolean not null default false` en
+`pacientes`: indica si el telefono registrado recibe WhatsApp. Se usa en
+Citas para decidir si ofrecer el boton "Compartir ubicacion por WhatsApp"
+-- solo aparece si el paciente tiene telefono, esta marcado como que acepta
+WhatsApp, y la sucursal de la cita tiene un enlace de mapa guardado.
+Registros existentes quedan en `false` por defecto (no se asume nada hasta
+que alguien lo marque explicitamente en el formulario de Pacientes).
+Probada con Postgres desechable (creacion limpia + re-ejecucion
+idempotente). Aplicada a `.17` y a Neon el 2026-09-06.
 
 ---
 

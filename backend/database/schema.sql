@@ -86,6 +86,9 @@ create table if not exists pacientes (
     fecha_nacimiento    date,
     sexo                text check (sexo in ('M', 'F', 'Otro')),
     telefono            text,
+    -- Indica si "telefono" recibe WhatsApp (se usa para decidir si mostrar
+    -- la opcion de "compartir ubicacion por WhatsApp" en Citas).
+    acepta_whatsapp     boolean not null default false,
     email               text unique,
     direccion           text,
     -- Contacto de emergencia: { nombre, telefono, parentesco }
@@ -134,6 +137,30 @@ create table if not exists doctores (
 );
 
 -- ---------------------------------------------------------
+-- Tabla: sucursales (sedes fisicas de una empresa). Una empresa
+-- siempre tiene al menos una ("Sede Principal" en instalaciones
+-- que aun no usan mas de una). Un doctor puede atender en varias
+-- sucursales de su empresa (ver doctor_horarios.sucursal_id).
+-- ---------------------------------------------------------
+create table if not exists sucursales (
+    id              uuid primary key default gen_random_uuid(),
+    empresa_id      uuid not null references empresas(id) on delete cascade,
+    nombre          text not null,
+    direccion       text,
+    telefono        text,
+    google_maps_url text,
+    zona_horaria    text not null default 'America/Panama',
+    -- Horario general de atencion (limite superior, distinto del horario
+    -- individual de cada doctor -- ver DISENO-ZONA-HORARIA-SUCURSALES.md
+    -- seccion 5). Nullable: si no se define, no agrega ninguna restriccion.
+    hora_apertura   time,
+    hora_cierre     time,
+    activo          boolean not null default true,
+    created_at      timestamptz not null default now(),
+    updated_at      timestamptz not null default now()
+);
+
+-- ---------------------------------------------------------
 -- Tabla: doctor_horarios (patron semanal recurrente de dias/horas
 -- en que atiende cada doctor -- tablero de turnos). No restringe
 -- la creacion de citas: es informativo para calcular disponibilidad,
@@ -142,6 +169,7 @@ create table if not exists doctores (
 create table if not exists doctor_horarios (
     id           uuid primary key default gen_random_uuid(),
     doctor_id    uuid not null references doctores(id) on delete cascade,
+    sucursal_id  uuid not null references sucursales(id) on delete cascade,
     dia_semana   smallint not null check (dia_semana between 0 and 6), -- 0=domingo … 6=sabado
     hora_inicio  time not null,
     hora_fin     time not null,
@@ -157,6 +185,7 @@ create table if not exists doctor_horarios (
 create table if not exists citas (
     id              uuid primary key default gen_random_uuid(),
     empresa_id      uuid not null references empresas(id),
+    sucursal_id     uuid not null references sucursales(id),
     paciente_id     uuid not null references pacientes(id) on delete restrict,
     doctor_id       uuid not null references doctores(id) on delete restrict,
     fecha           date not null,
@@ -301,9 +330,12 @@ create index if not exists idx_usuarios_empresas_rol_usuario on usuarios_empresa
 create index if not exists idx_usuarios_empresas_rol_empresa on usuarios_empresas_rol(empresa_id);
 create index if not exists idx_pacientes_empresas_paciente on pacientes_empresas(paciente_id);
 create index if not exists idx_pacientes_empresas_empresa on pacientes_empresas(empresa_id);
+create index if not exists idx_sucursales_empresa on sucursales(empresa_id);
 create index if not exists idx_doctores_empresa on doctores(empresa_id);
 create index if not exists idx_doctor_horarios_doctor on doctor_horarios(doctor_id);
+create index if not exists idx_doctor_horarios_sucursal on doctor_horarios(sucursal_id);
 create index if not exists idx_citas_empresa on citas(empresa_id);
+create index if not exists idx_citas_sucursal on citas(sucursal_id);
 create index if not exists idx_citas_doctor_fecha on citas(doctor_id, fecha);
 create index if not exists idx_citas_paciente on citas(paciente_id);
 create index if not exists idx_historias_clinicas_paciente on historias_clinicas(paciente_id);
@@ -340,7 +372,7 @@ do $$
 declare
     t text;
 begin
-    foreach t in array array['empresas','usuarios','usuarios_empresas_rol','especialidades','pacientes','pacientes_empresas','doctores','doctor_horarios','citas','historias_clinicas','signos_vitales','recetas','ordenes_laboratorio']
+    foreach t in array array['empresas','usuarios','usuarios_empresas_rol','especialidades','pacientes','pacientes_empresas','sucursales','doctores','doctor_horarios','citas','historias_clinicas','signos_vitales','recetas','ordenes_laboratorio']
     loop
         execute format('drop trigger if exists trg_set_updated_at on %I', t);
         execute format('create trigger trg_set_updated_at before update on %I for each row execute function set_updated_at()', t);

@@ -17,7 +17,7 @@ export class DoctoresService {
   eliminar(id: string): Observable<void> { return this.http.delete<void>(`${this.base}/${id}`); }
 
   listarHorarios(doctorId: string): Observable<DoctorHorario[]> { return this.http.get<DoctorHorario[]>(`${this.base}/${doctorId}/horarios`); }
-  crearHorario(doctorId: string, data: { dia_semana: number; hora_inicio: string; hora_fin: string }): Observable<DoctorHorario> {
+  crearHorario(doctorId: string, data: { dia_semana: number; hora_inicio: string; hora_fin: string; sucursal_id?: string }): Observable<DoctorHorario> {
     return this.http.post<DoctorHorario>(`${this.base}/${doctorId}/horarios`, data);
   }
   eliminarHorario(id: string): Observable<{ eliminado: boolean; citas_afectadas: number }> {

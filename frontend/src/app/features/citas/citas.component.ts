@@ -5,8 +5,9 @@ import { ActivatedRoute } from '@angular/router';
 import { CitasService } from '../../core/services/citas.service';
 import { PacientesService } from '../../core/services/pacientes.service';
 import { DoctoresService } from '../../core/services/doctores.service';
+import { SucursalesService } from '../../core/services/sucursales.service';
 import { AuthService } from '../../core/services/auth.service';
-import { Cita, Disponibilidad, Doctor, EstadoCita, EstadoLaboratorio, FranjaHoraria, HistoriaClinica, OrdenLaboratorio, Paciente, Receta, SignosVitales } from '../../core/models/models';
+import { Cita, Disponibilidad, Doctor, EstadoCita, EstadoLaboratorio, FranjaHoraria, HistoriaClinica, OrdenLaboratorio, Paciente, Receta, SignosVitales, Sucursal } from '../../core/models/models';
 import { clasificarImc } from '../../core/utils/imc.util';
 import { clasificarPresion } from '../../core/utils/presion.util';
 import { clasificarGlucosa } from '../../core/utils/glucosa.util';
@@ -25,6 +26,7 @@ export class CitasComponent implements OnInit {
   citas = signal<Cita[]>([]);
   pacientes = signal<Paciente[]>([]);
   doctores = signal<Doctor[]>([]);
+  sucursales = signal<Sucursal[]>([]);
   panelAbierto = signal(false);
   tabCita = signal<'cita' | 'historial'>('cita');
   editando = signal<Cita | null>(null);
@@ -84,6 +86,18 @@ export class CitasComponent implements OnInit {
   // rellena hora_inicio/hora_fin (siguen siendo editables a mano tambien).
   disponibilidad = signal<Disponibilidad | null>(null);
   cargandoDisponibilidad = signal(false);
+  // Franja/bloques del doctor en la sucursal elegida en el formulario --
+  // "ocupados" es a nivel de doctor completo (ver disponibilidad(), no
+  // depende de la sucursal), pero atiende/libres si dependen de cual sede.
+  // Metodo normal (no computed): depende de un FormControl, no de una senal,
+  // asi que se recalcula en cada deteccion de cambios (mismo patron que
+  // sinDisponibilidad()/horarioSinCambios() mas abajo).
+  disponibilidadSucursalActual() {
+    const disp = this.disponibilidad();
+    const sucursalId = this.form.get('sucursal_id')?.value;
+    if (!disp || !sucursalId) return null;
+    return disp.sucursales.find((s) => s.sucursal_id === sucursalId) ?? null;
+  }
 
   filtroFecha = signal('');
   filtroPaciente = signal('');
@@ -117,6 +131,7 @@ export class CitasComponent implements OnInit {
   form = this.fb.group({
     paciente_id: ['', Validators.required],
     doctor_id: ['', Validators.required],
+    sucursal_id: ['', Validators.required],
     fecha: [hoyISO(), Validators.required],
     hora_inicio: ['', Validators.required],
     hora_fin: ['', Validators.required],
@@ -158,6 +173,7 @@ export class CitasComponent implements OnInit {
     private srv: CitasService,
     private pacientesSrv: PacientesService,
     private doctoresSrv: DoctoresService,
+    private sucursalesSrv: SucursalesService,
     private route: ActivatedRoute,
     public auth: AuthService
   ) {}
@@ -166,6 +182,7 @@ export class CitasComponent implements OnInit {
     this.cargar();
     this.pacientesSrv.listar().subscribe((data) => this.pacientes.set(data));
     this.doctoresSrv.listar().subscribe((data) => this.doctores.set(data));
+    this.sucursalesSrv.listar().subscribe((data) => this.sucursales.set(data.filter((s) => s.activo)));
 
     this.form.get('doctor_id')!.valueChanges.subscribe(() => this.actualizarDisponibilidad());
     this.form.get('fecha')!.valueChanges.subscribe(() => this.actualizarDisponibilidad());
@@ -213,20 +230,24 @@ export class CitasComponent implements OnInit {
     if (!original) return false;
     const v = this.form.getRawValue();
     return v.doctor_id === original.doctor_id
+      && v.sucursal_id === original.sucursal_id
       && v.fecha === original.fecha?.substring(0, 10)
       && v.hora_inicio === original.hora_inicio?.substring(0, 5)
       && v.hora_fin === original.hora_fin?.substring(0, 5);
   }
 
   // Solo bloquea Guardar cuando el doctor SI tiene un horario configurado
-  // (al menos un bloque, en cualquier dia) pero ese dia no atiende o ya
-  // esta completo. Un doctor sin ningun horario cargado todavia sigue
-  // pudiendo recibir citas con total libertad, como antes de este tablero.
+  // (al menos un bloque, en cualquier dia) pero ese dia no atiende en la
+  // sucursal elegida, o ya esta completo ahi. Un doctor sin ningun horario
+  // cargado todavia sigue pudiendo recibir citas con total libertad, como
+  // antes de este tablero.
   sinDisponibilidad(): boolean {
     if (this.horarioSinCambios()) return false;
     const disp = this.disponibilidad();
     if (!disp || !disp.tiene_horario_configurado) return false;
-    return !disp.atiende || disp.libres.length === 0;
+    const sucursalDisp = this.disponibilidadSucursalActual();
+    if (!sucursalDisp) return true;
+    return !sucursalDisp.atiende || sucursalDisp.libres.length === 0;
   }
 
   formatoAmPm = formatoAmPm;
@@ -278,6 +299,35 @@ export class CitasComponent implements OnInit {
     return !r.creado_por || r.creado_por === this.auth.usuario()?.id;
   }
 
+  // Solo tiene sentido ofrecer "compartir ubicacion" si hay a donde
+  // mandarlo (telefono del paciente, marcado explicitamente como que
+  // recibe WhatsApp) y que mandar (enlace de la sucursal).
+  puedeCompartirUbicacion(c: Cita): boolean {
+    return !!c.paciente_telefono && !!c.paciente_acepta_whatsapp && !!c.sucursal_google_maps_url;
+  }
+
+  // wa.me abre WhatsApp Web/app con el mensaje precargado para ese numero
+  // -- no requiere API ni cuenta de WhatsApp Business.
+  whatsappUrl(c: Cita): string {
+    const telefono = (c.paciente_telefono || '').replace(/\D/g, '');
+    const empresa = this.auth.empresaActiva()?.empresa_nombre;
+
+    const lineas = [
+      `Hola ${c.paciente_nombre}, te confirmamos los datos de tu cita en ${empresa}:`,
+      '',
+      `Fecha: ${formatearFecha(c.fecha)}`,
+      `Hora: ${formatoAmPm(c.hora_inicio)} - ${formatoAmPm(c.hora_fin)}`,
+      `Doctor: ${c.doctor_nombre} (${c.especialidad_nombre})`,
+      `Sucursal: ${c.sucursal_nombre}${c.sucursal_direccion ? ' - ' + c.sucursal_direccion : ''}`,
+    ];
+    if (c.sucursal_hora_apertura && c.sucursal_hora_cierre) {
+      lineas.push(`Horario de atencion de la sucursal: ${formatoAmPm(c.sucursal_hora_apertura)} - ${formatoAmPm(c.sucursal_hora_cierre)}`);
+    }
+    lineas.push('', `Ubicacion: ${c.sucursal_google_maps_url}`);
+
+    return `https://wa.me/${telefono}?text=${encodeURIComponent(lineas.join('\n'))}`;
+  }
+
   abrirNuevo(): void {
     this.editando.set(null);
     this.disponibilidad.set(null);
@@ -286,7 +336,7 @@ export class CitasComponent implements OnInit {
     // reset (doctor_id y fecha cambiarian en dos eventos separados, el
     // primero con el otro campo todavia con el valor viejo) -- se llama una
     // sola vez, ya con el formulario completo, justo debajo.
-    this.form.reset({ fecha: hoyISO(), estado: 'pendiente' }, { emitEvent: false });
+    this.form.reset({ sucursal_id: this.sucursales()[0]?.id ?? '', fecha: hoyISO(), estado: 'pendiente' }, { emitEvent: false });
     this.errorGuardar.set(null);
     this.panelAbierto.set(true);
     this.actualizarDisponibilidad();
@@ -299,6 +349,7 @@ export class CitasComponent implements OnInit {
     this.form.reset({
       paciente_id: c.paciente_id,
       doctor_id: c.doctor_id,
+      sucursal_id: c.sucursal_id ?? this.sucursales()[0]?.id ?? '',
       fecha: c.fecha.substring(0, 10),
       hora_inicio: c.hora_inicio?.substring(0, 5),
       hora_fin: c.hora_fin?.substring(0, 5),

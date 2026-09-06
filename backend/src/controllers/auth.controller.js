@@ -44,6 +44,7 @@ async function login(req, res, next) {
          where e.activo = true
          order by e.nombre`,
         [usuario.id]
+        
       );
 
       if (todasEmpresas.length === 0) {

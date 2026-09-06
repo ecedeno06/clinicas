@@ -53,7 +53,7 @@ async function crear(req, res, next) {
   const client = await pool.connect();
   try {
     const {
-      nombre, identificacion, fecha_nacimiento, sexo, telefono, email,
+      nombre, identificacion, fecha_nacimiento, sexo, telefono, acepta_whatsapp, email,
       direccion, contacto_emergencia, alergias, activo, foto,
     } = req.body;
 
@@ -80,10 +80,10 @@ async function crear(req, res, next) {
         return res.status(400).json({ mensaje: 'nombre es requerido para un paciente nuevo' });
       }
       const ins = await client.query(
-        `insert into pacientes (nombre, identificacion, fecha_nacimiento, sexo, telefono, email, direccion, contacto_emergencia, alergias, foto)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning *`,
+        `insert into pacientes (nombre, identificacion, fecha_nacimiento, sexo, telefono, acepta_whatsapp, email, direccion, contacto_emergencia, alergias, foto)
+         values ($1,$2,$3,$4,$5, coalesce($6, false),$7,$8,$9,$10,$11) returning *`,
         [
-          nombre, identificacion || null, fecha_nacimiento || null, sexo, telefono, email,
+          nombre, identificacion || null, fecha_nacimiento || null, sexo, telefono, acepta_whatsapp, email,
           direccion, contacto_emergencia ? JSON.stringify(contacto_emergencia) : null, alergias, foto || null,
         ]
       );
@@ -120,7 +120,7 @@ async function crear(req, res, next) {
 async function actualizar(req, res, next) {
   try {
     const {
-      nombre, identificacion, fecha_nacimiento, sexo, telefono, email,
+      nombre, identificacion, fecha_nacimiento, sexo, telefono, acepta_whatsapp, email,
       direccion, contacto_emergencia, alergias, activo, foto,
     } = req.body;
 
@@ -137,14 +137,15 @@ async function actualizar(req, res, next) {
          fecha_nacimiento = coalesce($3, fecha_nacimiento),
          sexo = coalesce($4, sexo),
          telefono = coalesce($5, telefono),
-         email = coalesce($6, email),
-         direccion = coalesce($7, direccion),
-         contacto_emergencia = coalesce($8, contacto_emergencia),
-         alergias = coalesce($9, alergias),
-         foto = coalesce($10, foto)
-       where id = $11 returning *`,
+         acepta_whatsapp = coalesce($6, acepta_whatsapp),
+         email = coalesce($7, email),
+         direccion = coalesce($8, direccion),
+         contacto_emergencia = coalesce($9, contacto_emergencia),
+         alergias = coalesce($10, alergias),
+         foto = coalesce($11, foto)
+       where id = $12 returning *`,
       [
-        nombre, identificacion, fecha_nacimiento || null, sexo, telefono, email,
+        nombre, identificacion, fecha_nacimiento || null, sexo, telefono, acepta_whatsapp, email,
         direccion, contacto_emergencia ? JSON.stringify(contacto_emergencia) : null, alergias, foto,
         req.params.id,
       ]

@@ -1,9 +1,15 @@
 # Análisis y Hoja de Ruta: Zona Horaria por Sucursal (no solo por Clínica)
 
-> **Documento de Diseño — Estado: Aprobado para construir, implementación en
-> espera a pedido explícito del usuario (2026-09-05) — "no hagas el cambio
-> aún, en un par de días me recuerdas". No arrancar la Fase 1 sin retomarlo
-> primero con el usuario.**
+> **Documento de Diseño — Estado: Fases 1-3 implementadas (2026-09-06).**
+> Migraciones `012`-`015` aplicadas en `.17` y en Neon (verificado esquema
+> idéntico). Incluye: tabla `sucursales` con backfill automático, CRUD de
+> administración (pantalla "Sucursales", accesible a super admin y al admin
+> de la clínica), selector de sucursal en Horario del doctor (con el chequeo
+> de choque cruzando todas las sucursales del doctor), selector de sucursal
+> en Nueva/Editar cita, disponibilidad agrupada por sucursal, chequeo de
+> choque por paciente, y filtro "Sucursal" + columna en el dashboard.
+> **Pendiente**: subir el código a GitHub (confirmación explícita por
+> separado, como siempre).
 > **Origen:** surge del bug de desfase de un día en fechas corregido el 2026-09-05
 > (ver commit `9f399c5` y `MEJORAS-PROPUESTAS.md` sección 5), donde se anotó
 > agregar `zona_horaria` a `empresas`. Al revisarlo más a fondo, el cambio real
@@ -150,7 +156,7 @@ alter table citas alter column sucursal_id set not null;
 
 | Área | Cambio necesario |
 |---|---|
-| **Empresas (admin)** | Nueva pantalla/sección para gestionar sucursales de una empresa (crear, editar, desactivar). Si una empresa tiene una sola sucursal, la UI puede ocultar la complejidad y comportarse igual que hoy (auto-seleccionar la única sucursal). |
+| **Empresas (admin)** | Nueva pantalla/sección para gestionar sucursales de una empresa (crear, editar, desactivar). Si una empresa tiene una sola sucursal, la UI puede ocultar la complejidad y comportarse igual que hoy (auto-seleccionar la única sucursal). **Permisos (2026-09-06)**: no solo el super admin — el administrador de la clínica (rol `admin` en `usuarios_empresas_rol` para esa `empresa_id`) también debe poder gestionar las sucursales de su propia empresa. El backend debe permitir el CRUD de sucursales a cualquier usuario con rol `admin` en esa empresa, no solo a `es_super_admin`. |
 | **Doctores → Horario semanal** | Al agregar un bloque de horario, elegir a qué sucursal aplica (si el doctor trabaja en más de una). El endpoint de disponibilidad (`GET /api/doctores/:id/disponibilidad`) debe filtrar por sucursal, no solo por doctor. |
 | **Citas → Nueva/Editar cita** | Elegir sucursal (auto-seleccionada si el doctor solo atiende en una). Los chips de disponibilidad ya calculados dependen de `doctor_horarios` filtrado por sucursal. |
 | **Reagendar (estado `reagendar`)** | La lógica que marca citas como `reagendar` al eliminar un bloque de horario (`doctorHorarios.controller.js#eliminar`) debe filtrar también por `sucursal_id` del bloque eliminado, no solo por `doctor_id`. |
@@ -304,7 +310,7 @@ general de su sucursal.
 |---|---|---|---|
 | **Fase 0 — Hecho** | Corrección puntual del bug de desfase de un día en fechas (pipes de Angular sin `'UTC'`, cálculo de "hoy" con `toISOString()`). Ver commit `9f399c5`. | — | ✅ Completado 2026-09-05 |
 | **Fase 1** | Migración `sucursales` + `sucursal_id` en `doctor_horarios`/`citas`, con la migración automática de "sucursal principal" por empresa (sección 3.1). Sin cambios visibles en la UI todavia — todo sigue funcionando igual porque cada empresa sigue teniendo exactamente una sucursal. | — | Media (base necesaria para todo lo demás) |
-| **Fase 2** | Pantalla de administración de sucursales dentro de Empresas (CRUD). Selector de sucursal en Doctores → Horario semanal (oculto/auto-seleccionado si solo hay una). **Ampliar `hayChoqueDeBloque` para que siga comparando por `doctor_id` + `dia_semana` a través de todas sus sucursales (ver sección 4.1.b) — no reducirlo por sucursal.** | Fase 1 | Media |
+| **Fase 2** | Pantalla de administración de sucursales dentro de Empresas (CRUD). **Accesible tanto para `es_super_admin` como para el rol `admin` de esa empresa** (no solo super admin, ver fila "Empresas (admin)" arriba). Selector de sucursal en Doctores → Horario semanal (oculto/auto-seleccionado si solo hay una). **Ampliar `hayChoqueDeBloque` para que siga comparando por `doctor_id` + `dia_semana` a través de todas sus sucursales (ver sección 4.1.b) — no reducirlo por sucursal.** | Fase 1 | Media |
 | **Fase 3** | Selector de sucursal en Nueva/Editar cita (mismo criterio: oculto si el doctor solo tiene una opción). Endpoint de disponibilidad filtra por sucursal. Ajustar la lógica de `reagendar` para considerar `sucursal_id`. **Agregar chequeo de choque por `paciente_id` al crear/editar una cita (ver sección 4.1.a), independiente de sucursal/doctor.** Selector "Sucursal" en el dashboard + columna Sucursal en "Agenda del día" (ver sección 4.3). | Fase 2 | Media |
 | **Fase 4** | Horario de atención general de la sucursal (`hora_apertura`/`hora_cierre`) y su validación cruzada (suave) contra el horario de cada doctor. | Fase 2 | Baja |
 | **Fase 5** | Soporte real a multi-zona horaria en dashboard/reportes ("hoy" por sucursal en vez de global) y rotulado de hora con zona horaria en pantallas donde el usuario podría no estar en la misma zona que la sucursal. | Fase 1–3 | Baja (solo aplica si de verdad aparece una empresa con sucursales en zonas distintas) |

@@ -10,6 +10,7 @@ import { EspecialidadesComponent } from './features/especialidades/especialidade
 import { CitasComponent } from './features/citas/citas.component';
 import { UsuariosComponent } from './features/usuarios/usuarios.component';
 import { EmpresasComponent } from './features/empresas/empresas.component';
+import { SucursalesComponent } from './features/sucursales/sucursales.component';
 
 export const routes: Routes = [
   { path: 'login', component: LoginComponent },
@@ -25,6 +26,7 @@ export const routes: Routes = [
       { path: 'doctores', component: DoctoresComponent },
       { path: 'especialidades', component: EspecialidadesComponent },
       { path: 'usuarios', component: UsuariosComponent },
+      { path: 'sucursales', component: SucursalesComponent },
       { path: 'empresas', component: EmpresasComponent, canActivate: [superAdminGuard] },
     ],
   },
