@@ -11,6 +11,7 @@ import { clasificarImc } from '../../core/utils/imc.util';
 import { clasificarPresion } from '../../core/utils/presion.util';
 import { clasificarGlucosa } from '../../core/utils/glucosa.util';
 import { combinar12, formatoAmPm, HORAS_12, MINUTOS_60, partes12 } from '../../core/utils/hora12.util';
+import { hoyISO } from '../../core/utils/fecha.util';
 import { SelectorFotoComponent } from '../../core/components/selector-foto/selector-foto.component';
 
 @Component({
@@ -116,7 +117,7 @@ export class CitasComponent implements OnInit {
   form = this.fb.group({
     paciente_id: ['', Validators.required],
     doctor_id: ['', Validators.required],
-    fecha: [new Date().toISOString().substring(0, 10), Validators.required],
+    fecha: [hoyISO(), Validators.required],
     hora_inicio: ['', Validators.required],
     hora_fin: ['', Validators.required],
     motivo: [''],
@@ -285,7 +286,7 @@ export class CitasComponent implements OnInit {
     // reset (doctor_id y fecha cambiarian en dos eventos separados, el
     // primero con el otro campo todavia con el valor viejo) -- se llama una
     // sola vez, ya con el formulario completo, justo debajo.
-    this.form.reset({ fecha: new Date().toISOString().substring(0, 10), estado: 'pendiente' }, { emitEvent: false });
+    this.form.reset({ fecha: hoyISO(), estado: 'pendiente' }, { emitEvent: false });
     this.errorGuardar.set(null);
     this.panelAbierto.set(true);
     this.actualizarDisponibilidad();
@@ -477,7 +478,7 @@ export class CitasComponent implements OnInit {
   // consulta o el dia siguiente; pasado eso el backend tambien lo rechaza
   // (esto es solo para deshabilitar el formulario antes de intentarlo).
   diasDesdeConsulta(cita: Cita): number {
-    const hoy = new Date().toISOString().substring(0, 10);
+    const hoy = hoyISO();
     const msPorDia = 24 * 60 * 60 * 1000;
     return Math.round((new Date(hoy).getTime() - new Date(cita.fecha).getTime()) / msPorDia);
   }

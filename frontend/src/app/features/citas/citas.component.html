@@ -35,7 +35,7 @@
     <tbody>
       @for (c of citasFiltradas(); track c.id) {
         <tr>
-          <td>{{ c.fecha | date:'dd/MM/yyyy' }}</td>
+          <td>{{ c.fecha | date:'dd/MM/yyyy':'UTC' }}</td>
           <td>{{ formatoAmPm(c.hora_inicio) }} - {{ formatoAmPm(c.hora_fin) }}</td>
           <td>{{ c.paciente_nombre }}</td>
           <td>{{ c.paciente_edad ?? '-' }}</td>
@@ -297,7 +297,7 @@
             </div>
             <div class="form-group mt-16">
               <label>Fecha de nacimiento</label>
-              <div>{{ (pacienteDeHistoria()?.fecha_nacimiento | date:'dd/MM/yyyy') || '-' }}</div>
+              <div>{{ (pacienteDeHistoria()?.fecha_nacimiento | date:'dd/MM/yyyy':'UTC') || '-' }}</div>
             </div>
             <div class="form-group mt-16">
               <label>Edad</label>
@@ -334,7 +334,7 @@
 
         <div class="consulta-main">
           <div class="text-muted text-sm">
-            {{ c.paciente_nombre }} &middot; {{ c.doctor_nombre }} &middot; {{ c.fecha | date:'dd/MM/yyyy' }}
+            {{ c.paciente_nombre }} &middot; {{ c.doctor_nombre }} &middot; {{ c.fecha | date:'dd/MM/yyyy':'UTC' }}
           </div>
 
           <div class="card mt-16">
@@ -383,7 +383,7 @@
                 <tbody>
                   @for (sv of signosVitalesDeHistoriaDesc(); track sv.id) {
                     <tr [class.fila-signos-actual]="sv.cita_id === c.id">
-                      <td style="white-space: nowrap;">{{ sv.fecha_cita | date:'dd/MM/yyyy' }}</td>
+                      <td style="white-space: nowrap;">{{ sv.fecha_cita | date:'dd/MM/yyyy':'UTC' }}</td>
                       <td style="white-space: nowrap;">{{ sv.hora_cita ? formatoAmPm(sv.hora_cita) : '-' }}</td>
                       <td>{{ sv.temperatura ?? '-' }}</td>
                       <td>{{ sv.peso ?? '-' }}</td>
@@ -489,7 +489,7 @@
               @for (r of recetasDeHistoria(); track r.id) {
                 <div class="card mt-16">
                   <div class="flex items-center" style="justify-content: space-between;">
-                    <div class="text-muted text-sm">{{ r.fecha_cita | date:'dd/MM/yyyy' }} &middot; {{ r.doctor_nombre }}</div>
+                    <div class="text-muted text-sm">{{ r.fecha_cita | date:'dd/MM/yyyy':'UTC' }} &middot; {{ r.doctor_nombre }}</div>
                     <div class="flex gap-6">
                       <button type="button" class="btn-icon" title="Imprimir" aria-label="Imprimir" (click)="imprimirReceta(r)">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
@@ -577,7 +577,7 @@
             @for (o of laboratoriosDeHistoria(); track o.id) {
               <div class="card mt-16">
                 <div class="flex items-center" style="justify-content: space-between;">
-                  <div class="text-muted text-sm">{{ o.fecha_cita | date:'dd/MM/yyyy' }} &middot; {{ o.doctor_nombre }}</div>
+                  <div class="text-muted text-sm">{{ o.fecha_cita | date:'dd/MM/yyyy':'UTC' }} &middot; {{ o.doctor_nombre }}</div>
                   <span class="badge"
                     [class.badge-slate]="o.estado === 'pendiente'"
                     [class.badge-green]="o.estado === 'completada'"
@@ -625,7 +625,7 @@
       </div>
 
       <div class="text-muted text-sm">
-        {{ c.paciente_nombre }} &middot; {{ c.doctor_nombre }} &middot; {{ c.fecha | date:'dd/MM/yyyy' }}
+        {{ c.paciente_nombre }} &middot; {{ c.doctor_nombre }} &middot; {{ c.fecha | date:'dd/MM/yyyy':'UTC' }}
       </div>
 
       @if (cargandoSignos()) {
@@ -708,7 +708,7 @@
       </div>
 
       <div class="text-muted text-sm">
-        {{ c.paciente_nombre }} &middot; {{ c.doctor_nombre }} &middot; {{ c.fecha | date:'dd/MM/yyyy' }}
+        {{ c.paciente_nombre }} &middot; {{ c.doctor_nombre }} &middot; {{ c.fecha | date:'dd/MM/yyyy':'UTC' }}
       </div>
 
       @if (cargandoRecetas()) {
@@ -815,7 +815,7 @@
       </div>
 
       <div class="text-muted text-sm">
-        {{ c.paciente_nombre }} &middot; {{ c.doctor_nombre }} &middot; {{ c.fecha | date:'dd/MM/yyyy' }}
+        {{ c.paciente_nombre }} &middot; {{ c.doctor_nombre }} &middot; {{ c.fecha | date:'dd/MM/yyyy':'UTC' }}
       </div>
 
       @if (cargandoLaboratorio()) {

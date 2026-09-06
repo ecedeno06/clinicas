@@ -9,6 +9,7 @@ import { CitasService } from '../../core/services/citas.service';
 import { AuthService } from '../../core/services/auth.service';
 import { Cita, Doctor, LaboratorioPendiente, Paciente } from '../../core/models/models';
 import { formatoAmPm } from '../../core/utils/hora12.util';
+import { hoyISO } from '../../core/utils/fecha.util';
 
 @Component({
   selector: 'app-dashboard',
@@ -78,8 +79,4 @@ export class DashboardComponent implements OnInit {
     const [anio, mes, dia] = iso.substring(0, 10).split('-');
     return `${dia}/${mes}/${anio}`;
   }
-}
-
-function hoyISO(): string {
-  return new Date().toISOString().substring(0, 10);
 }

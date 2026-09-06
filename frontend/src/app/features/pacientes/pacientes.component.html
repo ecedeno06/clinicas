@@ -180,7 +180,7 @@
                 } @else {
                   @for (h of historial(); track h.id) {
                     <tr class="row-clickable" [class.row-selected]="historialSeleccionado()?.id === h.id" (click)="seleccionarHistorial(h)">
-                      <td style="white-space: nowrap;">{{ h.fecha_cita | date:'dd/MM/yyyy' }}</td>
+                      <td style="white-space: nowrap;">{{ h.fecha_cita | date:'dd/MM/yyyy':'UTC' }}</td>
                       <td style="white-space: nowrap;">{{ h.hora_cita?.substring(0, 5) || '-' }}</td>
                       <td>{{ h.doctor_nombre }} <div class="text-muted text-sm">{{ h.especialidad_nombre }}</div></td>
                       <td>
@@ -226,7 +226,7 @@
             @if (!historialSeleccionado()) {
               <div class="empty-state">Selecciona una consulta de la lista para ver este detalle.</div>
             } @else {
-              <div class="text-muted text-sm" style="margin-bottom:8px;">{{ historialSeleccionado()!.fecha_cita | date:'dd/MM/yyyy' }} &middot; {{ historialSeleccionado()!.doctor_nombre }}</div>
+              <div class="text-muted text-sm" style="margin-bottom:8px;">{{ historialSeleccionado()!.fecha_cita | date:'dd/MM/yyyy':'UTC' }} &middot; {{ historialSeleccionado()!.doctor_nombre }}</div>
 
               @if (tabInferior() === 'signos') {
                 @if (cargandoSignosSeleccionado()) {

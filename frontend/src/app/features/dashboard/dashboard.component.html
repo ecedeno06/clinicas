@@ -50,7 +50,7 @@
           <tbody>
             @for (l of laboratoriosPendientes(); track l.orden_id) {
               <tr>
-                <td style="white-space: nowrap;">{{ l.fecha | date:'dd/MM/yyyy' }}</td>
+                <td style="white-space: nowrap;">{{ l.fecha | date:'dd/MM/yyyy':'UTC' }}</td>
                 <td>{{ l.paciente_nombre }}</td>
                 <td>{{ l.doctor_nombre }} <div class="text-muted text-sm">{{ l.especialidad_nombre }}</div></td>
                 <td class="table-actions">

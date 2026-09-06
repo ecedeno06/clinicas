@@ -148,6 +148,24 @@ de si comparten pacientes/doctores o no.
 - Referencias/interconsultas entre especialistas.
 - Gestion de seguros, autorizaciones y copagos (ligado a facturacion).
 - Integracion con laboratorios externos (recepcion de resultados por API/HL7).
+- **Zona horaria por clinica**: agregar un campo `zona_horaria` a `empresas` (ej.
+  `America/Panama`) y usarlo para calcular/mostrar fechas y horarios de forma
+  consistente sin importar la zona horaria del navegador de quien lo mira ni la
+  del servidor donde corre el backend -- surgio al encontrar y corregir (2026-09-05)
+  un bug real de desfase de un dia: los campos `date` (sin hora) de Postgres se
+  mostraban con el pipe `date` de Angular usando la zona horaria LOCAL del
+  navegador, corriendo la fecha un dia hacia atras para cualquier usuario en una
+  zona horaria con offset negativo (todo el continente americano). Se corrigio
+  puntualmente agregando `:'UTC'` a esos pipes y centralizando el calculo de
+  "hoy" en `frontend/src/app/core/utils/fecha.util.ts` (usa la fecha LOCAL real
+  del navegador, no `toISOString()` que convierte a UTC primero), pero el
+  arreglo de fondo -- si se quiere manejar clinicas en zonas horarias distintas
+  entre si -- es que la zona horaria sea un dato explicito de la clinica, no una
+  suposicion implicita de que todos (servidor, navegador, doctor, paciente)
+  estan en la misma. Ligado a esto: el horario semanal del doctor
+  (`doctor_horarios`) tambien asume "la hora del navegador de quien agenda" hoy;
+  si se agrega zona horaria a la clinica, la disponibilidad deberia calcularse
+  respecto a ESA zona, no a la del cliente que hace la peticion.
 
 ## 6. Arquitectura de referencia
 
