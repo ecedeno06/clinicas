@@ -142,12 +142,23 @@ de si comparten pacientes/doctores o no.
 
 - Portal del paciente (ver sus propias citas/recetas/resultados).
 - Recordatorios de citas por WhatsApp/SMS/email.
+- **Factory de notificaciones** (email/SMS/push): pieza de infraestructura
+  reutilizable para que laboratorio-QR, campañas, y recordatorios de citas
+  (todos ya identificados en este documento) puedan avisar a alguien sin que
+  cada uno reinvente el envio de correos por su cuenta. Analisis completo y
+  hoja de ruta en
+  [DISENO-NOTIFICACIONES-FACTORY.md](./DISENO-NOTIFICACIONES-FACTORY.md).
 - Telemedicina (videollamada integrada).
 - Firma digital y consentimientos informados en PDF.
 - Certificados medicos e incapacidades generadas desde el sistema.
 - Referencias/interconsultas entre especialistas.
 - Gestion de seguros, autorizaciones y copagos (ligado a facturacion).
 - Integracion con laboratorios externos (recepcion de resultados por API/HL7).
+- **Campañas de visitas medicas** (oficinas, eventos): programar fecha/lugar,
+  reclutar doctores, aprobacion interna, y que las atenciones entren al mismo
+  flujo clinico existente (cita -> historia/signos/receta/laboratorio) sin
+  crear un modulo paralelo. Analisis completo y hoja de ruta en
+  [DISENO-CAMPANAS-MEDICAS.md](./DISENO-CAMPANAS-MEDICAS.md).
 - **Zona horaria por sucursal** (no solo por clinica): surgio al encontrar y
   corregir (2026-09-05) un bug real de desfase de un dia en fechas (ver commit
   `9f399c5`) -- el arreglo puntual ya esta hecho, pero al analizar el arreglo de
