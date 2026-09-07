@@ -29,7 +29,10 @@ export class CitasComponent implements OnInit {
   pacientes = signal<Paciente[]>([]);
   doctores = signal<Doctor[]>([]);
   sucursales = signal<Sucursal[]>([]);
-  campanasEnCurso = signal<Campana[]>([]);
+  // Campanas donde ya tiene sentido agendar: aprobadas (pre-agendar antes
+  // del dia del evento) o en_curso. El backend vuelve a validar esto al
+  // guardar.
+  campanasElegibles = signal<Campana[]>([]);
   // Doctores invitados (invitado o confirmado, no rechazado) de la
   // campana elegida en el formulario -- si hay una campana seleccionada,
   // solo ellos pueden agendarse; el backend vuelve a validar esto de
@@ -197,7 +200,9 @@ export class CitasComponent implements OnInit {
     this.pacientesSrv.listar().subscribe((data) => this.pacientes.set(data));
     this.doctoresSrv.listar().subscribe((data) => this.doctores.set(data));
     this.sucursalesSrv.listar().subscribe((data) => this.sucursales.set(data.filter((s) => s.activo)));
-    this.campanasSrv.listar({ estado: 'en_curso' }).subscribe((data) => this.campanasEnCurso.set(data));
+    this.campanasSrv.listar().subscribe((data) => {
+      this.campanasElegibles.set(data.filter((c) => c.estado === 'aprobada' || c.estado === 'en_curso'));
+    });
 
     this.form.get('doctor_id')!.valueChanges.subscribe(() => this.actualizarDisponibilidad());
     this.form.get('fecha')!.valueChanges.subscribe(() => this.actualizarDisponibilidad());
@@ -236,6 +241,28 @@ export class CitasComponent implements OnInit {
   onCambioCampana(campanaId: string | null): void {
     this.form.patchValue({ doctor_id: '' });
     this.cargarDoctoresCampana(campanaId);
+    this.actualizarBloqueoFecha(campanaId);
+  }
+
+  // La fecha de una cita de campana la define la campana, no el usuario --
+  // se fija (a fecha_inicio, por si la campana dura varios dias) y se
+  // bloquea el campo. Al volver a "Ninguna", se libera y vuelve a hoy.
+  private actualizarBloqueoFecha(campanaId: string | null): void {
+    const fechaCtrl = this.form.get('fecha')!;
+    if (!campanaId) {
+      fechaCtrl.enable({ emitEvent: false });
+      return;
+    }
+    const campana = this.campanasElegibles().find((c) => c.id === campanaId);
+    if (campana) {
+      fechaCtrl.setValue(campana.fecha_inicio.substring(0, 10), { emitEvent: false });
+    }
+    fechaCtrl.disable({ emitEvent: false });
+  }
+
+  campanaSeleccionada(): Campana | null {
+    const id = this.form.get('campana_id')?.value;
+    return id ? this.campanasElegibles().find((c) => c.id === id) ?? null : null;
   }
 
   // Solo carga la lista de doctores invitados (incluye "invitado" y
@@ -407,6 +434,7 @@ export class CitasComponent implements OnInit {
     this.panelAbierto.set(true);
     this.actualizarDisponibilidad();
     this.cargarDoctoresCampana(null);
+    this.actualizarBloqueoFecha(null);
   }
 
   abrirEditar(c: Cita): void {
@@ -429,6 +457,7 @@ export class CitasComponent implements OnInit {
     this.panelAbierto.set(true);
     this.actualizarDisponibilidad();
     this.cargarDoctoresCampana(c.campana_id ?? null);
+    this.actualizarBloqueoFecha(c.campana_id ?? null);
   }
 
   cerrarPanel(): void { this.panelAbierto.set(false); }

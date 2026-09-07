@@ -163,16 +163,42 @@ async function crear(req, res, next) {
     if (!sucursalId) return res.status(400).json({ mensaje: 'La sucursal indicada no existe o no pertenece a esta clinica.' });
 
     // Una cita de campana sigue siendo una cita normal (mismo insert de
-    // siempre) -- solo se valida que la campana este en_curso y que el
-    // doctor este invitado a ella (invitado o confirmado, no rechazado),
-    // para no dejar agendar a nombre de una campana a un doctor que nunca
-    // fue convocado. Ver DISENO-CAMPANAS-MEDICAS.md secciones 6 y 9.
+    // siempre) -- solo se valida que la campana este aprobada o en_curso
+    // (permite pre-agendar antes del dia del evento, una vez aprobada) y
+    // que el doctor este invitado a ella (invitado o confirmado, no
+    // rechazado), para no dejar agendar a nombre de una campana a un
+    // doctor que nunca fue convocado. Ver DISENO-CAMPANAS-MEDICAS.md
+    // secciones 6 y 9.
     if (campana_id) {
-      const campana = await pool.query('select estado from campanas where id = $1 and empresa_id = $2', [campana_id, req.empresaId]);
+      const campana = await pool.query(
+        'select estado, hora_inicio, hora_fin from campanas where id = $1 and empresa_id = $2',
+        [campana_id, req.empresaId]
+      );
       if (!campana.rows[0]) return res.status(400).json({ mensaje: 'La campana indicada no existe o no pertenece a esta clinica.' });
-      if (campana.rows[0].estado !== 'en_curso') {
-        return res.status(400).json({ mensaje: 'Solo se pueden crear citas para una campana que este en curso.' });
+      if (!['aprobada', 'en_curso'].includes(campana.rows[0].estado)) {
+        return res.status(400).json({ mensaje: 'Solo se pueden crear citas para una campana aprobada o en curso.' });
       }
+
+      // El horario de la cita no puede salirse del horario declarado de la
+      // campana (si no declaro horario, no hay restriccion -- ver
+      // campanas.controller.js, hora_inicio/hora_fin son opcionales).
+      const { hora_inicio: campanaHoraInicio, hora_fin: campanaHoraFin } = campana.rows[0];
+      if (campanaHoraInicio && campanaHoraFin) {
+        if (hora_inicio < campanaHoraInicio.substring(0, 5) || hora_fin > campanaHoraFin.substring(0, 5)) {
+          return res.status(400).json({
+            mensaje: `El horario de la cita debe estar dentro del horario de la campana (${campanaHoraInicio.substring(0, 5)} - ${campanaHoraFin.substring(0, 5)}).`,
+          });
+        }
+      }
+
+      // No se puede agendar una cita de campana en una fecha/hora que ya
+      // paso (a diferencia de una cita normal, que si se puede reagendar
+      // libremente hacia atras si hiciera falta corregir un registro).
+      const fechaHoraCita = new Date(`${fecha}T${hora_inicio}:00`);
+      if (fechaHoraCita < new Date()) {
+        return res.status(400).json({ mensaje: 'No se puede agendar una cita de campana en una fecha/hora que ya paso.' });
+      }
+
       const invitado = await pool.query(
         `select 1 from campana_doctores where campana_id = $1 and doctor_id = $2 and estado <> 'rechazado'`,
         [campana_id, doctor_id]
