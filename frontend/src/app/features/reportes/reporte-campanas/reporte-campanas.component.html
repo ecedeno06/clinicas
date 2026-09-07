@@ -1,0 +1,58 @@
+<div class="page-header">
+  <div>
+    <h1>Reporte de campañas</h1>
+    <div class="desc">Pacientes atendidos por campaña</div>
+  </div>
+</div>
+
+<div class="form-group" style="max-width:460px;">
+  <label>Campaña</label>
+  <select class="input" [ngModel]="campanaId()" (ngModelChange)="onCampanaChange($event)">
+    <option value="">Selecciona una campaña</option>
+    @for (c of campanas(); track c.id) { <option [value]="c.id">{{ c.nombre }} &middot; {{ c.lugar }}</option> }
+  </select>
+</div>
+
+@if (campanaSeleccionada(); as camp) {
+  <div class="card mt-16">
+    <h3 style="margin:0;">{{ camp.nombre }}</h3>
+    <div class="text-muted text-sm mt-8">
+      {{ camp.lugar }}
+      &middot; {{ camp.fecha_inicio | date:'dd/MM/yyyy':'UTC' }}
+      @if (camp.fecha_fin !== camp.fecha_inicio) { – {{ camp.fecha_fin | date:'dd/MM/yyyy':'UTC' }} }
+      @if (camp.sucursal_nombre) { &middot; {{ camp.sucursal_nombre }} }
+    </div>
+  </div>
+
+  <div class="page-header mt-16">
+    <div>
+      <h2 style="margin:0;">Pacientes atendidos ({{ citas().length }})</h2>
+    </div>
+    @if (citas().length > 0) {
+      <button type="button" class="btn btn-outline btn-sm" (click)="verPdf()">Ver PDF</button>
+    }
+  </div>
+
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead><tr><th>Fecha</th><th>Hora</th><th>Paciente</th><th>Doctor</th></tr></thead>
+      <tbody>
+        @if (cargando()) {
+          <tr><td colspan="4"><div class="empty-state">Cargando...</div></td></tr>
+        } @else {
+          @for (cita of citas(); track cita.id) {
+            <tr>
+              <td>{{ cita.fecha | date:'dd/MM/yyyy':'UTC' }}</td>
+              <td>{{ formatoAmPm(cita.hora_inicio) }} - {{ formatoAmPm(cita.hora_fin) }}</td>
+              <td>{{ cita.paciente_nombre }}</td>
+              <td>{{ cita.doctor_nombre }} <div class="text-muted text-sm">{{ cita.especialidad_nombre }}</div></td>
+            </tr>
+          } @empty {
+            <tr><td colspan="4"><div class="empty-state">Todavia no hay pacientes atendidos en esta campaña.</div></td></tr>
+          }
+        }
+      </tbody>
+    </table>
+  </div>
+}
+

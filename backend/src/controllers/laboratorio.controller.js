@@ -17,12 +17,17 @@ async function listarPendientes(req, res, next) {
       `select ol.id as orden_id, ol.created_at,
               c.id as cita_id, c.fecha, c.hora_inicio,
               p.id as paciente_id, p.nombre as paciente_nombre,
-              d.nombre as doctor_nombre, e.nombre as especialidad_nombre
+              d.nombre as doctor_nombre,
+              coalesce(
+                (select esp.nombre from especialidades esp where esp.id = c.especialidad_id),
+                (select string_agg(esp2.nombre, ', ' order by esp2.nombre)
+                 from doctor_especialidades de2 join especialidades esp2 on esp2.id = de2.especialidad_id
+                 where de2.doctor_id = d.id)
+              ) as especialidad_nombre
        from ordenes_laboratorio ol
        join citas c on c.id = ol.cita_id
        join pacientes p on p.id = ol.paciente_id
        join doctores d on d.id = ol.doctor_id
-       join especialidades e on e.id = d.especialidad_id
        where ol.empresa_id = $1 and ol.estado = 'pendiente'
        order by c.fecha asc, c.hora_inicio asc`,
       [req.empresaId]

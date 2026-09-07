@@ -2,6 +2,7 @@ import { Component, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { EmpresasService } from '../../core/services/empresas.service';
+import { AuthService } from '../../core/services/auth.service';
 import { Empresa, UsuarioGlobal, UsuarioDeEmpresa, Rol } from '../../core/models/models';
 import { redimensionarImagen } from '../../core/utils/imagen.util';
 
@@ -63,7 +64,7 @@ export class EmpresasComponent implements OnInit {
     activo: [true],
   });
 
-  constructor(private fb: FormBuilder, private srv: EmpresasService) {}
+  constructor(private fb: FormBuilder, private srv: EmpresasService, private auth: AuthService) {}
 
   ngOnInit(): void {
     this.cargar();
@@ -141,7 +142,11 @@ export class EmpresasComponent implements OnInit {
     const actual = this.editando();
     const req = actual ? this.srv.actualizar(actual.id, data) : this.srv.crear(data);
     req.subscribe({
-      next: () => { this.cerrarPanel(); this.cargar(); },
+      next: () => {
+        if (actual) this.auth.actualizarEmpresaActiva(actual.id, data.nombre!, data.logo ?? null);
+        this.cerrarPanel();
+        this.cargar();
+      },
       error: (err) => alert(err?.error?.mensaje || 'No se pudo guardar la clinica'),
     });
   }

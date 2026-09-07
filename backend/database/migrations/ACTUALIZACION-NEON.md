@@ -1,12 +1,15 @@
 # Actualizacion aplicada a Neon (produccion)
 
-Estado: `001` a `018` ya se aplicaron en Neon (verificado con
+Estado: `001` a `021` ya se aplicaron en Neon (verificado con
 comparacion completa de esquema contra `.19`/`.17`; `007` certificada en
 desarrollo y promovida el 2026-09-03; `008` aplicada el 2026-09-04;
 `009`, `010` y `011` aplicadas el 2026-09-05; `012`-`018` aplicadas el
 2026-09-06, comparacion de columnas de `sucursales`/`pacientes`/
 `doctor_horarios`/`citas`/`campanas`/`campana_doctores`/`doctores` entre
-`.17` y Neon confirmada identica). Ver tambien [README.md](./README.md)
+`.17` y Neon confirmada identica; `019`-`021` aplicadas el 2026-09-07,
+comparacion de columnas de `doctores`/`doctor_especialidades`/`citas`/
+`pacientes` entre `.17` y Neon confirmada identica, backfill de
+`doctor_especialidades` verificado 1:1). Ver tambien [README.md](./README.md)
 para el registro vivo de que esta aplicado en cada entorno.
 
 ## Resumen
@@ -31,6 +34,9 @@ para el registro vivo de que esta aplicado en cada entorno.
 | 16 | `016_campanas.sql` | Tablas nuevas `campanas` y `campana_doctores`, columna `campana_id` en `citas` | ✅ Aplicada 2026-09-06 |
 | 17 | `017_campanas_google_maps.sql` | Columna nueva `google_maps_url` en `campanas` | ✅ Aplicada 2026-09-06 |
 | 18 | `018_doctores_acepta_whatsapp.sql` | Columna nueva `acepta_whatsapp` en `doctores` | ✅ Aplicada 2026-09-06 |
+| 19 | `019_doctor_especialidades.sql` | Tabla nueva `doctor_especialidades` (N:M doctor-especialidad con numero de colegiado); elimina `doctores.especialidad_id`/`numero_colegiado`; agrega `citas.especialidad_id` (sin FK) | ✅ Aplicada 2026-09-07 |
+| 20 | `020_pacientes_google_maps.sql` | Columna nueva `google_maps_url` en `pacientes` | ✅ Aplicada 2026-09-07 |
+| 21 | `021_citas_domicilio.sql` | Columna nueva `es_domicilio` en `citas` | ✅ Aplicada 2026-09-07 |
 
 ---
 
@@ -340,6 +346,68 @@ formulario de Doctores. Registros existentes quedan en `false` por
 defecto. Probada con Postgres desechable (creación limpia + re-ejecución
 idempotente) y verificada contra `.17`. Aplicada a `.17` y a Neon el
 2026-09-06.
+
+---
+
+## 19. `019_doctor_especialidades.sql` — Un doctor puede tener varias especialidades
+
+Pasa de 1:N (`doctores.especialidad_id`, unica y obligatoria) a N:M via
+tabla puente `doctor_especialidades` (mismo patron que `campana_doctores`:
+PK propia, `unique(doctor_id, especialidad_id)`, cascada en ambas FK,
+indices, trigger `updated_at`). Cada fila lleva su propio numero de
+colegiado (la junta medica certifica por especialidad), por eso
+`doctores.numero_colegiado` tambien se elimina. Backfill: cada doctor
+existente pasa a una fila con su especialidad y colegiado actuales, luego
+se eliminan las columnas viejas (protegido con chequeo de
+`information_schema.columns` para poder re-correr la migracion sin error
+una vez ya aplicada).
+
+`citas.especialidad_id` es nuevo pero **sin** `references especialidades(id)`:
+es el filtro que el usuario elige al agendar (para acotar el selector de
+doctor cuando tiene varias especialidades), guardado como dato informativo
+para reportes/consultas futuras, no como llave protegida.
+
+Probada con Postgres desechable (creacion limpia + re-ejecucion
+idempotente) y luego end-to-end contra `.17` via los controladores reales:
+crear/editar un doctor con multiples especialidades, crear una cita
+guardando `especialidad_id`, y verificar que los joins de
+`campanas.controller.js`/`pacientes.controller.js`/`laboratorio.controller.js`
+(que antes asumian una sola especialidad por doctor) siguen funcionando
+con el nuevo modelo agregado. Aplicada a `.17` y a Neon el 2026-09-07
+(3 doctores -> 3 filas en `doctor_especialidades`, backfill 1:1, esquema
+verificado identico).
+
+---
+
+## 20. `020_pacientes_google_maps.sql` — Enlace a Google Maps del paciente
+
+Columna aditiva `google_maps_url text` en `pacientes`, mismo patron que
+`sucursales.google_maps_url` (migracion 014): reutiliza el mismo
+`MapaSelectorComponent` tal cual. Pensada para que el medico pueda ubicar
+y navegar hacia visitas a domicilio (link "Ver en el mapa" + "Abrir en
+Waze" en el listado de Pacientes). Probada con Postgres desechable
+(creacion limpia + re-ejecucion idempotente) y verificada end-to-end
+contra `.17`. Aplicada a `.17` y a Neon el 2026-09-07.
+
+---
+
+## 21. `021_citas_domicilio.sql` — Visita a domicilio
+
+Columna aditiva `es_domicilio boolean not null default false` en `citas`.
+Se fija con un checkbox en el formulario de cita, editable solo mientras
+la cita sigue `pendiente` (una vez confirmada/atendida/cancelada queda
+fija, no se puede corregir retroactivamente). `sucursal_id` se mantiene
+igual que en una campana: sigue siendo la sede que organiza/factura la
+cita, no el lugar fisico donde se atiende. Cuando una consulta del
+historial del paciente esta marcada como domicilio, aparece un boton de
+WhatsApp que comparte con el doctor asignado la ubicacion guardada en el
+paciente (fecha, hora, especialidad y motivo de la cita incluidos en el
+mensaje) -- solo si el doctor tiene telefono y `acepta_whatsapp` activado.
+Probada con Postgres desechable (creacion limpia + re-ejecucion
+idempotente) y verificada end-to-end contra `.17`: crear cita como
+domicilio, editar mientras pendiente (se aplica), confirmar y volver a
+intentar editar (se ignora, sin entrada de log falsa). Aplicada a `.17`
+y a Neon el 2026-09-07.
 
 ---
 

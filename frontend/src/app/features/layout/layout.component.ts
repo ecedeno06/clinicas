@@ -19,6 +19,7 @@ export class LayoutComponent {
   anioActual = new Date().getFullYear();
   menuAbierto = signal(false);
   panelPasswordAbierto = signal(false);
+  reportesAbierto = signal(false);
   sidebarColapsado = signal(localStorage.getItem(SIDEBAR_STORAGE_KEY) === '1');
 
   passwordForm = this.fb.group(

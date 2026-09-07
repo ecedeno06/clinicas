@@ -17,6 +17,7 @@
         <th>Paciente</th>
         <th>Edad</th>
         <th>Doctor</th>
+        <th>Sucursal</th>
         <th>Campaña</th>
         <th>Estado</th>
         <th></th>
@@ -27,6 +28,7 @@
         <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroPaciente()" (ngModelChange)="filtroPaciente.set($event)" /></th>
         <th></th>
         <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroDoctor()" (ngModelChange)="filtroDoctor.set($event)" /></th>
+        <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroSucursal()" (ngModelChange)="filtroSucursal.set($event)" /></th>
         <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroCampana()" (ngModelChange)="filtroCampana.set($event)" /></th>
         <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroEstado()" (ngModelChange)="filtroEstado.set($event)" /></th>
         <th>
@@ -42,6 +44,7 @@
           <td>{{ c.paciente_nombre }}</td>
           <td>{{ c.paciente_edad ?? '-' }}</td>
           <td>{{ c.doctor_nombre }} <div class="text-muted text-sm">{{ c.especialidad_nombre }}</div></td>
+          <td>{{ c.sucursal_nombre }}</td>
           <td>
             @if (c.campana_nombre) {
               <span class="badge badge-violet">{{ c.campana_nombre }}</span>
@@ -116,7 +119,7 @@
           </td>
         </tr>
       } @empty {
-        <tr><td colspan="8"><div class="empty-state">{{ hayFiltros() ? 'Ninguna cita coincide con los filtros.' : 'No hay citas agendadas todavia.' }}</div></td></tr>
+        <tr><td colspan="9"><div class="empty-state">{{ hayFiltros() ? 'Ninguna cita coincide con los filtros.' : 'No hay citas agendadas todavia.' }}</div></td></tr>
       }
     </tbody>
   </table>
@@ -157,6 +160,13 @@
           </select>
         </div>
         <div class="form-group mt-16">
+          <label>Especialidad</label>
+          <select class="input" formControlName="especialidad_id">
+            <option value="">Todas</option>
+            @for (e of especialidades(); track e.id) { <option [value]="e.id">{{ e.nombre }}</option> }
+          </select>
+        </div>
+        <div class="form-group mt-16">
           <label>Doctor *</label>
           <select class="input" formControlName="doctor_id">
             <option value="" disabled>Selecciona un doctor</option>
@@ -169,6 +179,15 @@
             <option value="" disabled>Selecciona una sucursal</option>
             @for (s of sucursales(); track s.id) { <option [value]="s.id">{{ s.nombre }}</option> }
           </select>
+        </div>
+        <div class="form-group mt-16">
+          <label class="flex items-center gap-8"><input type="checkbox" formControlName="es_domicilio" [attr.disabled]="editando() && editando()!.estado !== 'pendiente' ? true : null" /> Visita a domicilio del paciente</label>
+          <div class="text-muted text-sm mt-8">
+            La sucursal sigue siendo la sede que organiza la cita; permite compartir la ubicacion del paciente con el doctor desde su historial.
+            @if (editando() && editando()!.estado !== 'pendiente') {
+              <div>Ya no se puede cambiar: la cita dejo de estar pendiente.</div>
+            }
+          </div>
         </div>
         <div class="form-group mt-16">
           <label>Fecha *</label>
@@ -971,39 +990,3 @@
   </div>
 }
 
-@if (recetaParaImprimir(); as r) {
-  <div class="print-receta">
-    <h2>Receta medica</h2>
-    <div>
-      {{ r.doctor_nombre || citaReceta()?.doctor_nombre }}
-      @if (citaReceta()?.especialidad_nombre) { &middot; {{ citaReceta()?.especialidad_nombre }} }
-    </div>
-    <div>Paciente: {{ citaReceta()?.paciente_nombre || pacienteDeHistoria()?.nombre }}</div>
-    <div>Fecha: {{ r.created_at | date:'dd/MM/yyyy' }}</div>
-    <table style="width:100%; margin-top:16px; border-collapse: collapse;">
-      <thead>
-        <tr>
-          <th style="text-align:left; border-bottom:1px solid #ccc;">Medicamento</th>
-          <th style="text-align:left; border-bottom:1px solid #ccc;">Dosis</th>
-          <th style="text-align:left; border-bottom:1px solid #ccc;">Frecuencia</th>
-          <th style="text-align:left; border-bottom:1px solid #ccc;">Duracion</th>
-          <th style="text-align:left; border-bottom:1px solid #ccc;">Indicaciones</th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (m of r.medicamentos; track m.id) {
-          <tr>
-            <td>{{ m.medicamento }}</td>
-            <td>{{ m.dosis || '-' }}</td>
-            <td>{{ m.frecuencia || '-' }}</td>
-            <td>{{ m.duracion || '-' }}</td>
-            <td>{{ m.indicaciones || '-' }}</td>
-          </tr>
-        }
-      </tbody>
-    </table>
-    @if (r.indicaciones_generales) {
-      <div style="margin-top:16px;">Indicaciones generales: {{ r.indicaciones_generales }}</div>
-    }
-  </div>
-}

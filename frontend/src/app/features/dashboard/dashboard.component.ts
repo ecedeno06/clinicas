@@ -57,6 +57,10 @@ export class DashboardComponent implements OnInit {
   // El selector de sucursal solo aporta algo si la clinica tiene mas de una.
   mostrarFiltroSucursal = computed(() => this.sucursales().length > 1);
 
+  // Nombre de la sucursal activa en el filtro del tablero, para propagarlo
+  // como filtro de texto al navegar a Citas (que filtra por nombre, no id).
+  sucursalNombreFiltro = computed(() => this.sucursales().find((s) => s.id === this.sucursalFiltro())?.nombre ?? '');
+
   irAHoy(): void { this.fechaAgenda.set(hoyISO()); }
 
   formatoAmPm = formatoAmPm;

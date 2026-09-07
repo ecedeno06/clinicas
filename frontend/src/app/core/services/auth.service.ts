@@ -105,6 +105,14 @@ export class AuthService {
     this._usuario.set({ ...this._usuario(), ...usuario } as Usuario);
   }
 
+  // Refresca nombre/logo de la clinica activa en la sesion actual cuando se
+  // edita la empresa desde el panel de administracion (esos datos quedan
+  // cacheados en el usuario desde el login y no se actualizan solos).
+  actualizarEmpresaActiva(empresaId: string, nombre: string, logo: string | null): void {
+    if (this._usuario()?.empresa_id !== empresaId) return;
+    this.guardarUsuarioActualizado({ empresa_nombre: nombre, empresa_logo: logo } as Usuario);
+  }
+
   get token(): string | null {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;

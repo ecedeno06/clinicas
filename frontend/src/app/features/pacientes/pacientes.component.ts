@@ -1,20 +1,23 @@
-import { Component, OnInit, signal, computed } from '@angular/core';
+import { Component, OnInit, ViewChild, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { PacientesService } from '../../core/services/pacientes.service';
 import { CitasService } from '../../core/services/citas.service';
 import { AuthService } from '../../core/services/auth.service';
-import { HistoriaClinica, OrdenLaboratorio, Paciente, Receta, SignosVitales } from '../../core/models/models';
+import { EstadoCita, HistoriaClinica, OrdenLaboratorio, Paciente, Receta, SignosVitales } from '../../core/models/models';
+import { formatoFechaCorta } from '../../core/utils/pdf.util';
+import { formatoAmPm } from '../../core/utils/hora12.util';
 import { clasificarImc } from '../../core/utils/imc.util';
 import { clasificarPresion } from '../../core/utils/presion.util';
 import { clasificarGlucosa } from '../../core/utils/glucosa.util';
 import { SelectorFotoComponent } from '../../core/components/selector-foto/selector-foto.component';
 import { EscanerDocumentoComponent, DatosDocumentoDetectados } from '../../core/components/escaner-documento/escaner-documento.component';
+import { MapaSelectorComponent, UbicacionSeleccionada, extraerLatLng } from '../../core/components/mapa-selector/mapa-selector.component';
 
 @Component({
   selector: 'app-pacientes',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule, SelectorFotoComponent, EscanerDocumentoComponent],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, SelectorFotoComponent, EscanerDocumentoComponent, MapaSelectorComponent],
   templateUrl: './pacientes.component.html',
   styleUrl: './pacientes.component.css',
 })
@@ -29,6 +32,49 @@ export class PacientesComponent implements OnInit {
   pacienteHistorial = signal<Paciente | null>(null);
   historial = signal<HistoriaClinica[]>([]);
   cargandoHistorial = signal(false);
+
+  filtroHistorialFecha = signal('');
+  filtroHistorialDoctor = signal('');
+  filtroHistorialSucursal = signal('');
+  filtroHistorialEstado = signal('');
+
+  hayFiltrosHistorial = computed(() => !!(
+    this.filtroHistorialFecha() || this.filtroHistorialDoctor() || this.filtroHistorialSucursal() || this.filtroHistorialEstado()
+  ));
+
+  limpiarFiltrosHistorial(): void {
+    this.filtroHistorialFecha.set('');
+    this.filtroHistorialDoctor.set('');
+    this.filtroHistorialSucursal.set('');
+    this.filtroHistorialEstado.set('');
+  }
+
+  historialFiltrado = computed(() => {
+    const fecha = this.filtroHistorialFecha().trim().toLowerCase();
+    const doctor = this.filtroHistorialDoctor().trim().toLowerCase();
+    const sucursal = this.filtroHistorialSucursal().trim().toLowerCase();
+    const estado = this.filtroHistorialEstado().trim().toLowerCase();
+
+    return this.historial().filter((h) => {
+      if (fecha && !formatoFechaCorta(h.fecha_cita || '').includes(fecha)) return false;
+      if (doctor && !(h.doctor_nombre ?? '').toLowerCase().includes(doctor)) return false;
+      if (sucursal && !(h.sucursal_nombre ?? '').toLowerCase().includes(sucursal)) return false;
+      if (estado && !this.estadoEtiquetaHistorial(h.estado).toLowerCase().includes(estado)) return false;
+      return true;
+    });
+  });
+
+  estadoEtiquetaHistorial(estado: EstadoCita | undefined): string {
+    const etiquetas: Record<string, string> = {
+      pendiente: 'Pendiente',
+      confirmada: 'Confirmada',
+      atendida: 'Atendida',
+      cancelada: 'Cancelada',
+      no_asistio: 'No asistió',
+      reagendar: 'Reagendar',
+    };
+    return estado ? (etiquetas[estado] ?? estado) : '';
+  }
 
   historialSeleccionado = signal<HistoriaClinica | null>(null);
   // Dos grupos de tabs independientes: arriba (lista/antecedentes del
@@ -83,6 +129,7 @@ export class PacientesComponent implements OnInit {
     acepta_whatsapp: [false],
     email: [''],
     direccion: [''],
+    google_maps_url: [''],
     alergias: [''],
     contacto_emergencia: this.fb.group({
       nombre: [''],
@@ -122,6 +169,51 @@ export class PacientesComponent implements OnInit {
   }
 
   cerrarPanel(): void { this.panelAbierto.set(false); }
+
+  @ViewChild(MapaSelectorComponent) mapaSelector?: MapaSelectorComponent;
+
+  abrirMapa(): void {
+    this.mapaSelector?.abrir(this.form.get('google_maps_url')?.value);
+  }
+
+  onUbicacionElegida(u: UbicacionSeleccionada): void {
+    this.form.patchValue({ google_maps_url: u.url });
+    this.form.get('google_maps_url')?.markAsDirty();
+  }
+
+  // Para que el medico pueda navegar hacia una visita a domicilio con la
+  // app que prefiera, igual que en Sucursales.
+  wazeUrl(p: Paciente): string | null {
+    const coords = extraerLatLng(p.google_maps_url);
+    return coords ? `https://waze.com/ul?ll=${coords[0]},${coords[1]}&navigate=yes` : null;
+  }
+
+  // Solo tiene sentido ofrecer "compartir ubicacion con el doctor" si la
+  // consulta fue marcada como visita a domicilio, hay a donde mandarlo
+  // (telefono del doctor, marcado explicitamente como que recibe
+  // WhatsApp) y que mandar (enlace guardado en el paciente).
+  puedeCompartirUbicacionDoctor(h: HistoriaClinica): boolean {
+    return !!h.es_domicilio && !!h.doctor_telefono && !!h.doctor_acepta_whatsapp && !!this.pacienteHistorial()?.google_maps_url;
+  }
+
+  whatsappUrlDoctor(h: HistoriaClinica): string {
+    const paciente = this.pacienteHistorial()!;
+    const telefono = (h.doctor_telefono || '').replace(/\D/g, '');
+    const lineas = [
+      `Hola ${h.doctor_nombre}, visita a domicilio de ${paciente.nombre}:`,
+      '',
+      `Fecha: ${formatoFechaCorta(h.fecha_cita || '')}`,
+    ];
+    if (h.hora_cita) {
+      lineas.push(`Hora: ${formatoAmPm(h.hora_cita)}${h.hora_fin_cita ? ' - ' + formatoAmPm(h.hora_fin_cita) : ''}`);
+    }
+    if (h.especialidad_nombre) lineas.push(`Especialidad: ${h.especialidad_nombre}`);
+    if (h.motivo_cita) lineas.push(`Motivo: ${h.motivo_cita}`);
+    lineas.push('', `Ubicacion (Google Maps): ${paciente.google_maps_url}`);
+    const coords = extraerLatLng(paciente.google_maps_url);
+    if (coords) lineas.push(`Abrir con Waze: https://waze.com/ul?ll=${coords[0]},${coords[1]}&navigate=yes`);
+    return `https://wa.me/${telefono}?text=${encodeURIComponent(lineas.join('\n'))}`;
+  }
 
   // A diferencia de Citas (que edita un paciente ya existente y guarda la
   // foto de inmediato), aqui solo se guarda cuando se envia el formulario
@@ -222,6 +314,7 @@ export class PacientesComponent implements OnInit {
     this.pacienteHistorial.set(p);
     this.historial.set([]);
     this.historialSeleccionado.set(null);
+    this.limpiarFiltrosHistorial();
     this.tabSuperior.set('consultas');
     this.tabInferior.set('signos');
     this.signosVitalesSeleccionado.set(null);

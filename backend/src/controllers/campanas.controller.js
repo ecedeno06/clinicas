@@ -50,11 +50,13 @@ async function obtener(req, res, next) {
     if (!rows[0]) return res.status(404).json({ mensaje: 'Campana no encontrada' });
 
     const doctores = await pool.query(
-      `select cd.id, cd.doctor_id, cd.estado, cd.notas, d.nombre as doctor_nombre, e.nombre as especialidad_nombre,
+      `select cd.id, cd.doctor_id, cd.estado, cd.notas, d.nombre as doctor_nombre,
+              (select string_agg(esp.nombre, ', ' order by esp.nombre)
+               from doctor_especialidades de join especialidades esp on esp.id = de.especialidad_id
+               where de.doctor_id = d.id) as especialidad_nombre,
               d.telefono as doctor_telefono, d.acepta_whatsapp as doctor_acepta_whatsapp
        from campana_doctores cd
        join doctores d on d.id = cd.doctor_id
-       join especialidades e on e.id = d.especialidad_id
        where cd.campana_id = $1
        order by d.nombre asc`,
       [req.params.id]
@@ -197,11 +199,13 @@ async function listarDoctores(req, res, next) {
     if (!campana.rows[0]) return res.status(404).json({ mensaje: 'Campana no encontrada' });
 
     const { rows } = await pool.query(
-      `select cd.id, cd.doctor_id, cd.estado, cd.notas, d.nombre as doctor_nombre, e.nombre as especialidad_nombre,
+      `select cd.id, cd.doctor_id, cd.estado, cd.notas, d.nombre as doctor_nombre,
+              (select string_agg(esp.nombre, ', ' order by esp.nombre)
+               from doctor_especialidades de join especialidades esp on esp.id = de.especialidad_id
+               where de.doctor_id = d.id) as especialidad_nombre,
               d.telefono as doctor_telefono, d.acepta_whatsapp as doctor_acepta_whatsapp
        from campana_doctores cd
        join doctores d on d.id = cd.doctor_id
-       join especialidades e on e.id = d.especialidad_id
        where cd.campana_id = $1
        order by d.nombre asc`,
       [req.params.id]

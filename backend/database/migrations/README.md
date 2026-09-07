@@ -36,6 +36,9 @@ docker run --rm -i -e PGPASSWORD='<password>' postgres:16 \
 | `016_campanas.sql` | Tablas `campanas` y `campana_doctores` (Fase 1 de campañas médicas) + `citas.campana_id` | ✅ Aplicada 2026-09-06 | ✅ Aplicada 2026-09-06 |
 | `017_campanas_google_maps.sql` | Columna `google_maps_url` en `campanas` | ✅ Aplicada 2026-09-06 | ✅ Aplicada 2026-09-06 |
 | `018_doctores_acepta_whatsapp.sql` | Columna `acepta_whatsapp` en `doctores` | ✅ Aplicada 2026-09-06 | ✅ Aplicada 2026-09-06 |
+| `019_doctor_especialidades.sql` | Tabla nueva `doctor_especialidades` (un doctor puede tener varias especialidades, cada una con su numero de colegiado); elimina `doctores.especialidad_id`/`numero_colegiado`; agrega `citas.especialidad_id` (sin FK, dato informativo) | ✅ Aplicada 2026-09-07 | ✅ Aplicada 2026-09-07 |
+| `020_pacientes_google_maps.sql` | Columna `google_maps_url` en `pacientes` (visitas a domicilio) | ✅ Aplicada 2026-09-07 | ✅ Aplicada 2026-09-07 |
+| `021_citas_domicilio.sql` | Columna `es_domicilio` en `citas` (marca visita a domicilio del paciente) | ✅ Aplicada 2026-09-07 | ✅ Aplicada 2026-09-07 |
 
 **Verificado 2026-09-02**: comparacion completa de esquema (tablas, columnas,
 indices, constraints, funciones, triggers) entre `.19` y Neon — identicos
@@ -44,6 +47,11 @@ indices, constraints, funciones, triggers) entre `.19` y Neon — identicos
 **Verificado 2026-09-06**: comparacion de columnas de `sucursales`,
 `pacientes`, `doctor_horarios` y `citas` entre `.17` y Neon tras aplicar
 `012`-`015` — identicas.
+
+**Verificado 2026-09-07**: comparacion de columnas de `doctores`,
+`doctor_especialidades`, `citas` y `pacientes` entre `.17` y Neon tras
+aplicar `019`-`021` — identicas. Backfill de `doctor_especialidades`
+confirmado (3 doctores -> 3 filas, 1:1, sin perdida de datos).
 
 Actualizar esta tabla cada vez que se agregue una migracion nueva o se
 aplique una existente a un entorno adicional.

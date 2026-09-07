@@ -54,7 +54,7 @@ async function crear(req, res, next) {
   try {
     const {
       nombre, identificacion, fecha_nacimiento, sexo, telefono, acepta_whatsapp, email,
-      direccion, contacto_emergencia, alergias, activo, foto,
+      direccion, google_maps_url, contacto_emergencia, alergias, activo, foto,
     } = req.body;
 
     await client.query('begin');
@@ -80,11 +80,11 @@ async function crear(req, res, next) {
         return res.status(400).json({ mensaje: 'nombre es requerido para un paciente nuevo' });
       }
       const ins = await client.query(
-        `insert into pacientes (nombre, identificacion, fecha_nacimiento, sexo, telefono, acepta_whatsapp, email, direccion, contacto_emergencia, alergias, foto)
-         values ($1,$2,$3,$4,$5, coalesce($6, false),$7,$8,$9,$10,$11) returning *`,
+        `insert into pacientes (nombre, identificacion, fecha_nacimiento, sexo, telefono, acepta_whatsapp, email, direccion, google_maps_url, contacto_emergencia, alergias, foto)
+         values ($1,$2,$3,$4,$5, coalesce($6, false),$7,$8,$9,$10,$11,$12) returning *`,
         [
           nombre, identificacion || null, fecha_nacimiento || null, sexo, telefono, acepta_whatsapp, email,
-          direccion, contacto_emergencia ? JSON.stringify(contacto_emergencia) : null, alergias, foto || null,
+          direccion, google_maps_url || null, contacto_emergencia ? JSON.stringify(contacto_emergencia) : null, alergias, foto || null,
         ]
       );
       paciente = ins.rows[0];
@@ -121,7 +121,7 @@ async function actualizar(req, res, next) {
   try {
     const {
       nombre, identificacion, fecha_nacimiento, sexo, telefono, acepta_whatsapp, email,
-      direccion, contacto_emergencia, alergias, activo, foto,
+      direccion, google_maps_url, contacto_emergencia, alergias, activo, foto,
     } = req.body;
 
     const vinculo = await pool.query(
@@ -140,13 +140,14 @@ async function actualizar(req, res, next) {
          acepta_whatsapp = coalesce($6, acepta_whatsapp),
          email = coalesce($7, email),
          direccion = coalesce($8, direccion),
-         contacto_emergencia = coalesce($9, contacto_emergencia),
-         alergias = coalesce($10, alergias),
-         foto = coalesce($11, foto)
-       where id = $12 returning *`,
+         google_maps_url = coalesce($9, google_maps_url),
+         contacto_emergencia = coalesce($10, contacto_emergencia),
+         alergias = coalesce($11, alergias),
+         foto = coalesce($12, foto)
+       where id = $13 returning *`,
       [
         nombre, identificacion, fecha_nacimiento || null, sexo, telefono, acepta_whatsapp, email,
-        direccion, contacto_emergencia ? JSON.stringify(contacto_emergencia) : null, alergias, foto,
+        direccion, google_maps_url, contacto_emergencia ? JSON.stringify(contacto_emergencia) : null, alergias, foto,
         req.params.id,
       ]
     );
@@ -200,7 +201,16 @@ async function historial(req, res, next) {
     const { rows } = await pool.query(
       `select coalesce(hc.id, c.id) as id, c.id as cita_id, c.empresa_id, c.paciente_id, c.doctor_id,
               hc.motivo_consulta, hc.diagnostico, hc.tratamiento, hc.notas, hc.created_at,
-              c.fecha as fecha_cita, c.hora_inicio as hora_cita, d.nombre as doctor_nombre, e.nombre as especialidad_nombre,
+              c.fecha as fecha_cita, c.hora_inicio as hora_cita, c.hora_fin as hora_fin_cita,
+              c.motivo as motivo_cita, c.estado, c.es_domicilio,
+              d.nombre as doctor_nombre, d.telefono as doctor_telefono, d.acepta_whatsapp as doctor_acepta_whatsapp,
+              coalesce(
+                (select esp.nombre from especialidades esp where esp.id = c.especialidad_id),
+                (select string_agg(esp2.nombre, ', ' order by esp2.nombre)
+                 from doctor_especialidades de2 join especialidades esp2 on esp2.id = de2.especialidad_id
+                 where de2.doctor_id = d.id)
+              ) as especialidad_nombre,
+              s.nombre as sucursal_nombre,
               exists(select 1 from recetas r where r.cita_id = c.id) as tiene_receta,
               exists(select 1 from ordenes_laboratorio ol where ol.cita_id = c.id) as tiene_laboratorio,
               (case
@@ -210,7 +220,7 @@ async function historial(req, res, next) {
               end) as estado_laboratorio
        from citas c
        join doctores d on d.id = c.doctor_id
-       join especialidades e on e.id = d.especialidad_id
+       left join sucursales s on s.id = c.sucursal_id
        left join historias_clinicas hc on hc.cita_id = c.id
        where c.paciente_id = $1 and c.empresa_id = $2
        order by c.fecha desc, c.hora_inicio desc`,

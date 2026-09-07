@@ -42,6 +42,25 @@
         <span class="nav-label">Especialidades</span>
       </a>
       @if (auth.esSuperAdmin() || auth.usuario()?.rol === 'admin') {
+        <button type="button" class="nav-toggle" title="Reportes" (click)="reportesAbierto.set(!reportesAbierto())">
+          <span class="nav-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-6 4 3 5-8"/></svg>
+          </span>
+          <span class="nav-label">Reportes</span>
+          <span class="nav-chevron" [class.open]="reportesAbierto()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+          </span>
+        </button>
+        @if (reportesAbierto()) {
+          <a routerLink="/reportes/campanas" routerLinkActive="active" class="nav-sub" title="Reporte de campañas">
+            <span class="nav-label">Campañas</span>
+          </a>
+          <a routerLink="/reportes/citas" routerLinkActive="active" class="nav-sub" title="Reporte de citas">
+            <span class="nav-label">Citas</span>
+          </a>
+        }
+      }
+      @if (auth.esSuperAdmin() || auth.usuario()?.rol === 'admin') {
         <a routerLink="/sucursales" routerLinkActive="active" title="Sucursales">
           <span class="nav-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M6 21V10l6-6 6 6v11"/><path d="M10 21v-6h4v6"/></svg>

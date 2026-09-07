@@ -91,6 +91,10 @@ create table if not exists pacientes (
     acepta_whatsapp     boolean not null default false,
     email               text unique,
     direccion           text,
+    -- Enlace a Google Maps de la direccion, para que el medico pueda
+    -- ubicar y navegar hacia visitas a domicilio (mismo patron que
+    -- sucursales.google_maps_url).
+    google_maps_url     text,
     -- Contacto de emergencia: { nombre, telefono, parentesco }
     contacto_emergencia jsonb,
     alergias            text,
@@ -120,15 +124,15 @@ create table if not exists pacientes_empresas (
 -- Tabla: doctores (catalogo de doctores/especialistas de la
 -- clinica). usuario_id es opcional: se puede crear el doctor
 -- antes de darle acceso al sistema, o nunca dárselo si solo se
--- usa para agendar sus citas.
+-- usa para agendar sus citas. Un doctor puede tener varias
+-- especialidades (ver doctor_especialidades mas abajo) -- por
+-- eso especialidad_id/numero_colegiado NO viven aqui.
 -- ---------------------------------------------------------
 create table if not exists doctores (
     id                  uuid primary key default gen_random_uuid(),
     empresa_id          uuid not null references empresas(id),
     usuario_id          uuid references usuarios(id) on delete set null,
-    especialidad_id     uuid not null references especialidades(id) on delete restrict,
     nombre              text not null,
-    numero_colegiado    text,                 -- numero de colegiatura/licencia medica
     telefono            text,
     -- Indica si "telefono" recibe WhatsApp, mismo patron que
     -- pacientes.acepta_whatsapp.
@@ -137,6 +141,18 @@ create table if not exists doctores (
     activo              boolean not null default true,
     created_at          timestamptz not null default now(),
     updated_at          timestamptz not null default now()
+);
+
+-- Especialidades de un doctor (N:M): la junta medica certifica por
+-- especialidad, asi que cada una tiene su propio numero de colegiado.
+create table if not exists doctor_especialidades (
+    id                uuid primary key default gen_random_uuid(),
+    doctor_id         uuid not null references doctores(id) on delete cascade,
+    especialidad_id   uuid not null references especialidades(id) on delete cascade,
+    numero_colegiado  text,
+    created_at        timestamptz not null default now(),
+    updated_at        timestamptz not null default now(),
+    unique (doctor_id, especialidad_id)
 );
 
 -- ---------------------------------------------------------
@@ -242,6 +258,14 @@ create table if not exists citas (
     paciente_id     uuid not null references pacientes(id) on delete restrict,
     doctor_id       uuid not null references doctores(id) on delete restrict,
     campana_id      uuid references campanas(id),
+    -- Especialidad elegida como filtro al agendar (el doctor puede tener
+    -- varias). Sin "references": es dato informativo para reportes, no una
+    -- relacion protegida -- especialidades puede cambiar sin afectar citas
+    -- ya creadas.
+    especialidad_id uuid,
+    -- Visita a domicilio del paciente en vez de en la sucursal (sucursal_id
+    -- sigue siendo la sede organizadora, igual que en una campana).
+    es_domicilio    boolean not null default false,
     fecha           date not null,
     hora_inicio     time not null,
     hora_fin        time not null,
@@ -386,6 +410,8 @@ create index if not exists idx_pacientes_empresas_paciente on pacientes_empresas
 create index if not exists idx_pacientes_empresas_empresa on pacientes_empresas(empresa_id);
 create index if not exists idx_sucursales_empresa on sucursales(empresa_id);
 create index if not exists idx_doctores_empresa on doctores(empresa_id);
+create index if not exists idx_doctor_especialidades_doctor on doctor_especialidades(doctor_id);
+create index if not exists idx_doctor_especialidades_especialidad on doctor_especialidades(especialidad_id);
 create index if not exists idx_doctor_horarios_doctor on doctor_horarios(doctor_id);
 create index if not exists idx_doctor_horarios_sucursal on doctor_horarios(sucursal_id);
 create index if not exists idx_campanas_empresa on campanas(empresa_id);
@@ -429,7 +455,7 @@ do $$
 declare
     t text;
 begin
-    foreach t in array array['empresas','usuarios','usuarios_empresas_rol','especialidades','pacientes','pacientes_empresas','sucursales','doctores','doctor_horarios','campanas','campana_doctores','citas','historias_clinicas','signos_vitales','recetas','ordenes_laboratorio']
+    foreach t in array array['empresas','usuarios','usuarios_empresas_rol','especialidades','pacientes','pacientes_empresas','sucursales','doctores','doctor_especialidades','doctor_horarios','campanas','campana_doctores','citas','historias_clinicas','signos_vitales','recetas','ordenes_laboratorio']
     loop
         execute format('drop trigger if exists trg_set_updated_at on %I', t);
         execute format('create trigger trg_set_updated_at before update on %I for each row execute function set_updated_at()', t);

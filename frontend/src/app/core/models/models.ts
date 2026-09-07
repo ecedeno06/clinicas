@@ -119,6 +119,7 @@ export interface Paciente {
   acepta_whatsapp?: boolean;
   email?: string;
   direccion?: string;
+  google_maps_url?: string | null;
   contacto_emergencia?: ContactoEmergencia | null;
   alergias?: string;
   foto?: string | null;
@@ -135,14 +136,23 @@ export interface Especialidad {
   created_at?: string;
 }
 
+// Un doctor puede tener varias especialidades, cada una con su propio
+// numero de colegiado (la junta medica certifica por especialidad).
+export interface DoctorEspecialidad {
+  especialidad_id: string;
+  nombre?: string;
+  numero_colegiado?: string | null;
+}
+
 export interface Doctor {
   id: string;
   empresa_id?: string;
   usuario_id?: string | null;
-  especialidad_id: string;
+  especialidades: DoctorEspecialidad[];
+  // Nombres de especialidades ya unidos ("Cardiologia, Pediatria"), para
+  // mostrar en listados/mensajes sin necesitar el arreglo estructurado.
   especialidad_nombre?: string;
   nombre: string;
-  numero_colegiado?: string;
   telefono?: string;
   acepta_whatsapp?: boolean;
   email?: string;
@@ -210,7 +220,11 @@ export interface Cita {
   paciente_acepta_whatsapp?: boolean;
   doctor_id: string;
   doctor_nombre?: string;
+  // Especialidad elegida como filtro al agendar (dato informativo, no una
+  // relacion protegida -- ver migracion 019_doctor_especialidades.sql).
+  especialidad_id?: string | null;
   especialidad_nombre?: string;
+  es_domicilio?: boolean;
   fecha: string;
   hora_inicio: string;
   hora_fin: string;
@@ -239,8 +253,15 @@ export interface HistoriaClinica {
   // Presentes solo cuando viene del historial de un paciente (join con la cita)
   fecha_cita?: string;
   hora_cita?: string;
+  hora_fin_cita?: string;
+  motivo_cita?: string | null;
+  estado?: EstadoCita;
   doctor_nombre?: string;
+  doctor_telefono?: string | null;
+  doctor_acepta_whatsapp?: boolean;
   especialidad_nombre?: string;
+  sucursal_nombre?: string;
+  es_domicilio?: boolean;
   tiene_receta?: boolean;
   tiene_laboratorio?: boolean;
   estado_laboratorio?: EstadoLaboratorio | null;

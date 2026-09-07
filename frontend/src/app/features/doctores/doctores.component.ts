@@ -1,11 +1,11 @@
 import { Component, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormArray, FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { DoctoresService } from '../../core/services/doctores.service';
 import { EspecialidadesService } from '../../core/services/especialidades.service';
 import { SucursalesService } from '../../core/services/sucursales.service';
 import { AuthService } from '../../core/services/auth.service';
-import { Doctor, DoctorHorario, Especialidad, Sucursal } from '../../core/models/models';
+import { Doctor, DoctorEspecialidad, DoctorHorario, Especialidad, Sucursal } from '../../core/models/models';
 import { combinar12, formatoAmPm, HORAS_12, MINUTOS_60, partes12 } from '../../core/utils/hora12.util';
 
 @Component({
@@ -44,7 +44,7 @@ export class DoctoresComponent implements OnInit {
     return this.doctores().filter((d) => {
       if (nombre && !d.nombre.toLowerCase().includes(nombre)) return false;
       if (especialidad && !(d.especialidad_nombre ?? '').toLowerCase().includes(especialidad)) return false;
-      if (colegiado && !(d.numero_colegiado ?? '').toLowerCase().includes(colegiado)) return false;
+      if (colegiado && !d.especialidades.some((e) => (e.numero_colegiado ?? '').toLowerCase().includes(colegiado))) return false;
       if (telefono && !(d.telefono ?? '').toLowerCase().includes(telefono)) return false;
       return true;
     });
@@ -52,12 +52,11 @@ export class DoctoresComponent implements OnInit {
 
   form = this.fb.group({
     nombre: ['', Validators.required],
-    especialidad_id: ['', Validators.required],
-    numero_colegiado: [''],
     telefono: [''],
     acepta_whatsapp: [false],
     email: [''],
     activo: [true],
+    especialidades: this.fb.array([this.crearEspecialidadGroup()]),
   });
 
   constructor(
@@ -76,10 +75,49 @@ export class DoctoresComponent implements OnInit {
 
   cargar(): void { this.srv.listar().subscribe((data) => this.doctores.set(data)); }
 
+  colegiadosTexto(d: Doctor): string {
+    const conColegiado = d.especialidades.filter((e) => e.numero_colegiado);
+    if (!conColegiado.length) return '-';
+    return conColegiado.map((e) => `${e.nombre}: ${e.numero_colegiado}`).join(', ');
+  }
+
   esAdmin(): boolean { return this.auth.esSuperAdmin() || this.auth.usuario()?.rol === 'admin'; }
 
-  abrirNuevo(): void { this.editando.set(null); this.form.reset({ activo: true }); this.panelAbierto.set(true); }
-  abrirEditar(d: Doctor): void { this.editando.set(d); this.form.reset({ ...d }); this.panelAbierto.set(true); }
+  crearEspecialidadGroup(e?: Partial<DoctorEspecialidad>) {
+    return this.fb.group({
+      especialidad_id: [e?.especialidad_id ?? '', Validators.required],
+      numero_colegiado: [e?.numero_colegiado ?? ''],
+    });
+  }
+
+  get especialidadesArray(): FormArray {
+    return this.form.get('especialidades') as FormArray;
+  }
+
+  agregarEspecialidad(): void {
+    this.especialidadesArray.push(this.crearEspecialidadGroup());
+  }
+
+  quitarEspecialidad(i: number): void {
+    if (this.especialidadesArray.length > 1) this.especialidadesArray.removeAt(i);
+  }
+
+  abrirNuevo(): void {
+    this.editando.set(null);
+    this.form.reset({ activo: true });
+    this.especialidadesArray.clear();
+    this.especialidadesArray.push(this.crearEspecialidadGroup());
+    this.panelAbierto.set(true);
+  }
+
+  abrirEditar(d: Doctor): void {
+    this.editando.set(d);
+    this.form.reset({ nombre: d.nombre, telefono: d.telefono, acepta_whatsapp: d.acepta_whatsapp, email: d.email, activo: d.activo });
+    this.especialidadesArray.clear();
+    (d.especialidades.length ? d.especialidades : [undefined]).forEach((e) => this.especialidadesArray.push(this.crearEspecialidadGroup(e)));
+    this.panelAbierto.set(true);
+  }
+
   cerrarPanel(): void { this.panelAbierto.set(false); }
 
   guardar(): void {

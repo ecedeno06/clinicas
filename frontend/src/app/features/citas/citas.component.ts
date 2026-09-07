@@ -7,8 +7,9 @@ import { PacientesService } from '../../core/services/pacientes.service';
 import { DoctoresService } from '../../core/services/doctores.service';
 import { SucursalesService } from '../../core/services/sucursales.service';
 import { CampanasService } from '../../core/services/campanas.service';
+import { EspecialidadesService } from '../../core/services/especialidades.service';
 import { AuthService } from '../../core/services/auth.service';
-import { Campana, CampanaDoctor, Cita, Disponibilidad, Doctor, EstadoCita, EstadoLaboratorio, FranjaHoraria, HistoriaClinica, OrdenLaboratorio, Paciente, Receta, SignosVitales, Sucursal } from '../../core/models/models';
+import { Campana, CampanaDoctor, Cita, Disponibilidad, Doctor, Especialidad, EstadoCita, EstadoLaboratorio, FranjaHoraria, HistoriaClinica, OrdenLaboratorio, Paciente, Receta, SignosVitales, Sucursal } from '../../core/models/models';
 import { clasificarImc } from '../../core/utils/imc.util';
 import { clasificarPresion } from '../../core/utils/presion.util';
 import { clasificarGlucosa } from '../../core/utils/glucosa.util';
@@ -16,6 +17,8 @@ import { combinar12, formatoAmPm, HORAS_12, MINUTOS_60, partes12 } from '../../c
 import { hoyISO } from '../../core/utils/fecha.util';
 import { SelectorFotoComponent } from '../../core/components/selector-foto/selector-foto.component';
 import { extraerLatLng } from '../../core/components/mapa-selector/mapa-selector.component';
+import { generarPdf, encabezadoClinica, formatoFechaCorta } from '../../core/utils/pdf.util';
+import { TDocumentDefinitions } from 'pdfmake/interfaces';
 
 @Component({
   selector: 'app-citas',
@@ -29,6 +32,7 @@ export class CitasComponent implements OnInit {
   pacientes = signal<Paciente[]>([]);
   doctores = signal<Doctor[]>([]);
   sucursales = signal<Sucursal[]>([]);
+  especialidades = signal<Especialidad[]>([]);
   // Campanas donde ya tiene sentido agendar: aprobadas (pre-agendar antes
   // del dia del evento) o en_curso. El backend vuelve a validar esto al
   // guardar.
@@ -83,7 +87,6 @@ export class CitasComponent implements OnInit {
   cargandoRecetas = signal(false);
   recetaEditando = signal<Receta | null>(null); // null = formulario de receta nueva
   mostrarFormularioReceta = signal(false);
-  recetaParaImprimir = signal<Receta | null>(null);
 
   // Una cita puede tener varias ordenes de laboratorio.
   citaLaboratorio = signal<Cita | null>(null);
@@ -113,15 +116,17 @@ export class CitasComponent implements OnInit {
   filtroFecha = signal('');
   filtroPaciente = signal('');
   filtroDoctor = signal('');
+  filtroSucursal = signal('');
   filtroCampana = signal('');
   filtroEstado = signal('');
 
-  hayFiltros = computed(() => !!(this.filtroFecha() || this.filtroPaciente() || this.filtroDoctor() || this.filtroCampana() || this.filtroEstado()));
+  hayFiltros = computed(() => !!(this.filtroFecha() || this.filtroPaciente() || this.filtroDoctor() || this.filtroSucursal() || this.filtroCampana() || this.filtroEstado()));
 
   limpiarFiltros(): void {
     this.filtroFecha.set('');
     this.filtroPaciente.set('');
     this.filtroDoctor.set('');
+    this.filtroSucursal.set('');
     this.filtroCampana.set('');
     this.filtroEstado.set('');
   }
@@ -130,6 +135,7 @@ export class CitasComponent implements OnInit {
     const fecha = this.filtroFecha().trim().toLowerCase();
     const paciente = this.filtroPaciente().trim().toLowerCase();
     const doctor = this.filtroDoctor().trim().toLowerCase();
+    const sucursal = this.filtroSucursal().trim().toLowerCase();
     const campana = this.filtroCampana().trim().toLowerCase();
     const estado = this.filtroEstado().trim().toLowerCase();
 
@@ -137,6 +143,7 @@ export class CitasComponent implements OnInit {
       if (fecha && !formatearFecha(c.fecha).includes(fecha)) return false;
       if (paciente && !(c.paciente_nombre ?? '').toLowerCase().includes(paciente)) return false;
       if (doctor && !(c.doctor_nombre ?? '').toLowerCase().includes(doctor)) return false;
+      if (sucursal && !(c.sucursal_nombre ?? '').toLowerCase().includes(sucursal)) return false;
       if (campana && !(c.campana_nombre || 'Normal').toLowerCase().includes(campana)) return false;
       if (estado && !c.estado.toLowerCase().includes(estado)) return false;
       return true;
@@ -145,9 +152,11 @@ export class CitasComponent implements OnInit {
 
   form = this.fb.group({
     paciente_id: ['', Validators.required],
+    especialidad_id: [''],
     doctor_id: ['', Validators.required],
     sucursal_id: ['', Validators.required],
     campana_id: [''],
+    es_domicilio: [false],
     fecha: [hoyISO(), Validators.required],
     hora_inicio: ['', Validators.required],
     hora_fin: ['', Validators.required],
@@ -191,6 +200,7 @@ export class CitasComponent implements OnInit {
     private doctoresSrv: DoctoresService,
     private sucursalesSrv: SucursalesService,
     private campanasSrv: CampanasService,
+    private especialidadesSrv: EspecialidadesService,
     private route: ActivatedRoute,
     public auth: AuthService
   ) {}
@@ -200,6 +210,7 @@ export class CitasComponent implements OnInit {
     this.pacientesSrv.listar().subscribe((data) => this.pacientes.set(data));
     this.doctoresSrv.listar().subscribe((data) => this.doctores.set(data));
     this.sucursalesSrv.listar().subscribe((data) => this.sucursales.set(data.filter((s) => s.activo)));
+    this.especialidadesSrv.listar().subscribe((data) => this.especialidades.set(data.filter((e) => e.activo)));
     this.campanasSrv.listar().subscribe((data) => {
       this.campanasElegibles.set(data.filter((c) => c.estado === 'aprobada' || c.estado === 'en_curso'));
     });
@@ -207,14 +218,17 @@ export class CitasComponent implements OnInit {
     this.form.get('doctor_id')!.valueChanges.subscribe(() => this.actualizarDisponibilidad());
     this.form.get('fecha')!.valueChanges.subscribe(() => this.actualizarDisponibilidad());
     this.form.get('campana_id')!.valueChanges.subscribe((campanaId) => this.onCambioCampana(campanaId));
+    this.form.get('especialidad_id')!.valueChanges.subscribe(() => this.onCambioEspecialidad());
 
     // Llegar aqui desde otra pantalla (ej. "Agenda del dia" o "Laboratorios
     // pendientes" del tablero) puede traer ?fecha=dd/mm/aaaa&paciente=...
-    // &doctor=... para acotar la lista a esa cita puntual.
+    // &doctor=...&sucursal=... para acotar la lista a esa cita puntual, o
+    // respetar el filtro de sucursal que tenia activo el tablero.
     const params = this.route.snapshot.queryParamMap;
     if (params.get('fecha')) this.filtroFecha.set(params.get('fecha')!);
     if (params.get('paciente')) this.filtroPaciente.set(params.get('paciente')!);
     if (params.get('doctor')) this.filtroDoctor.set(params.get('doctor')!);
+    if (params.get('sucursal')) this.filtroSucursal.set(params.get('sucursal')!);
     if (params.get('estado')) this.filtroEstado.set(params.get('estado')!);
   }
 
@@ -279,11 +293,28 @@ export class CitasComponent implements OnInit {
 
   // Si hay una campana elegida, solo sus doctores invitados aparecen como
   // opcion -- el backend vuelve a exigir esto al guardar, esto es solo UI.
+  // Ademas, si se eligio una especialidad puntual (no "Todas"), se acota a
+  // los doctores que la tengan -- especialidad_id es solo un filtro de UI,
+  // no se valida en el backend (ver migracion 019_doctor_especialidades.sql).
   doctoresParaCita(): Doctor[] {
     const confirmados = this.doctoresConfirmadosCampana();
-    if (!confirmados) return this.doctores();
-    const idsConfirmados = new Set(confirmados.map((d) => d.doctor_id));
-    return this.doctores().filter((d) => idsConfirmados.has(d.id));
+    let lista = confirmados
+      ? this.doctores().filter((d) => new Set(confirmados.map((c) => c.doctor_id)).has(d.id))
+      : this.doctores();
+
+    const especialidadId = this.form.get('especialidad_id')?.value;
+    if (especialidadId) {
+      lista = lista.filter((d) => d.especialidades.some((e) => e.especialidad_id === especialidadId));
+    }
+    return lista;
+  }
+
+  // Cambiar la especialidad a proposito limpia el doctor elegido, mismo
+  // motivo que onCambioCampana: el <select> de Doctor cambia sus opciones y
+  // el navegador puede quedarse mostrando una opcion que Angular nunca
+  // registro como seleccionada.
+  onCambioEspecialidad(): void {
+    this.form.patchValue({ doctor_id: '' });
   }
 
   elegirFranja(f: FranjaHoraria): void {
@@ -429,7 +460,7 @@ export class CitasComponent implements OnInit {
     // reset (doctor_id y fecha cambiarian en dos eventos separados, el
     // primero con el otro campo todavia con el valor viejo) -- se llama una
     // sola vez, ya con el formulario completo, justo debajo.
-    this.form.reset({ sucursal_id: this.sucursales()[0]?.id ?? '', campana_id: '', fecha: hoyISO(), estado: 'pendiente' }, { emitEvent: false });
+    this.form.reset({ sucursal_id: this.sucursales()[0]?.id ?? '', especialidad_id: '', campana_id: '', es_domicilio: false, fecha: hoyISO(), estado: 'pendiente' }, { emitEvent: false });
     this.errorGuardar.set(null);
     this.panelAbierto.set(true);
     this.actualizarDisponibilidad();
@@ -443,9 +474,11 @@ export class CitasComponent implements OnInit {
     this.tabCita.set('cita');
     this.form.reset({
       paciente_id: c.paciente_id,
+      especialidad_id: c.especialidad_id ?? '',
       doctor_id: c.doctor_id,
       sucursal_id: c.sucursal_id ?? this.sucursales()[0]?.id ?? '',
       campana_id: c.campana_id ?? '',
+      es_domicilio: c.es_domicilio ?? false,
       fecha: c.fecha.substring(0, 10),
       hora_inicio: c.hora_inicio?.substring(0, 5),
       hora_fin: c.hora_fin?.substring(0, 5),
@@ -683,7 +716,6 @@ export class CitasComponent implements OnInit {
     this.recetas.set([]);
     this.mostrarFormularioReceta.set(false);
     this.recetaEditando.set(null);
-    this.recetaParaImprimir.set(null);
     this.cargandoRecetas.set(true);
     this.srv.listarRecetas(c.id).subscribe({
       next: (data) => { this.recetas.set(data); this.cargandoRecetas.set(false); },
@@ -752,8 +784,43 @@ export class CitasComponent implements OnInit {
   }
 
   imprimirReceta(r: Receta): void {
-    this.recetaParaImprimir.set(r);
-    setTimeout(() => window.print(), 0);
+    const empresa = this.auth.empresaActiva();
+    const doctorNombre = r.doctor_nombre || this.citaReceta()?.doctor_nombre || '';
+    const especialidad = this.citaReceta()?.especialidad_nombre;
+    const pacienteNombre = this.citaReceta()?.paciente_nombre || this.pacienteDeHistoria()?.nombre || '';
+
+    const filas = r.medicamentos.map((m) => [
+      m.medicamento,
+      m.dosis || '-',
+      m.frecuencia || '-',
+      m.duracion || '-',
+      m.indicaciones || '-',
+    ]);
+
+    const doc: TDocumentDefinitions = {
+      pageMargins: [30, 30, 30, 30],
+      content: [
+        ...(encabezadoClinica(empresa?.empresa_logo, empresa?.empresa_nombre, 'Receta médica') as any[]),
+        { text: especialidad ? `${doctorNombre}  ·  ${especialidad}` : doctorNombre, margin: [0, 0, 0, 2] },
+        { text: `Paciente: ${pacienteNombre}`, margin: [0, 0, 0, 2] },
+        { text: `Fecha: ${r.created_at ? formatoFechaCorta(r.created_at) : ''}`, color: '#64748b', margin: [0, 0, 0, 10] },
+        {
+          table: {
+            headerRows: 1,
+            widths: ['*', 'auto', 'auto', 'auto', '*'],
+            body: [
+              ['Medicamento', 'Dosis', 'Frecuencia', 'Duración', 'Indicaciones'].map((t) => ({ text: t, bold: true })),
+              ...filas,
+            ],
+          },
+          layout: 'lightHorizontalLines',
+        },
+        ...(r.indicaciones_generales ? [{ text: `Indicaciones generales: ${r.indicaciones_generales}`, margin: [0, 10, 0, 0] as [number, number, number, number] }] : []),
+      ],
+      defaultStyle: { fontSize: 9 },
+    };
+
+    generarPdf(doc);
   }
 
   crearExamenGroup(e?: Partial<{ nombre_examen: string; valor_referencia: string; resultado: string; unidad: string }>) {

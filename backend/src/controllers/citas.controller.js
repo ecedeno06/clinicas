@@ -22,7 +22,13 @@ async function listar(req, res, next) {
 
     const { rows } = await pool.query(
       `select c.*, p.nombre as paciente_nombre, p.telefono as paciente_telefono, p.acepta_whatsapp as paciente_acepta_whatsapp,
-              d.nombre as doctor_nombre, e.nombre as especialidad_nombre,
+              d.nombre as doctor_nombre,
+              coalesce(
+                (select esp.nombre from especialidades esp where esp.id = c.especialidad_id),
+                (select string_agg(esp2.nombre, ', ' order by esp2.nombre)
+                 from doctor_especialidades de2 join especialidades esp2 on esp2.id = de2.especialidad_id
+                 where de2.doctor_id = d.id)
+              ) as especialidad_nombre,
               s.nombre as sucursal_nombre, s.direccion as sucursal_direccion, s.google_maps_url as sucursal_google_maps_url,
               s.hora_apertura as sucursal_hora_apertura, s.hora_cierre as sucursal_hora_cierre,
               camp.nombre as campana_nombre,
@@ -39,7 +45,6 @@ async function listar(req, res, next) {
        from citas c
        join pacientes p on p.id = c.paciente_id
        join doctores d on d.id = c.doctor_id
-       join especialidades e on e.id = d.especialidad_id
        join sucursales s on s.id = c.sucursal_id
        left join campanas camp on camp.id = c.campana_id
        left join historias_clinicas hc on hc.cita_id = c.id
@@ -56,14 +61,19 @@ async function obtener(req, res, next) {
   try {
     const { rows } = await pool.query(
       `select c.*, p.nombre as paciente_nombre, p.telefono as paciente_telefono, p.acepta_whatsapp as paciente_acepta_whatsapp,
-              d.nombre as doctor_nombre, e.nombre as especialidad_nombre,
+              d.nombre as doctor_nombre,
+              coalesce(
+                (select esp.nombre from especialidades esp where esp.id = c.especialidad_id),
+                (select string_agg(esp2.nombre, ', ' order by esp2.nombre)
+                 from doctor_especialidades de2 join especialidades esp2 on esp2.id = de2.especialidad_id
+                 where de2.doctor_id = d.id)
+              ) as especialidad_nombre,
               s.nombre as sucursal_nombre, s.direccion as sucursal_direccion, s.google_maps_url as sucursal_google_maps_url,
               s.hora_apertura as sucursal_hora_apertura, s.hora_cierre as sucursal_hora_cierre,
               camp.nombre as campana_nombre
        from citas c
        join pacientes p on p.id = c.paciente_id
        join doctores d on d.id = c.doctor_id
-       join especialidades e on e.id = d.especialidad_id
        join sucursales s on s.id = c.sucursal_id
        left join campanas camp on camp.id = c.campana_id
        where c.id = $1 and c.empresa_id = $2`,
@@ -125,7 +135,7 @@ async function hayChoqueDePaciente({ empresaId, pacienteId, fecha, horaInicio, h
 // POST /api/citas
 async function crear(req, res, next) {
   try {
-    const { paciente_id, doctor_id, fecha, hora_inicio, hora_fin, motivo, observaciones, estado, sucursal_id, campana_id } = req.body;
+    const { paciente_id, doctor_id, fecha, hora_inicio, hora_fin, motivo, observaciones, estado, sucursal_id, campana_id, especialidad_id, es_domicilio } = req.body;
 
     if (!paciente_id || !doctor_id || !fecha || !hora_inicio || !hora_fin) {
       return res.status(400).json({ mensaje: 'paciente, doctor, fecha y horario son requeridos' });
@@ -210,9 +220,9 @@ async function crear(req, res, next) {
 
     const log = primerEventoLog(req.usuario?.nombre, 'Cita creada');
     const { rows } = await pool.query(
-      `insert into citas (empresa_id, sucursal_id, paciente_id, doctor_id, campana_id, fecha, hora_inicio, hora_fin, motivo, observaciones, estado, log)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10, coalesce($11, 'pendiente'), $12::jsonb) returning *`,
-      [req.empresaId, sucursalId, paciente_id, doctor_id, campana_id || null, fecha, hora_inicio, hora_fin, motivo, observaciones, estado, log]
+      `insert into citas (empresa_id, sucursal_id, paciente_id, doctor_id, campana_id, especialidad_id, es_domicilio, fecha, hora_inicio, hora_fin, motivo, observaciones, estado, log)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12, coalesce($13, 'pendiente'), $14::jsonb) returning *`,
+      [req.empresaId, sucursalId, paciente_id, doctor_id, campana_id || null, especialidad_id || null, !!es_domicilio, fecha, hora_inicio, hora_fin, motivo, observaciones, estado, log]
     );
     res.status(201).json(rows[0]);
   } catch (err) { next(err); }
@@ -221,7 +231,7 @@ async function crear(req, res, next) {
 // PUT /api/citas/:id
 async function actualizar(req, res, next) {
   try {
-    const { fecha, hora_inicio, hora_fin, estado, motivo, observaciones, sucursal_id } = req.body;
+    const { fecha, hora_inicio, hora_fin, estado, motivo, observaciones, sucursal_id, es_domicilio } = req.body;
 
     const actual = await pool.query('select * from citas where id = $1 and empresa_id = $2', [req.params.id, req.empresaId]);
     if (!actual.rows[0]) return res.status(404).json({ mensaje: 'Cita no encontrada' });
@@ -281,6 +291,11 @@ async function actualizar(req, res, next) {
       nuevoEstado = 'pendiente';
     }
 
+    // Visita a domicilio solo se puede corregir mientras la cita sigue
+    // pendiente -- una vez confirmada/atendida/cancelada/etc. queda fija
+    // (evita cambiar retroactivamente algo que ya paso).
+    const esDomicilioNuevo = es_domicilio !== undefined && cita.estado === 'pendiente' ? es_domicilio : null;
+
     await pool.query(
       `update citas set
          fecha = coalesce($1, fecha),
@@ -289,9 +304,10 @@ async function actualizar(req, res, next) {
          estado = coalesce($4, estado),
          motivo = coalesce($5, motivo),
          observaciones = coalesce($6, observaciones),
-         sucursal_id = coalesce($7, sucursal_id)
-       where id = $8 and empresa_id = $9`,
-      [fecha, hora_inicio, hora_fin, nuevoEstado, motivo, observaciones, sucursalId, req.params.id, req.empresaId]
+         sucursal_id = coalesce($7, sucursal_id),
+         es_domicilio = coalesce($8, es_domicilio)
+       where id = $9 and empresa_id = $10`,
+      [fecha, hora_inicio, hora_fin, nuevoEstado, motivo, observaciones, sucursalId, esDomicilioNuevo, req.params.id, req.empresaId]
     );
 
     const eventos = [];
@@ -316,6 +332,9 @@ async function actualizar(req, res, next) {
     }
     if (nuevoEstado && nuevoEstado !== cita.estado) {
       eventos.push({ nota: 'Estado', anterior: cita.estado, nuevo: nuevoEstado });
+    }
+    if (esDomicilioNuevo !== null && esDomicilioNuevo !== cita.es_domicilio) {
+      eventos.push({ nota: 'Visita a domicilio', anterior: cita.es_domicilio ? 'Si' : 'No', nuevo: esDomicilioNuevo ? 'Si' : 'No' });
     }
     // (motivo || '') !== (cita.motivo || ''): el formulario reenvia '' para
     // "sin motivo" pero en la base puede estar guardado como null -- sin

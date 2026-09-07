@@ -12,6 +12,8 @@ import { UsuariosComponent } from './features/usuarios/usuarios.component';
 import { EmpresasComponent } from './features/empresas/empresas.component';
 import { SucursalesComponent } from './features/sucursales/sucursales.component';
 import { CampanasComponent } from './features/campanas/campanas.component';
+import { ReporteCampanasComponent } from './features/reportes/reporte-campanas/reporte-campanas.component';
+import { ReporteCitasComponent } from './features/reportes/reporte-citas/reporte-citas.component';
 
 export const routes: Routes = [
   { path: 'login', component: LoginComponent },
@@ -29,6 +31,8 @@ export const routes: Routes = [
       { path: 'usuarios', component: UsuariosComponent },
       { path: 'sucursales', component: SucursalesComponent },
       { path: 'campanas', component: CampanasComponent },
+      { path: 'reportes/campanas', component: ReporteCampanasComponent },
+      { path: 'reportes/citas', component: ReporteCitasComponent },
       { path: 'empresas', component: EmpresasComponent, canActivate: [superAdminGuard] },
     ],
   },

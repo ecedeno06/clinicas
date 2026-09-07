@@ -242,6 +242,39 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; colo
   box-shadow: inset 2px 0 0 var(--teal-500);
 }
 
+.sidebar-nav button.nav-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  color: #cbd5e1;
+  font-size: 13.5px;
+  font-weight: 500;
+  background: none;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+}
+.sidebar-nav button.nav-toggle:hover { background: #1c2740; color: white; }
+
+.sidebar-nav .nav-chevron {
+  margin-left: auto;
+  flex-shrink: 0;
+  display: flex;
+  transition: transform 0.15s;
+}
+.sidebar-nav .nav-chevron.open { transform: rotate(90deg); }
+
+.sidebar-nav .nav-sub { padding-left: 40px; font-size: 12.5px; }
+
+.sidebar.collapsed .nav-chevron,
+.sidebar.collapsed .nav-sub {
+  display: none;
+}
+
 .sidebar-footer {
   padding: 10px;
   border-top: 1px solid #1c2740;
@@ -818,22 +851,6 @@ table.data-table {
 .auth-error {
   background: #fee2e2; color: #dc2626;
   padding: 8px 12px; border-radius: 8px; font-size: 12.5px; margin-bottom: 12px;
-}
-
-/* ---------- Impresion de receta ---------- */
-.print-receta { display: none; }
-
-@media print {
-  body * { visibility: hidden; }
-  .print-receta, .print-receta * { visibility: visible; }
-  .print-receta {
-    display: block;
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    padding: 24px;
-  }
 }
 
 /* ---------- Utilidades ---------- */

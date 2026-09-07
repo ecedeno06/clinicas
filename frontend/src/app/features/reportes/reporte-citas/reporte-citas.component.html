@@ -1,0 +1,81 @@
+<div class="page-header">
+  <div>
+    <h1>Reporte de citas</h1>
+    <div class="desc">Citas por sucursal y rango de fechas</div>
+  </div>
+</div>
+
+<div class="flex gap-16" style="flex-wrap:wrap;">
+  <div class="form-group" style="min-width:220px;">
+    <label>Sucursal</label>
+    <select class="input" [ngModel]="sucursalId()" (ngModelChange)="sucursalId.set($event)">
+      <option value="">Todas las sucursales</option>
+      @for (s of sucursales(); track s.id) { <option [value]="s.id">{{ s.nombre }}</option> }
+    </select>
+  </div>
+  <div class="form-group" style="min-width:160px;">
+    <label>Desde</label>
+    <input class="input" type="date" [ngModel]="desde()" (ngModelChange)="desde.set($event)" />
+  </div>
+  <div class="form-group" style="min-width:160px;">
+    <label>Hasta</label>
+    <input class="input" type="date" [ngModel]="hasta()" (ngModelChange)="hasta.set($event)" />
+  </div>
+  <div class="form-group" style="min-width:180px;">
+    <label>Estado</label>
+    <select class="input" [ngModel]="estado()" (ngModelChange)="estado.set($event)">
+      <option value="">Todos los estados</option>
+      @for (e of estados; track e) { <option [value]="e">{{ estadoEtiqueta(e) }}</option> }
+    </select>
+  </div>
+  <div class="form-group" style="justify-content:flex-end; display:flex;">
+    <button type="button" class="btn btn-accent" (click)="buscar()">Buscar</button>
+  </div>
+</div>
+
+@if (buscado()) {
+  <div class="page-header mt-16">
+    <div>
+      <h2 style="margin:0;">Resultados ({{ citas().length }})</h2>
+      <p class="text-muted text-sm" style="margin:0;">{{ sucursalNombreFiltro() }} &middot; {{ desde() | date:'dd/MM/yyyy':'UTC' }} – {{ hasta() | date:'dd/MM/yyyy':'UTC' }} @if (estado()) { &middot; {{ estadoEtiqueta(estado()) }} }</p>
+    </div>
+    @if (citas().length > 0) {
+      <button type="button" class="btn btn-outline btn-sm" (click)="verPdf()">Ver PDF</button>
+    }
+  </div>
+
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead><tr><th>Fecha</th><th>Hora</th><th>Paciente</th><th>Doctor</th><th>Sucursal</th><th>Campaña</th><th>Estado</th></tr></thead>
+      <tbody>
+        @if (cargando()) {
+          <tr><td colspan="7"><div class="empty-state">Buscando...</div></td></tr>
+        } @else {
+          @for (cita of citas(); track cita.id) {
+            <tr>
+              <td>{{ cita.fecha | date:'dd/MM/yyyy':'UTC' }}</td>
+              <td>{{ formatoAmPm(cita.hora_inicio) }} - {{ formatoAmPm(cita.hora_fin) }}</td>
+              <td>{{ cita.paciente_nombre }}</td>
+              <td>{{ cita.doctor_nombre }} <div class="text-muted text-sm">{{ cita.especialidad_nombre }}</div></td>
+              <td>{{ cita.sucursal_nombre }}</td>
+              <td>{{ cita.campana_nombre }}</td>
+              <td>
+                <span class="badge"
+                  [class.badge-slate]="cita.estado === 'pendiente'"
+                  [class.badge-amber]="cita.estado === 'confirmada'"
+                  [class.badge-green]="cita.estado === 'atendida'"
+                  [class.badge-red]="cita.estado === 'cancelada' || cita.estado === 'no_asistio'"
+                  [class.badge-violet]="cita.estado === 'reagendar'">
+                  {{ cita.estado }}
+                </span>
+              </td>
+            </tr>
+          } @empty {
+            <tr><td colspan="7"><div class="empty-state">No hay citas para estos filtros.</div></td></tr>
+          }
+        }
+      </tbody>
+    </table>
+  </div>
+}
+
