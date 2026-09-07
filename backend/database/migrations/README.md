@@ -39,6 +39,7 @@ docker run --rm -i -e PGPASSWORD='<password>' postgres:16 \
 | `019_doctor_especialidades.sql` | Tabla nueva `doctor_especialidades` (un doctor puede tener varias especialidades, cada una con su numero de colegiado); elimina `doctores.especialidad_id`/`numero_colegiado`; agrega `citas.especialidad_id` (sin FK, dato informativo) | ✅ Aplicada 2026-09-07 | ✅ Aplicada 2026-09-07 |
 | `020_pacientes_google_maps.sql` | Columna `google_maps_url` en `pacientes` (visitas a domicilio) | ✅ Aplicada 2026-09-07 | ✅ Aplicada 2026-09-07 |
 | `021_citas_domicilio.sql` | Columna `es_domicilio` en `citas` (marca visita a domicilio del paciente) | ✅ Aplicada 2026-09-07 | ✅ Aplicada 2026-09-07 |
+| `022_citas_urgencia.sql` | Columna `es_urgencia` en `citas` (permite asignar cualquier doctor sin validar su horario configurado ni choques de campaña) | ✅ Aplicada 2026-09-07 | ✅ Aplicada 2026-09-07 |
 
 **Verificado 2026-09-02**: comparacion completa de esquema (tablas, columnas,
 indices, constraints, funciones, triggers) entre `.19` y Neon — identicos

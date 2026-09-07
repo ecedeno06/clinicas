@@ -225,6 +225,7 @@ export interface Cita {
   especialidad_id?: string | null;
   especialidad_nombre?: string;
   es_domicilio?: boolean;
+  es_urgencia?: boolean;
   fecha: string;
   hora_inicio: string;
   hora_fin: string;

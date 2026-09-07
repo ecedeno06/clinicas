@@ -37,6 +37,7 @@ para el registro vivo de que esta aplicado en cada entorno.
 | 19 | `019_doctor_especialidades.sql` | Tabla nueva `doctor_especialidades` (N:M doctor-especialidad con numero de colegiado); elimina `doctores.especialidad_id`/`numero_colegiado`; agrega `citas.especialidad_id` (sin FK) | ✅ Aplicada 2026-09-07 |
 | 20 | `020_pacientes_google_maps.sql` | Columna nueva `google_maps_url` en `pacientes` | ✅ Aplicada 2026-09-07 |
 | 21 | `021_citas_domicilio.sql` | Columna nueva `es_domicilio` en `citas` | ✅ Aplicada 2026-09-07 |
+| 22 | `022_citas_urgencia.sql` | Columna nueva `es_urgencia` en `citas` | ✅ Aplicada 2026-09-07 |
 
 ---
 
@@ -408,6 +409,28 @@ idempotente) y verificada end-to-end contra `.17`: crear cita como
 domicilio, editar mientras pendiente (se aplica), confirmar y volver a
 intentar editar (se ignora, sin entrada de log falsa). Aplicada a `.17`
 y a Neon el 2026-09-07.
+
+---
+
+## 22. `022_citas_urgencia.sql` — Cita de urgencia
+
+Columna aditiva `es_urgencia boolean not null default false` en `citas`.
+Checkbox "Es una urgencia" en el formulario, editable solo mientras la cita
+sigue `pendiente` (mismo criterio que `es_domicilio`). Permite asignar
+cualquier doctor sin que su horario configurado (`doctor_horarios`) ni un
+compromiso de campaña confirmado que se cruce lo bloqueen -- el choque
+contra OTRA cita del mismo PACIENTE se sigue validando siempre, una
+urgencia no lo omite. En el frontend, el nombre del paciente parpadea en
+rojo luminoso (con leve pulso de tamaño) mientras la cita de urgencia
+siga sin atender ni cancelar, y aparece un icono de sirena junto al
+nombre en el tablero y en Citas.
+
+Probada con Postgres desechable (creación limpia + re-ejecución
+idempotente) y verificada end-to-end contra `.17`: crear/editar una cita
+de urgencia que se cruza con un compromiso de campaña confirmado del
+doctor (falla sin urgencia, pasa con urgencia); el choque de horario del
+paciente se sigue bloqueando igual. Aplicada a `.17` y a Neon el
+2026-09-07.
 
 ---
 

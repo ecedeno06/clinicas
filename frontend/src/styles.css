@@ -853,6 +853,40 @@ table.data-table {
   padding: 8px 12px; border-radius: 8px; font-size: 12.5px; margin-bottom: 12px;
 }
 
+/* ---------- Icono de cita de urgencia (sirena, brillo + balanceo) ---------- */
+.icono-urgencia {
+  display: inline-flex;
+  vertical-align: middle;
+  margin-left: 6px;
+  transform-origin: 50% 85%;
+  animation: urgencia-flash 1.4s ease-in-out infinite, urgencia-rock 1.4s ease-in-out infinite;
+}
+@keyframes urgencia-flash {
+  0%, 100% { filter: drop-shadow(0 0 2px rgba(255,149,0,0.7)) drop-shadow(0 0 4px rgba(255,149,0,0.4)); }
+  50%      { filter: drop-shadow(0 0 6px rgba(255,180,60,1)) drop-shadow(0 0 11px rgba(255,180,60,0.8)); }
+}
+@keyframes urgencia-rock {
+  0%, 100% { transform: rotate(-8deg); }
+  50%      { transform: rotate(8deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .icono-urgencia { animation: none; filter: drop-shadow(0 0 3px rgba(255,149,0,0.8)); }
+}
+
+/* Nombre del paciente parpadeando en rojo luminoso mientras la cita de
+   urgencia siga sin atender (una vez "atendida" deja de parpadear). */
+.nombre-urgencia {
+  font-weight: 600;
+  animation: nombre-urgencia-flash 1s ease-in-out infinite;
+}
+@keyframes nombre-urgencia-flash {
+  0%, 100% { color: inherit; text-shadow: none; font-size: 1em; }
+  50%      { color: #ff3b30; text-shadow: 0 0 6px rgba(255,59,48,0.9), 0 0 12px rgba(255,59,48,0.6); font-size: calc(1em + 1px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nombre-urgencia { animation: none; color: #ff3b30; }
+}
+
 /* ---------- Utilidades ---------- */
 .flex { display: flex; }
 .items-center { align-items: center; }

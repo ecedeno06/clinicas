@@ -266,6 +266,10 @@ create table if not exists citas (
     -- Visita a domicilio del paciente en vez de en la sucursal (sucursal_id
     -- sigue siendo la sede organizadora, igual que en una campana).
     es_domicilio    boolean not null default false,
+    -- Urgencia: permite asignar cualquier doctor sin que el horario
+    -- configurado (doctor_horarios) lo bloquee. No omite los choques
+    -- reales de horario (otra cita a la misma hora).
+    es_urgencia     boolean not null default false,
     fecha           date not null,
     hora_inicio     time not null,
     hora_fin        time not null,

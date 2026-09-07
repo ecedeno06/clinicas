@@ -96,7 +96,7 @@
     <thead>
       <tr>
         <th>Horario</th>
-        <th>Paciente</th>
+        <th style="min-width:160px;">Paciente</th>
         <th>Doctor</th>
         <th>Sucursal</th>
         <th>Estado</th>
@@ -107,7 +107,19 @@
       @for (c of agendaDelDia(); track c.id) {
         <tr>
           <td>{{ formatoAmPm(c.hora_inicio) }} - {{ formatoAmPm(c.hora_fin) }}</td>
-          <td>{{ c.paciente_nombre }}</td>
+          <td>
+            <span [class.nombre-urgencia]="c.es_urgencia && c.estado !== 'atendida' && c.estado !== 'cancelada'">{{ c.paciente_nombre }}</span>
+            @if (c.es_urgencia) {
+              <span class="icono-urgencia" title="Cita de urgencia" aria-label="Cita de urgencia">
+                <svg width="16" height="16" viewBox="0 0 24 24">
+                  <rect x="6" y="19" width="12" height="2.5" rx="1" fill="#7a4a12"/>
+                  <path d="M8 19 L8 13 Q8 6 12 4 Q16 6 16 13 L16 19 Z" fill="#ff9500"/>
+                  <ellipse cx="12" cy="13" rx="4" ry="1.3" fill="#ffb347" opacity="0.6"/>
+                  <circle cx="12" cy="5.5" r="2.2" fill="#ffdca8"/>
+                </svg>
+              </span>
+            }
+          </td>
           <td>{{ c.doctor_nombre }} <div class="text-muted text-sm">{{ c.especialidad_nombre }}</div></td>
           <td>{{ c.sucursal_nombre }}</td>
           <td>

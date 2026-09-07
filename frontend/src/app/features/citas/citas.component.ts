@@ -157,6 +157,7 @@ export class CitasComponent implements OnInit {
     sucursal_id: ['', Validators.required],
     campana_id: [''],
     es_domicilio: [false],
+    es_urgencia: [false],
     fecha: [hoyISO(), Validators.required],
     hora_inicio: ['', Validators.required],
     hora_fin: ['', Validators.required],
@@ -358,6 +359,7 @@ export class CitasComponent implements OnInit {
   // (y el chequeo de choque campana-vs-horario, ver choqueCampana.js).
   sinDisponibilidad(): boolean {
     if (this.form.get('campana_id')?.value) return false;
+    if (this.form.get('es_urgencia')?.value) return false;
     if (this.horarioSinCambios()) return false;
     const disp = this.disponibilidad();
     if (!disp || !disp.tiene_horario_configurado) return false;
@@ -460,7 +462,7 @@ export class CitasComponent implements OnInit {
     // reset (doctor_id y fecha cambiarian en dos eventos separados, el
     // primero con el otro campo todavia con el valor viejo) -- se llama una
     // sola vez, ya con el formulario completo, justo debajo.
-    this.form.reset({ sucursal_id: this.sucursales()[0]?.id ?? '', especialidad_id: '', campana_id: '', es_domicilio: false, fecha: hoyISO(), estado: 'pendiente' }, { emitEvent: false });
+    this.form.reset({ sucursal_id: this.sucursales()[0]?.id ?? '', especialidad_id: '', campana_id: '', es_domicilio: false, es_urgencia: false, fecha: hoyISO(), estado: 'pendiente' }, { emitEvent: false });
     this.errorGuardar.set(null);
     this.panelAbierto.set(true);
     this.actualizarDisponibilidad();
@@ -479,6 +481,7 @@ export class CitasComponent implements OnInit {
       sucursal_id: c.sucursal_id ?? this.sucursales()[0]?.id ?? '',
       campana_id: c.campana_id ?? '',
       es_domicilio: c.es_domicilio ?? false,
+      es_urgencia: c.es_urgencia ?? false,
       fecha: c.fecha.substring(0, 10),
       hora_inicio: c.hora_inicio?.substring(0, 5),
       hora_fin: c.hora_fin?.substring(0, 5),

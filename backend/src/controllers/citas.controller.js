@@ -135,7 +135,7 @@ async function hayChoqueDePaciente({ empresaId, pacienteId, fecha, horaInicio, h
 // POST /api/citas
 async function crear(req, res, next) {
   try {
-    const { paciente_id, doctor_id, fecha, hora_inicio, hora_fin, motivo, observaciones, estado, sucursal_id, campana_id, especialidad_id, es_domicilio } = req.body;
+    const { paciente_id, doctor_id, fecha, hora_inicio, hora_fin, motivo, observaciones, estado, sucursal_id, campana_id, especialidad_id, es_domicilio, es_urgencia } = req.body;
 
     if (!paciente_id || !doctor_id || !fecha || !hora_inicio || !hora_fin) {
       return res.status(400).json({ mensaje: 'paciente, doctor, fecha y horario son requeridos' });
@@ -150,23 +150,29 @@ async function crear(req, res, next) {
     const doctor = await pool.query('select id from doctores where id = $1 and empresa_id = $2', [doctor_id, req.empresaId]);
     if (!doctor.rows[0]) return res.status(400).json({ mensaje: 'El doctor indicado no pertenece a esta clinica' });
 
-    const choqueDoctor = await hayChoqueDeHorario({ empresaId: req.empresaId, doctorId: doctor_id, fecha, horaInicio: hora_inicio, horaFin: hora_fin });
-    if (choqueDoctor) {
-      return res.status(409).json({ mensaje: 'El doctor ya tiene una cita agendada que se cruza con ese horario.' });
+    // Una urgencia puede asignar cualquier doctor sin que sus compromisos
+    // de horario lo bloqueen -- solo se salta lo que depende del horario
+    // DEL DOCTOR (otra cita suya, un compromiso de campana confirmado);
+    // el choque contra otra cita del PACIENTE se sigue validando siempre.
+    if (!es_urgencia) {
+      const choqueDoctor = await hayChoqueDeHorario({ empresaId: req.empresaId, doctorId: doctor_id, fecha, horaInicio: hora_inicio, horaFin: hora_fin });
+      if (choqueDoctor) {
+        return res.status(409).json({ mensaje: 'El doctor ya tiene una cita agendada que se cruza con ese horario.' });
+      }
+
+      // El doctor no puede tener un compromiso de campana confirmado que se
+      // cruce con este horario (si esta cita es en si de una campana, no
+      // choca contra el compromiso de esa misma campana). Ver
+      // DISENO-CAMPANAS-MEDICAS.md seccion 9.
+      const choqueCampana = await hayChoqueCampanaParaCita({ doctorId: doctor_id, fecha, horaInicio: hora_inicio, horaFin: hora_fin, excluirCampanaId: campana_id || null });
+      if (choqueCampana) {
+        return res.status(409).json({ mensaje: 'El doctor tiene un compromiso de campana confirmado que se cruza con ese horario.' });
+      }
     }
 
     const choquePaciente = await hayChoqueDePaciente({ empresaId: req.empresaId, pacienteId: paciente_id, fecha, horaInicio: hora_inicio, horaFin: hora_fin });
     if (choquePaciente) {
       return res.status(409).json({ mensaje: 'El paciente ya tiene otra cita agendada que se cruza con ese horario.' });
-    }
-
-    // El doctor no puede tener un compromiso de campana confirmado que se
-    // cruce con este horario (si esta cita es en si de una campana, no
-    // choca contra el compromiso de esa misma campana). Ver
-    // DISENO-CAMPANAS-MEDICAS.md seccion 9.
-    const choqueCampana = await hayChoqueCampanaParaCita({ doctorId: doctor_id, fecha, horaInicio: hora_inicio, horaFin: hora_fin, excluirCampanaId: campana_id || null });
-    if (choqueCampana) {
-      return res.status(409).json({ mensaje: 'El doctor tiene un compromiso de campana confirmado que se cruza con ese horario.' });
     }
 
     const sucursalId = await resolverSucursal(sucursal_id, req.empresaId);
@@ -220,9 +226,9 @@ async function crear(req, res, next) {
 
     const log = primerEventoLog(req.usuario?.nombre, 'Cita creada');
     const { rows } = await pool.query(
-      `insert into citas (empresa_id, sucursal_id, paciente_id, doctor_id, campana_id, especialidad_id, es_domicilio, fecha, hora_inicio, hora_fin, motivo, observaciones, estado, log)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12, coalesce($13, 'pendiente'), $14::jsonb) returning *`,
-      [req.empresaId, sucursalId, paciente_id, doctor_id, campana_id || null, especialidad_id || null, !!es_domicilio, fecha, hora_inicio, hora_fin, motivo, observaciones, estado, log]
+      `insert into citas (empresa_id, sucursal_id, paciente_id, doctor_id, campana_id, especialidad_id, es_domicilio, es_urgencia, fecha, hora_inicio, hora_fin, motivo, observaciones, estado, log)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13, coalesce($14, 'pendiente'), $15::jsonb) returning *`,
+      [req.empresaId, sucursalId, paciente_id, doctor_id, campana_id || null, especialidad_id || null, !!es_domicilio, !!es_urgencia, fecha, hora_inicio, hora_fin, motivo, observaciones, estado, log]
     );
     res.status(201).json(rows[0]);
   } catch (err) { next(err); }
@@ -231,7 +237,7 @@ async function crear(req, res, next) {
 // PUT /api/citas/:id
 async function actualizar(req, res, next) {
   try {
-    const { fecha, hora_inicio, hora_fin, estado, motivo, observaciones, sucursal_id, es_domicilio } = req.body;
+    const { fecha, hora_inicio, hora_fin, estado, motivo, observaciones, sucursal_id, es_domicilio, es_urgencia } = req.body;
 
     const actual = await pool.query('select * from citas where id = $1 and empresa_id = $2', [req.params.id, req.empresaId]);
     if (!actual.rows[0]) return res.status(404).json({ mensaje: 'Cita no encontrada' });
@@ -244,13 +250,29 @@ async function actualizar(req, res, next) {
       return res.status(400).json({ mensaje: 'La hora de fin debe ser posterior a la hora de inicio.' });
     }
 
+    // Urgencia efectiva para esta edicion: el valor nuevo si se esta
+    // corrigiendo ahora mismo (y la cita sigue pendiente), si no el que ya
+    // tenia guardado. Igual que en crear(), una urgencia salta los choques
+    // que dependen del horario DEL DOCTOR, pero no el del paciente.
+    const urgenciaEfectiva = es_urgencia !== undefined && cita.estado === 'pendiente' ? es_urgencia : cita.es_urgencia;
+
     if (fecha || hora_inicio || hora_fin) {
-      const choqueDoctor = await hayChoqueDeHorario({
-        empresaId: req.empresaId, doctorId: cita.doctor_id, fecha: nuevaFecha,
-        horaInicio: nuevaHoraInicio, horaFin: nuevaHoraFin, excluirCitaId: cita.id,
-      });
-      if (choqueDoctor) {
-        return res.status(409).json({ mensaje: 'El doctor ya tiene una cita agendada que se cruza con ese horario.' });
+      if (!urgenciaEfectiva) {
+        const choqueDoctor = await hayChoqueDeHorario({
+          empresaId: req.empresaId, doctorId: cita.doctor_id, fecha: nuevaFecha,
+          horaInicio: nuevaHoraInicio, horaFin: nuevaHoraFin, excluirCitaId: cita.id,
+        });
+        if (choqueDoctor) {
+          return res.status(409).json({ mensaje: 'El doctor ya tiene una cita agendada que se cruza con ese horario.' });
+        }
+
+        const choqueCampana = await hayChoqueCampanaParaCita({
+          doctorId: cita.doctor_id, fecha: nuevaFecha, horaInicio: nuevaHoraInicio, horaFin: nuevaHoraFin,
+          excluirCampanaId: cita.campana_id,
+        });
+        if (choqueCampana) {
+          return res.status(409).json({ mensaje: 'El doctor tiene un compromiso de campana confirmado que se cruza con ese horario.' });
+        }
       }
 
       const choquePaciente = await hayChoqueDePaciente({
@@ -259,14 +281,6 @@ async function actualizar(req, res, next) {
       });
       if (choquePaciente) {
         return res.status(409).json({ mensaje: 'El paciente ya tiene otra cita agendada que se cruza con ese horario.' });
-      }
-
-      const choqueCampana = await hayChoqueCampanaParaCita({
-        doctorId: cita.doctor_id, fecha: nuevaFecha, horaInicio: nuevaHoraInicio, horaFin: nuevaHoraFin,
-        excluirCampanaId: cita.campana_id,
-      });
-      if (choqueCampana) {
-        return res.status(409).json({ mensaje: 'El doctor tiene un compromiso de campana confirmado que se cruza con ese horario.' });
       }
     }
 
@@ -291,10 +305,11 @@ async function actualizar(req, res, next) {
       nuevoEstado = 'pendiente';
     }
 
-    // Visita a domicilio solo se puede corregir mientras la cita sigue
-    // pendiente -- una vez confirmada/atendida/cancelada/etc. queda fija
-    // (evita cambiar retroactivamente algo que ya paso).
+    // Visita a domicilio y urgencia solo se pueden corregir mientras la
+    // cita sigue pendiente -- una vez confirmada/atendida/cancelada/etc.
+    // quedan fijas (evita cambiar retroactivamente algo que ya paso).
     const esDomicilioNuevo = es_domicilio !== undefined && cita.estado === 'pendiente' ? es_domicilio : null;
+    const esUrgenciaNuevo = es_urgencia !== undefined && cita.estado === 'pendiente' ? es_urgencia : null;
 
     await pool.query(
       `update citas set
@@ -305,9 +320,10 @@ async function actualizar(req, res, next) {
          motivo = coalesce($5, motivo),
          observaciones = coalesce($6, observaciones),
          sucursal_id = coalesce($7, sucursal_id),
-         es_domicilio = coalesce($8, es_domicilio)
-       where id = $9 and empresa_id = $10`,
-      [fecha, hora_inicio, hora_fin, nuevoEstado, motivo, observaciones, sucursalId, esDomicilioNuevo, req.params.id, req.empresaId]
+         es_domicilio = coalesce($8, es_domicilio),
+         es_urgencia = coalesce($9, es_urgencia)
+       where id = $10 and empresa_id = $11`,
+      [fecha, hora_inicio, hora_fin, nuevoEstado, motivo, observaciones, sucursalId, esDomicilioNuevo, esUrgenciaNuevo, req.params.id, req.empresaId]
     );
 
     const eventos = [];
@@ -335,6 +351,9 @@ async function actualizar(req, res, next) {
     }
     if (esDomicilioNuevo !== null && esDomicilioNuevo !== cita.es_domicilio) {
       eventos.push({ nota: 'Visita a domicilio', anterior: cita.es_domicilio ? 'Si' : 'No', nuevo: esDomicilioNuevo ? 'Si' : 'No' });
+    }
+    if (esUrgenciaNuevo !== null && esUrgenciaNuevo !== cita.es_urgencia) {
+      eventos.push({ nota: 'Urgencia', anterior: cita.es_urgencia ? 'Si' : 'No', nuevo: esUrgenciaNuevo ? 'Si' : 'No' });
     }
     // (motivo || '') !== (cita.motivo || ''): el formulario reenvia '' para
     // "sin motivo" pero en la base puede estar guardado como null -- sin
