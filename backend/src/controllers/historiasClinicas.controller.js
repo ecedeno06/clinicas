@@ -4,7 +4,7 @@ const { registrarEventoCita } = require('../utils/citaLog');
 // Estados que se pueden fijar desde el dropdown de la Consulta -- no
 // incluye pendiente/confirmada/no_asistio porque esos se manejan desde
 // el formulario de Editar cita, no desde aqui.
-const ESTADOS_VALIDOS_DESDE_CONSULTA = ['atendida', 'cancelada', 'reagendar'];
+const ESTADOS_VALIDOS_DESDE_CONSULTA = ['pendiente', 'atendida', 'cancelada', 'reagendar'];
 
 // GET /api/citas/:citaId/historia
 async function obtenerPorCita(req, res, next) {

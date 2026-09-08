@@ -522,11 +522,16 @@ export class CitasComponent implements OnInit {
     this.citaHistoria.set(c);
     this.tabHistoria.set('consulta');
     this.historia.set(null);
-    // El dropdown de estado solo maneja los 3 desenlaces de una consulta
-    // (atendida/cancelada/reagendar) -- si la cita esta en otro estado
-    // (pendiente, confirmada, no_asistio), se ofrece "Atendida" por
-    // defecto en vez de un valor que el dropdown no puede representar.
-    const estadoInicial = (['atendida', 'cancelada', 'reagendar'] as EstadoCita[]).includes(c.estado) ? c.estado : 'atendida';
+    // El dropdown de estado maneja los 3 desenlaces de una consulta
+    // (atendida/cancelada/reagendar), mas "pendiente" si la cita todavia
+    // esta vigente -- si la cita esta en otro estado (confirmada,
+    // no_asistio) o "pendiente" ya no aplica (cita vencida), se ofrece
+    // "Atendida" por defecto en vez de un valor que el dropdown no puede
+    // representar.
+    const estadosValidos: EstadoCita[] = this.citaVigente(c)
+      ? ['pendiente', 'atendida', 'cancelada', 'reagendar']
+      : ['atendida', 'cancelada', 'reagendar'];
+    const estadoInicial = estadosValidos.includes(c.estado) ? c.estado : 'atendida';
     // Si todavia no existe historia clinica para esta cita, se precarga el
     // motivo que ya quedo anotado al agendarla (c.motivo) para que el
     // doctor no tenga que volver a escribirlo -- si ya hay una historia
@@ -674,6 +679,13 @@ export class CitasComponent implements OnInit {
     const hoy = hoyISO();
     const msPorDia = 24 * 60 * 60 * 1000;
     return Math.round((new Date(hoy).getTime() - new Date(cita.fecha).getTime()) / msPorDia);
+  }
+
+  // La opcion "Pendiente" del estado de la cita solo tiene sentido si la
+  // cita todavia no paso en el tiempo (hoy o una fecha futura).
+  citaVigente(cita: Cita | null | undefined): boolean {
+    if (!cita) return false;
+    return cita.fecha.substring(0, 10) >= hoyISO();
   }
 
   signosBloqueado(cita: Cita | null | undefined): boolean {

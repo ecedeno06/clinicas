@@ -466,6 +466,9 @@
               <div class="form-group mt-16">
                 <label>Estado de la cita</label>
                 <select class="input" formControlName="estado">
+                  @if (citaVigente(citaHistoria())) {
+                    <option value="pendiente">Pendiente</option>
+                  }
                   <option value="atendida">Atendida</option>
                   <option value="cancelada">Cancelada</option>
                   <option value="reagendar">Reprogramar</option>
