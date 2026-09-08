@@ -36,14 +36,16 @@
           <td>{{ p.telefono || '-' }}</td>
           <td><span class="badge" [class.badge-green]="p.activo" [class.badge-slate]="!p.activo">{{ p.activo ? 'Activo' : 'Inactivo' }}</span></td>
           <td class="table-actions">
-            @if (p.google_maps_url && p.comparte_ubicacion) {
-              <a [href]="p.google_maps_url" target="_blank" rel="noopener" class="btn-icon" title="Ver ubicacion en el mapa (visita a domicilio)" aria-label="Ver ubicacion en el mapa">
+            @if (direccionPrincipal(p); as dirPrincipal) {
+              @if (dirPrincipal.google_maps_url && dirPrincipal.comparte_ubicacion) {
+              <a [href]="dirPrincipal.google_maps_url" target="_blank" rel="noopener" class="btn-icon" title="Ver ubicacion en el mapa (visita a domicilio)" aria-label="Ver ubicacion en el mapa">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
               </a>
               @if (wazeUrl(p); as waze) {
                 <a [href]="waze" target="_blank" rel="noopener" class="btn-icon" title="Abrir en Waze" aria-label="Abrir en Waze">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-5-5 18-4-7-7-4z"/></svg>
                 </a>
+              }
               }
             }
             @if (p.telefono) {
@@ -150,19 +152,72 @@
           <input class="input" type="email" formControlName="email" />
         </div>
         <div class="form-group mt-16">
-          <label>Direccion</label>
-          <textarea class="input" rows="2" formControlName="direccion"></textarea>
-        </div>
-        <div class="form-group mt-16">
-          <label>Enlace de Google Maps</label>
-          <div class="flex items-center gap-8">
-            <input class="input" type="url" formControlName="google_maps_url" placeholder="https://maps.google.com/..." style="flex:1" />
-            <button type="button" class="btn-icon" title="Elegir en el mapa" aria-label="Elegir en el mapa" (click)="abrirMapa()">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-            </button>
-            <label class="flex items-center gap-8" style="white-space:nowrap;"><input type="checkbox" formControlName="comparte_ubicacion" /> Comparte ubicacion</label>
+          <label>Direcciones</label>
+          <div formArrayName="direcciones">
+            @for (grupo of direccionesArray.controls; track $index; let i = $index) {
+              <div class="card mt-16" [formGroupName]="i">
+                <div class="flex items-center" style="justify-content: space-between;">
+                  <h3 style="margin:0;">
+                    Direccion {{ i + 1 }}
+                    @if (grupo.get('es_principal')?.value) {
+                      <span class="badge badge-green" style="margin-left:8px;">Principal</span>
+                    }
+                  </h3>
+                  <div class="flex gap-8">
+                    @if (!grupo.get('es_principal')?.value) {
+                      <button type="button" class="btn btn-outline btn-sm" (click)="marcarPrincipal(i)">Marcar como principal</button>
+                    }
+                    <button type="button" class="btn btn-outline btn-sm" (click)="quitarDireccion(i)">Quitar</button>
+                  </div>
+                </div>
+                <div class="form-group mt-16">
+                  <label>Direccion</label>
+                  <textarea class="input" rows="2" formControlName="direccion"></textarea>
+                </div>
+                <div class="form-group mt-16">
+                  <label>Enlace de Google Maps</label>
+                  <div class="flex items-center gap-8">
+                    <input class="input" type="url" formControlName="google_maps_url" placeholder="https://maps.google.com/..." style="flex:1" />
+                    <button type="button" class="btn-icon" title="Elegir en el mapa" aria-label="Elegir en el mapa" (click)="abrirMapa(i)">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                    </button>
+                  </div>
+                  <div class="text-muted text-sm mt-8">Pega el enlace de Google Maps o usa el boton para elegir el punto en un mapa.</div>
+                </div>
+                <div class="form-group mt-16">
+                  <button type="button" class="btn btn-outline btn-sm" [disabled]="detectandoDireccion() === i" (click)="detectarDivisionPolitica(i)">
+                    {{ detectandoDireccion() === i ? 'Detectando...' : 'Detectar provincia y distrito' }}
+                  </button>
+                  <div class="text-muted text-sm mt-8">Requiere haber elegido un punto en el mapa. El corregimiento no se autocompleta (Google no lo provee para Panama) -- escribelo a mano.</div>
+                </div>
+                <div class="flex gap-12 mt-16">
+                  <div class="form-group" style="flex:1">
+                    <label>Pais</label>
+                    <input class="input" formControlName="pais" />
+                  </div>
+                  <div class="form-group" style="flex:1">
+                    <label>Provincia</label>
+                    <input class="input" formControlName="provincia" />
+                  </div>
+                </div>
+                <div class="flex gap-12 mt-16">
+                  <div class="form-group" style="flex:1">
+                    <label>Distrito</label>
+                    <input class="input" formControlName="distrito" />
+                  </div>
+                  <div class="form-group" style="flex:1">
+                    <label>Corregimiento</label>
+                    <input class="input" formControlName="corregimiento" />
+                  </div>
+                </div>
+                <div class="form-group mt-16">
+                  <label class="flex items-center gap-8"><input type="checkbox" formControlName="comparte_ubicacion" /> Comparte ubicacion</label>
+                  <div class="text-muted text-sm mt-8">Los botones de ubicacion (mapa/Waze) solo se muestran si el paciente marco que la comparte.</div>
+                </div>
+              </div>
+            }
           </div>
-          <div class="text-muted text-sm mt-8">Pega el enlace de Google Maps o usa el boton para elegir el punto en un mapa. Sirve para ubicar visitas a domicilio. Los botones de ubicacion solo se muestran si el paciente marco que la comparte.</div>
+          <button type="button" class="btn btn-outline btn-sm mt-16" (click)="agregarDireccion()">+ Agregar direccion</button>
         </div>
         <div class="form-group mt-16">
           <label>Alergias</label>

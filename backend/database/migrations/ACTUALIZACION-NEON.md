@@ -40,6 +40,7 @@ para el registro vivo de que esta aplicado en cada entorno.
 | 22 | `022_citas_urgencia.sql` | Columna nueva `es_urgencia` en `citas` | ✅ Aplicada 2026-09-07 |
 | 23 | `023_pacientes_comparte_ubicacion.sql` | Columna nueva `comparte_ubicacion` en `pacientes` | ✅ Aplicada 2026-09-08 |
 | 24 | `024_usuarios_telefono.sql` | Columnas nuevas `telefono`/`acepta_whatsapp` en `usuarios` | ✅ Aplicada 2026-09-08 |
+| 25 | `025_direcciones_paciente.sql` | Tabla nueva `direcciones_paciente` (multiples direcciones por paciente, una principal); elimina `pacientes.direccion`/`google_maps_url`/`comparte_ubicacion` | ✅ Aplicada 2026-09-08 |
 
 ---
 
@@ -466,6 +467,39 @@ Probada con Postgres desechable (creacion limpia + re-ejecucion
 idempotente) y verificada end-to-end contra `.17` via el controlador
 real (crear, actualizar, listar). Aplicada a `.17` y a Neon el
 2026-09-08.
+
+---
+
+## 25. `025_direcciones_paciente.sql` — Multiples direcciones por paciente
+
+Reemplaza las columnas `pacientes.direccion`/`google_maps_url`/
+`comparte_ubicacion` (migraciones 020 y 023) por una tabla puente
+`direcciones_paciente` (1 paciente : N direcciones), con `pais`/
+`provincia`/`distrito`/`corregimiento` y `comparte_ubicacion` por
+direccion, y `es_principal` con indice unico parcial (a lo sumo una
+principal por paciente) -- esa es la que usan Google Maps/Waze/WhatsApp
+al doctor en las comunicaciones existentes. Mismo criterio ya aplicado en
+la migracion 019 (doctor_especialidades): backfill de cada paciente con
+direccion/`google_maps_url` actuales a una fila principal, luego se
+eliminan las columnas viejas, protegido con chequeo de columna para
+poder re-correrse sin error.
+
+Se agrego tambien en esta fase (backend, sin migracion propia): endpoint
+`GET /api/geocodificacion/reverse`, proxy hacia la API de Geocoding de
+Google (key `MAPKEY`, solo en el backend, nunca en el frontend) para
+autocompletar provincia/distrito de una direccion -- ver
+`DISENO-GEOCODIFICACION-INVERSA.md` para el diseno completo, incluyendo
+el hallazgo de que Google no provee el corregimiento para Panama.
+
+Probada con Postgres desechable (creacion limpia + re-ejecucion
+idempotente, con datos sinteticos de pacientes con y sin direccion) y
+verificada end-to-end contra `.17` via el controlador real (crear con
+varias direcciones, validar que solo una sea principal, reemplazo
+completo al editar). Aplicada a `.17` y a Neon el 2026-09-08 (esquema
+verificado identico, backfill 1:1 confirmado en ambos).
+
+**Pendiente**: agregar la variable de entorno `MAPKEY` en Render cuando
+se despliegue esta version (no aplica a Neon, es solo del backend).
 
 ---
 

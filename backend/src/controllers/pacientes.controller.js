@@ -1,10 +1,26 @@
 const { pool } = require('../config/db');
 
+// Un paciente puede tener varias direcciones (tabla puente
+// direcciones_paciente), una marcada como principal -- esa es la que usan
+// Google Maps/Waze/WhatsApp al doctor en Citas/historial. Se agregan como
+// json_agg, ordenadas con la principal primero.
+const SELECT_DIRECCIONES = `
+  coalesce((
+    select json_agg(json_build_object(
+      'id', dp.id, 'direccion', dp.direccion, 'google_maps_url', dp.google_maps_url,
+      'pais', dp.pais, 'provincia', dp.provincia, 'distrito', dp.distrito, 'corregimiento', dp.corregimiento,
+      'comparte_ubicacion', dp.comparte_ubicacion, 'es_principal', dp.es_principal
+    ) order by dp.es_principal desc, dp.created_at)
+    from direcciones_paciente dp
+    where dp.paciente_id = p.id
+  ), '[]') as direcciones
+`;
+
 // GET /api/pacientes
 async function listar(req, res, next) {
   try {
     const { rows } = await pool.query(
-      `select p.*, pe.activo
+      `select p.*, pe.activo, ${SELECT_DIRECCIONES}
        from pacientes p
        join pacientes_empresas pe on pe.paciente_id = p.id
        where pe.empresa_id = $1
@@ -18,7 +34,7 @@ async function listar(req, res, next) {
 async function obtener(req, res, next) {
   try {
     const { rows } = await pool.query(
-      `select p.*, pe.activo
+      `select p.*, pe.activo, ${SELECT_DIRECCIONES}
        from pacientes p
        join pacientes_empresas pe on pe.paciente_id = p.id
        where p.id = $1 and pe.empresa_id = $2`,
@@ -27,6 +43,28 @@ async function obtener(req, res, next) {
     if (!rows[0]) return res.status(404).json({ mensaje: 'Paciente no encontrado' });
     res.json(rows[0]);
   } catch (err) { next(err); }
+}
+
+// Valida que a lo sumo una direccion venga marcada como principal --
+// mismo limite que ya impone el indice unico parcial en la base de datos,
+// pero devolver un 400 claro es mejor que dejar que explote el insert.
+function validarDirecciones(direcciones) {
+  if (direcciones === undefined) return null;
+  if (!Array.isArray(direcciones)) return 'direcciones debe ser un arreglo';
+  const principales = direcciones.filter((d) => d.es_principal).length;
+  if (principales > 1) return 'Solo una direccion puede marcarse como principal';
+  return null;
+}
+
+async function reemplazarDirecciones(ejecutor, pacienteId, direcciones) {
+  await ejecutor.query('delete from direcciones_paciente where paciente_id = $1', [pacienteId]);
+  for (const d of direcciones) {
+    await ejecutor.query(
+      `insert into direcciones_paciente (paciente_id, direccion, google_maps_url, pais, provincia, distrito, corregimiento, comparte_ubicacion, es_principal)
+       values ($1,$2,$3,$4,$5,$6,$7, coalesce($8, false), coalesce($9, false))`,
+      [pacienteId, d.direccion || null, d.google_maps_url || null, d.pais || null, d.provincia || null, d.distrito || null, d.corregimiento || null, d.comparte_ubicacion, d.es_principal]
+    );
+  }
 }
 
 // GET /api/pacientes/buscar?identificacion=X
@@ -54,8 +92,11 @@ async function crear(req, res, next) {
   try {
     const {
       nombre, identificacion, fecha_nacimiento, sexo, telefono, acepta_whatsapp, email,
-      direccion, google_maps_url, comparte_ubicacion, contacto_emergencia, alergias, activo, foto,
+      direcciones, contacto_emergencia, alergias, activo, foto,
     } = req.body;
+
+    const errorDirecciones = validarDirecciones(direcciones);
+    if (errorDirecciones) return res.status(400).json({ mensaje: errorDirecciones });
 
     await client.query('begin');
 
@@ -80,14 +121,17 @@ async function crear(req, res, next) {
         return res.status(400).json({ mensaje: 'nombre es requerido para un paciente nuevo' });
       }
       const ins = await client.query(
-        `insert into pacientes (nombre, identificacion, fecha_nacimiento, sexo, telefono, acepta_whatsapp, email, direccion, google_maps_url, comparte_ubicacion, contacto_emergencia, alergias, foto)
-         values ($1,$2,$3,$4,$5, coalesce($6, false),$7,$8,$9, coalesce($10, false),$11,$12,$13) returning *`,
+        `insert into pacientes (nombre, identificacion, fecha_nacimiento, sexo, telefono, acepta_whatsapp, email, contacto_emergencia, alergias, foto)
+         values ($1,$2,$3,$4,$5, coalesce($6, false),$7,$8,$9,$10) returning *`,
         [
           nombre, identificacion || null, fecha_nacimiento || null, sexo, telefono, acepta_whatsapp, email,
-          direccion, google_maps_url || null, comparte_ubicacion, contacto_emergencia ? JSON.stringify(contacto_emergencia) : null, alergias, foto || null,
+          contacto_emergencia ? JSON.stringify(contacto_emergencia) : null, alergias, foto || null,
         ]
       );
       paciente = ins.rows[0];
+      if (Array.isArray(direcciones) && direcciones.length) {
+        await reemplazarDirecciones(client, paciente.id, direcciones);
+      }
     }
 
     await client.query(
@@ -98,7 +142,7 @@ async function crear(req, res, next) {
     await client.query('commit');
 
     const { rows } = await pool.query(
-      `select p.*, pe.activo
+      `select p.*, pe.activo, ${SELECT_DIRECCIONES}
        from pacientes p join pacientes_empresas pe on pe.paciente_id = p.id and pe.empresa_id = $2
        where p.id = $1`,
       [paciente.id, req.empresaId]
@@ -118,19 +162,25 @@ async function crear(req, res, next) {
 // etc.) y, si viene "activo", el estado de la relacion con ESTA clinica
 // puntual (no afecta su estado en otras clinicas).
 async function actualizar(req, res, next) {
+  const client = await pool.connect();
   try {
     const {
       nombre, identificacion, fecha_nacimiento, sexo, telefono, acepta_whatsapp, email,
-      direccion, google_maps_url, comparte_ubicacion, contacto_emergencia, alergias, activo, foto,
+      direcciones, contacto_emergencia, alergias, activo, foto,
     } = req.body;
 
-    const vinculo = await pool.query(
+    const errorDirecciones = validarDirecciones(direcciones);
+    if (errorDirecciones) return res.status(400).json({ mensaje: errorDirecciones });
+
+    const vinculo = await client.query(
       'select 1 from pacientes_empresas where paciente_id = $1 and empresa_id = $2',
       [req.params.id, req.empresaId]
     );
     if (!vinculo.rows[0]) return res.status(404).json({ mensaje: 'Paciente no encontrado' });
 
-    const { rows } = await pool.query(
+    await client.query('begin');
+
+    const { rows } = await client.query(
       `update pacientes set
          nombre = coalesce($1, nombre),
          identificacion = coalesce($2, identificacion),
@@ -139,37 +189,43 @@ async function actualizar(req, res, next) {
          telefono = coalesce($5, telefono),
          acepta_whatsapp = coalesce($6, acepta_whatsapp),
          email = coalesce($7, email),
-         direccion = coalesce($8, direccion),
-         google_maps_url = coalesce($9, google_maps_url),
-         comparte_ubicacion = coalesce($10, comparte_ubicacion),
-         contacto_emergencia = coalesce($11, contacto_emergencia),
-         alergias = coalesce($12, alergias),
-         foto = coalesce($13, foto)
-       where id = $14 returning *`,
+         contacto_emergencia = coalesce($8, contacto_emergencia),
+         alergias = coalesce($9, alergias),
+         foto = coalesce($10, foto)
+       where id = $11 returning *`,
       [
         nombre, identificacion, fecha_nacimiento || null, sexo, telefono, acepta_whatsapp, email,
-        direccion, google_maps_url, comparte_ubicacion, contacto_emergencia ? JSON.stringify(contacto_emergencia) : null, alergias, foto,
+        contacto_emergencia ? JSON.stringify(contacto_emergencia) : null, alergias, foto,
         req.params.id,
       ]
     );
 
+    if (direcciones !== undefined) {
+      await reemplazarDirecciones(client, req.params.id, direcciones || []);
+    }
+
     if (activo !== undefined) {
-      await pool.query(
+      await client.query(
         'update pacientes_empresas set activo = $1 where paciente_id = $2 and empresa_id = $3',
         [activo, req.params.id, req.empresaId]
       );
     }
 
+    await client.query('commit');
+
     const { rows: final } = await pool.query(
-      `select p.*, pe.activo
+      `select p.*, pe.activo, ${SELECT_DIRECCIONES}
        from pacientes p join pacientes_empresas pe on pe.paciente_id = p.id and pe.empresa_id = $2
        where p.id = $1`,
       [req.params.id, req.empresaId]
     );
     res.json(final[0] || rows[0]);
   } catch (err) {
+    await client.query('rollback');
     if (err.code === '23505') return res.status(409).json({ mensaje: 'Ya existe un paciente con esa identificacion o correo.' });
     next(err);
+  } finally {
+    client.release();
   }
 }
 

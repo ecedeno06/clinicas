@@ -12,5 +12,6 @@ router.use('/citas', require('./citas.routes'));
 router.use('/recetas', require('./recetas.routes'));
 router.use('/horarios', require('./doctorHorarios.routes'));
 router.use('/laboratorio', require('./laboratorio.routes'));
+router.use('/geocodificacion', require('./geocodificacion.routes'));
 
 module.exports = router;

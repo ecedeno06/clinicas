@@ -1,11 +1,12 @@
 import { Component, OnInit, ViewChild, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormArray, FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { PacientesService } from '../../core/services/pacientes.service';
 import { CitasService } from '../../core/services/citas.service';
 import { SucursalesService } from '../../core/services/sucursales.service';
+import { GeocodificacionService } from '../../core/services/geocodificacion.service';
 import { AuthService } from '../../core/services/auth.service';
-import { EstadoCita, HistoriaClinica, OrdenLaboratorio, Paciente, Receta, SignosVitales, Sucursal } from '../../core/models/models';
+import { DireccionPaciente, EstadoCita, HistoriaClinica, OrdenLaboratorio, Paciente, Receta, SignosVitales, Sucursal } from '../../core/models/models';
 import { formatoFechaCorta } from '../../core/utils/pdf.util';
 import { formatoAmPm } from '../../core/utils/hora12.util';
 import { clasificarImc } from '../../core/utils/imc.util';
@@ -14,6 +15,7 @@ import { clasificarGlucosa } from '../../core/utils/glucosa.util';
 import { SelectorFotoComponent } from '../../core/components/selector-foto/selector-foto.component';
 import { EscanerDocumentoComponent, DatosDocumentoDetectados } from '../../core/components/escaner-documento/escaner-documento.component';
 import { MapaSelectorComponent, UbicacionSeleccionada, extraerLatLng } from '../../core/components/mapa-selector/mapa-selector.component';
+import { direccionPrincipal } from '../../core/utils/direccion.util';
 
 @Component({
   selector: 'app-pacientes',
@@ -28,7 +30,7 @@ export class PacientesComponent implements OnInit {
   editando = signal<Paciente | null>(null);
   pacienteExistente = signal<Paciente | null>(null);
 
-  private readonly camposIdentidad = ['nombre', 'fecha_nacimiento', 'sexo', 'telefono', 'email', 'direccion', 'alergias', 'contacto_emergencia'];
+  private readonly camposIdentidad = ['nombre', 'fecha_nacimiento', 'sexo', 'telefono', 'email', 'direcciones', 'alergias', 'contacto_emergencia'];
 
   pacienteHistorial = signal<Paciente | null>(null);
   historial = signal<HistoriaClinica[]>([]);
@@ -131,9 +133,7 @@ export class PacientesComponent implements OnInit {
     telefono: [''],
     acepta_whatsapp: [false],
     email: [''],
-    direccion: [''],
-    google_maps_url: [''],
-    comparte_ubicacion: [false],
+    direcciones: this.fb.array([this.crearDireccionGroup()]),
     alergias: [''],
     contacto_emergencia: this.fb.group({
       nombre: [''],
@@ -148,6 +148,7 @@ export class PacientesComponent implements OnInit {
     private srv: PacientesService,
     private citasSrv: CitasService,
     private sucursalesSrv: SucursalesService,
+    private geocodificacionSrv: GeocodificacionService,
     public auth: AuthService
   ) {}
 
@@ -161,6 +162,8 @@ export class PacientesComponent implements OnInit {
     this.editando.set(null);
     this.pacienteExistente.set(null);
     this.form.reset({ activo: true, contacto_emergencia: { nombre: '', telefono: '', parentesco: '' } });
+    this.direccionesArray.clear();
+    this.direccionesArray.push(this.crearDireccionGroup());
     this.habilitarCamposIdentidad();
     this.panelAbierto.set(true);
   }
@@ -170,6 +173,7 @@ export class PacientesComponent implements OnInit {
     this.pacienteExistente.set(null);
     this.form.reset({
       ...p,
+      direcciones: undefined,
       fecha_nacimiento: p.fecha_nacimiento?.substring(0, 10) ?? '',
       contacto_emergencia: {
         nombre: p.contacto_emergencia?.nombre ?? '',
@@ -177,27 +181,96 @@ export class PacientesComponent implements OnInit {
         parentesco: p.contacto_emergencia?.parentesco ?? '',
       },
     });
+    this.direccionesArray.clear();
+    (p.direcciones?.length ? p.direcciones : [undefined]).forEach((d) => this.direccionesArray.push(this.crearDireccionGroup(d)));
     this.habilitarCamposIdentidad();
     this.panelAbierto.set(true);
   }
 
   cerrarPanel(): void { this.panelAbierto.set(false); }
 
+  // ---------- Direcciones (lista repetible, una marcada como principal) ----------
+
+  crearDireccionGroup(d?: DireccionPaciente) {
+    return this.fb.group({
+      direccion: [d?.direccion ?? ''],
+      google_maps_url: [d?.google_maps_url ?? ''],
+      pais: [d?.pais ?? ''],
+      provincia: [d?.provincia ?? ''],
+      distrito: [d?.distrito ?? ''],
+      corregimiento: [d?.corregimiento ?? ''],
+      comparte_ubicacion: [d?.comparte_ubicacion ?? false],
+      es_principal: [d?.es_principal ?? false],
+    });
+  }
+
+  get direccionesArray(): FormArray {
+    return this.form.get('direcciones') as FormArray;
+  }
+
+  agregarDireccion(): void {
+    this.direccionesArray.push(this.crearDireccionGroup());
+  }
+
+  quitarDireccion(i: number): void {
+    this.direccionesArray.removeAt(i);
+  }
+
+  // Solo una direccion puede ser la principal -- desmarca todas las demas.
+  marcarPrincipal(i: number): void {
+    this.direccionesArray.controls.forEach((c, idx) => c.get('es_principal')?.setValue(idx === i));
+  }
+
   @ViewChild(MapaSelectorComponent) mapaSelector?: MapaSelectorComponent;
 
-  abrirMapa(): void {
-    this.mapaSelector?.abrir(this.form.get('google_maps_url')?.value);
+  // Como el mapa es un unico componente compartido, hay que recordar CUAL
+  // fila de direcciones se estaba editando cuando se abrio.
+  private indiceDireccionMapa: number | null = null;
+
+  abrirMapa(i: number): void {
+    this.indiceDireccionMapa = i;
+    this.mapaSelector?.abrir(this.direccionesArray.at(i).get('google_maps_url')?.value);
   }
 
   onUbicacionElegida(u: UbicacionSeleccionada): void {
-    this.form.patchValue({ google_maps_url: u.url });
-    this.form.get('google_maps_url')?.markAsDirty();
+    if (this.indiceDireccionMapa === null) return;
+    const grupo = this.direccionesArray.at(this.indiceDireccionMapa);
+    grupo.patchValue({ google_maps_url: u.url });
+    grupo.markAsDirty();
   }
+
+  // Llama a nuestro backend (nunca directo a Google -- la API key nunca
+  // sale del servidor) para traer provincia/distrito de esa direccion.
+  // Corregimiento no se autocompleta (Google no lo provee para Panama,
+  // ver DISENO-GEOCODIFICACION-INVERSA.md) -- se escribe a mano.
+  detectandoDireccion = signal<number | null>(null);
+
+  detectarDivisionPolitica(i: number): void {
+    const grupo = this.direccionesArray.at(i);
+    const coords = extraerLatLng(grupo.get('google_maps_url')?.value);
+    if (!coords) {
+      alert('Primero elige una ubicacion en el mapa.');
+      return;
+    }
+    this.detectandoDireccion.set(i);
+    this.geocodificacionSrv.reverse(coords[0], coords[1]).subscribe({
+      next: (d) => {
+        grupo.patchValue({ pais: d.pais ?? grupo.get('pais')?.value, provincia: d.provincia ?? grupo.get('provincia')?.value, distrito: d.distrito ?? grupo.get('distrito')?.value });
+        this.detectandoDireccion.set(null);
+      },
+      error: (err) => {
+        alert(err?.error?.mensaje || 'No se pudo detectar la division politica para ese punto.');
+        this.detectandoDireccion.set(null);
+      },
+    });
+  }
+
+  direccionPrincipal = direccionPrincipal;
 
   // Para que el medico pueda navegar hacia una visita a domicilio con la
   // app que prefiera, igual que en Sucursales.
   wazeUrl(p: Paciente): string | null {
-    const coords = extraerLatLng(p.google_maps_url);
+    const coords = extraerLatLng(direccionPrincipal(p)?.google_maps_url);
     return coords ? `https://waze.com/ul?ll=${coords[0]},${coords[1]}&navigate=yes` : null;
   }
 
@@ -241,12 +314,13 @@ export class PacientesComponent implements OnInit {
   // (telefono del doctor, marcado explicitamente como que recibe
   // WhatsApp) y que mandar (enlace guardado en el paciente).
   puedeCompartirUbicacionDoctor(h: HistoriaClinica): boolean {
-    const paciente = this.pacienteHistorial();
-    return !!h.es_domicilio && !!h.doctor_telefono && !!h.doctor_acepta_whatsapp && !!paciente?.google_maps_url && !!paciente?.comparte_ubicacion;
+    const direccion = direccionPrincipal(this.pacienteHistorial());
+    return !!h.es_domicilio && !!h.doctor_telefono && !!h.doctor_acepta_whatsapp && !!direccion?.google_maps_url && !!direccion?.comparte_ubicacion;
   }
 
   whatsappUrlDoctor(h: HistoriaClinica): string {
     const paciente = this.pacienteHistorial()!;
+    const direccion = direccionPrincipal(paciente)!;
     const telefono = (h.doctor_telefono || '').replace(/\D/g, '');
     const lineas = [
       `Hola ${h.doctor_nombre}, visita a domicilio de ${paciente.nombre}:`,
@@ -258,8 +332,8 @@ export class PacientesComponent implements OnInit {
     }
     if (h.especialidad_nombre) lineas.push(`Especialidad: ${h.especialidad_nombre}`);
     if (h.motivo_cita) lineas.push(`Motivo: ${h.motivo_cita}`);
-    lineas.push('', `Ubicacion (Google Maps): ${paciente.google_maps_url}`);
-    const coords = extraerLatLng(paciente.google_maps_url);
+    lineas.push('', `Ubicacion (Google Maps): ${direccion.google_maps_url}`);
+    const coords = extraerLatLng(direccion.google_maps_url);
     if (coords) lineas.push(`Abrir con Waze: https://waze.com/ul?ll=${coords[0]},${coords[1]}&navigate=yes`);
     return `https://wa.me/${telefono}?text=${encodeURIComponent(lineas.join('\n'))}`;
   }
@@ -317,7 +391,6 @@ export class PacientesComponent implements OnInit {
             telefono: res.paciente.telefono ?? '',
             acepta_whatsapp: res.paciente.acepta_whatsapp ?? false,
             email: res.paciente.email ?? '',
-            direccion: res.paciente.direccion ?? '',
             alergias: res.paciente.alergias ?? '',
             contacto_emergencia: {
               nombre: res.paciente.contacto_emergencia?.nombre ?? '',
@@ -325,6 +398,8 @@ export class PacientesComponent implements OnInit {
               parentesco: res.paciente.contacto_emergencia?.parentesco ?? '',
             },
           });
+          this.direccionesArray.clear();
+          (res.paciente.direcciones?.length ? res.paciente.direcciones : [undefined]).forEach((d) => this.direccionesArray.push(this.crearDireccionGroup(d)));
           this.deshabilitarCamposIdentidad();
         } else {
           this.pacienteExistente.set(null);

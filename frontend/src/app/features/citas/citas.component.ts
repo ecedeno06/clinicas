@@ -17,6 +17,7 @@ import { combinar12, formatoAmPm, HORAS_12, MINUTOS_60, partes12 } from '../../c
 import { hoyISO } from '../../core/utils/fecha.util';
 import { SelectorFotoComponent } from '../../core/components/selector-foto/selector-foto.component';
 import { extraerLatLng } from '../../core/components/mapa-selector/mapa-selector.component';
+import { direccionPrincipal } from '../../core/utils/direccion.util';
 import { generarPdf, encabezadoClinica, formatoFechaCorta } from '../../core/utils/pdf.util';
 import { TDocumentDefinitions } from 'pdfmake/interfaces';
 
@@ -370,6 +371,7 @@ export class CitasComponent implements OnInit {
   }
 
   formatoAmPm = formatoAmPm;
+  direccionPrincipal = direccionPrincipal;
 
   // ---------- Hora de inicio/fin en formato 12h (los <select> no dependen
   // del locale del navegador, a diferencia de <input type="time">) ----------

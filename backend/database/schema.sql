@@ -94,15 +94,6 @@ create table if not exists pacientes (
     -- la opcion de "compartir ubicacion por WhatsApp" en Citas).
     acepta_whatsapp     boolean not null default false,
     email               text unique,
-    direccion           text,
-    -- Enlace a Google Maps de la direccion, para que el medico pueda
-    -- ubicar y navegar hacia visitas a domicilio (mismo patron que
-    -- sucursales.google_maps_url).
-    google_maps_url     text,
-    -- Consentimiento explicito para compartir esa ubicacion con el
-    -- personal/doctor -- controla si los botones de ubicacion se
-    -- muestran, aunque el enlace ya este guardado.
-    comparte_ubicacion  boolean not null default false,
     -- Contacto de emergencia: { nombre, telefono, parentesco }
     contacto_emergencia jsonb,
     alergias            text,
@@ -110,6 +101,30 @@ create table if not exists pacientes (
     foto                text,
     created_at          timestamptz not null default now(),
     updated_at          timestamptz not null default now()
+);
+
+-- Un paciente puede tener varias direcciones (casa, trabajo, etc.), una
+-- marcada como principal -- esa es la que usan Google Maps/Waze/WhatsApp
+-- al doctor en las comunicaciones existentes (Citas, historial clinico).
+create table if not exists direcciones_paciente (
+    id                 uuid primary key default gen_random_uuid(),
+    paciente_id        uuid not null references pacientes(id) on delete cascade,
+    direccion          text,
+    google_maps_url    text,
+    pais               text,
+    provincia          text,
+    distrito           text,
+    -- Nivel mas fino de la division politica de Panama -- Google no lo
+    -- provee via geocodificacion inversa (verificado empiricamente), asi
+    -- que en la practica se escribe a mano casi siempre.
+    corregimiento      text,
+    -- Consentimiento explicito para compartir ESTA direccion con el
+    -- personal/doctor -- por direccion, no por paciente (una puede
+    -- compartirse y otra no).
+    comparte_ubicacion boolean not null default false,
+    es_principal       boolean not null default false,
+    created_at         timestamptz not null default now(),
+    updated_at         timestamptz not null default now()
 );
 
 -- ---------------------------------------------------------
@@ -420,6 +435,9 @@ create index if not exists idx_usuarios_empresas_rol_usuario on usuarios_empresa
 create index if not exists idx_usuarios_empresas_rol_empresa on usuarios_empresas_rol(empresa_id);
 create index if not exists idx_pacientes_empresas_paciente on pacientes_empresas(paciente_id);
 create index if not exists idx_pacientes_empresas_empresa on pacientes_empresas(empresa_id);
+create index if not exists idx_direcciones_paciente_paciente on direcciones_paciente(paciente_id);
+-- Como maximo una direccion principal por paciente.
+create unique index if not exists uq_direcciones_paciente_principal on direcciones_paciente(paciente_id) where es_principal;
 create index if not exists idx_sucursales_empresa on sucursales(empresa_id);
 create index if not exists idx_doctores_empresa on doctores(empresa_id);
 create index if not exists idx_doctor_especialidades_doctor on doctor_especialidades(doctor_id);
@@ -467,7 +485,7 @@ do $$
 declare
     t text;
 begin
-    foreach t in array array['empresas','usuarios','usuarios_empresas_rol','especialidades','pacientes','pacientes_empresas','sucursales','doctores','doctor_especialidades','doctor_horarios','campanas','campana_doctores','citas','historias_clinicas','signos_vitales','recetas','ordenes_laboratorio']
+    foreach t in array array['empresas','usuarios','usuarios_empresas_rol','especialidades','pacientes','pacientes_empresas','direcciones_paciente','sucursales','doctores','doctor_especialidades','doctor_horarios','campanas','campana_doctores','citas','historias_clinicas','signos_vitales','recetas','ordenes_laboratorio']
     loop
         execute format('drop trigger if exists trg_set_updated_at on %I', t);
         execute format('create trigger trg_set_updated_at before update on %I for each row execute function set_updated_at()', t);

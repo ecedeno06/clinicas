@@ -110,6 +110,23 @@ export interface ContactoEmergencia {
   parentesco?: string;
 }
 
+// Un paciente puede tener varias direcciones (casa, trabajo, etc.), una
+// marcada como principal -- esa es la que usan Google Maps/Waze/WhatsApp
+// al doctor en Citas/historial. Ver DISENO-GEOCODIFICACION-INVERSA.md.
+export interface DireccionPaciente {
+  id?: string;
+  direccion?: string | null;
+  google_maps_url?: string | null;
+  pais?: string | null;
+  provincia?: string | null;
+  distrito?: string | null;
+  // Google no provee este nivel para Panama -- se escribe a mano casi
+  // siempre (ver diseno, seccion 3).
+  corregimiento?: string | null;
+  comparte_ubicacion?: boolean;
+  es_principal?: boolean;
+}
+
 export interface Paciente {
   id: string;
   empresa_id?: string;
@@ -120,9 +137,7 @@ export interface Paciente {
   telefono?: string;
   acepta_whatsapp?: boolean;
   email?: string;
-  direccion?: string;
-  google_maps_url?: string | null;
-  comparte_ubicacion?: boolean;
+  direcciones?: DireccionPaciente[];
   contacto_emergencia?: ContactoEmergencia | null;
   alergias?: string;
   foto?: string | null;
