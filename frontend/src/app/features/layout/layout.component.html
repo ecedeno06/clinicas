@@ -163,7 +163,7 @@
         </div>
       </div>
 
-      <app-selector-foto #selectorFotoPerfil [foto]="auth.usuario()?.avatar" [nombre]="auth.usuario()?.nombre || ''" [ocultarDisparador]="true" (fotoCambiada)="onFotoPerfilCambiada($event)" (fotoEliminada)="onFotoPerfilEliminada()"></app-selector-foto>
+      <app-selector-foto #selectorFotoPerfil style="display:contents" [foto]="auth.usuario()?.avatar" [nombre]="auth.usuario()?.nombre || ''" [ocultarDisparador]="true" (fotoCambiada)="onFotoPerfilCambiada($event)" (fotoEliminada)="onFotoPerfilEliminada()"></app-selector-foto>
     </header>
 
     <main class="content">
