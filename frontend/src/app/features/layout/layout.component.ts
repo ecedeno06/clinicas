@@ -4,14 +4,14 @@ import { FormBuilder, ReactiveFormsModule, ValidationErrors, Validators, Abstrac
 import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
 import { ThemeService } from '../../core/services/theme.service';
-import { redimensionarImagen } from '../../core/utils/imagen.util';
+import { SelectorFotoComponent } from '../../core/components/selector-foto/selector-foto.component';
 
 const SIDEBAR_STORAGE_KEY = 'clinica_sidebar_colapsado';
 
 @Component({
   selector: 'app-layout',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterOutlet, RouterLink, RouterLinkActive],
+  imports: [CommonModule, ReactiveFormsModule, RouterOutlet, RouterLink, RouterLinkActive, SelectorFotoComponent],
   templateUrl: './layout.component.html',
   styleUrl: './layout.component.css',
 })
@@ -48,30 +48,26 @@ export class LayoutComponent {
       .join('');
   }
 
-  onArchivoSeleccionado(event: Event): void {
-    this.menuAbierto.set(false);
-    const input = event.target as HTMLInputElement;
-    const archivo = input.files?.[0];
-    if (!archivo) return;
-
-    if (!archivo.type.startsWith('image/')) {
-      alert('Selecciona un archivo de imagen valido.');
-      return;
-    }
-
-    redimensionarImagen(archivo, 200).then((base64) => {
-      this.auth.actualizarAvatar(base64).subscribe({
-        next: () => {},
-        error: (err) => alert(err?.error?.mensaje || 'No se pudo actualizar la foto de perfil'),
-      });
+  onFotoPerfilCambiada(base64: string): void {
+    this.auth.actualizarAvatar(base64).subscribe({
+      next: () => {},
+      error: (err) => alert(err?.error?.mensaje || 'No se pudo actualizar la foto de perfil'),
     });
-
-    input.value = '';
   }
 
   eliminarFotoPerfil(): void {
     this.menuAbierto.set(false);
     if (!confirm('Eliminar tu foto de perfil?')) return;
+    this.auth.actualizarAvatar(null).subscribe({
+      next: () => {},
+      error: (err) => alert(err?.error?.mensaje || 'No se pudo eliminar la foto de perfil'),
+    });
+  }
+
+  // El selector de foto ya pregunta su propia confirmacion antes de emitir
+  // esto -- no se vuelve a confirmar aqui (a diferencia de
+  // eliminarFotoPerfil(), llamado directo desde el item de menu).
+  onFotoPerfilEliminada(): void {
     this.auth.actualizarAvatar(null).subscribe({
       next: () => {},
       error: (err) => alert(err?.error?.mensaje || 'No se pudo eliminar la foto de perfil'),

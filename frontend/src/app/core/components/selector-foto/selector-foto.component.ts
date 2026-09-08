@@ -22,6 +22,10 @@ export class SelectorFotoComponent implements OnDestroy {
   // clic para cambiarla (ej. la ficha de la cita, donde la foto solo se
   // edita desde el registro del paciente).
   @Input() soloLectura = false;
+  // Cuando es true, no se muestra el boton/avatar disparador (solo el
+  // modal) -- para cuando otro elemento de la pantalla (ej. un item de
+  // menu) es quien debe abrir el selector via abrirSelector().
+  @Input() ocultarDisparador = false;
   @Output() fotoCambiada = new EventEmitter<string>();
   @Output() fotoEliminada = new EventEmitter<void>();
 
