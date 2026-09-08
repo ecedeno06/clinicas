@@ -3,8 +3,9 @@ import { CommonModule } from '@angular/common';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { PacientesService } from '../../core/services/pacientes.service';
 import { CitasService } from '../../core/services/citas.service';
+import { SucursalesService } from '../../core/services/sucursales.service';
 import { AuthService } from '../../core/services/auth.service';
-import { EstadoCita, HistoriaClinica, OrdenLaboratorio, Paciente, Receta, SignosVitales } from '../../core/models/models';
+import { EstadoCita, HistoriaClinica, OrdenLaboratorio, Paciente, Receta, SignosVitales, Sucursal } from '../../core/models/models';
 import { formatoFechaCorta } from '../../core/utils/pdf.util';
 import { formatoAmPm } from '../../core/utils/hora12.util';
 import { clasificarImc } from '../../core/utils/imc.util';
@@ -94,6 +95,8 @@ export class PacientesComponent implements OnInit {
   ordenesLaboratorioSeleccionadas = signal<OrdenLaboratorio[]>([]);
   cargandoLaboratorioSeleccionado = signal(false);
 
+  sucursales = signal<Sucursal[]>([]);
+
   filtroNombre = signal('');
   filtroIdentificacion = signal('');
   filtroTelefono = signal('');
@@ -139,9 +142,18 @@ export class PacientesComponent implements OnInit {
     activo: [true],
   });
 
-  constructor(private fb: FormBuilder, private srv: PacientesService, private citasSrv: CitasService, public auth: AuthService) {}
+  constructor(
+    private fb: FormBuilder,
+    private srv: PacientesService,
+    private citasSrv: CitasService,
+    private sucursalesSrv: SucursalesService,
+    public auth: AuthService
+  ) {}
 
-  ngOnInit(): void { this.cargar(); }
+  ngOnInit(): void {
+    this.cargar();
+    this.sucursalesSrv.listar().subscribe((data) => this.sucursales.set(data.filter((s) => s.activo)));
+  }
   cargar(): void { this.srv.listar().subscribe((data) => this.pacientes.set(data)); }
 
   abrirNuevo(): void {
@@ -186,6 +198,41 @@ export class PacientesComponent implements OnInit {
   wazeUrl(p: Paciente): string | null {
     const coords = extraerLatLng(p.google_maps_url);
     return coords ? `https://waze.com/ul?ll=${coords[0]},${coords[1]}&navigate=yes` : null;
+  }
+
+  // El paciente es global (puede atenderse en varias sucursales) y el
+  // usuario logueado no tiene una "sucursal actual" en el sistema -- se le
+  // pregunta desde cual esta llamando justo antes de abrir WhatsApp, para
+  // poder incluirla en el mensaje.
+  pacienteWhatsappAbierto = signal<string | null>(null);
+  sucursalWhatsapp = signal('');
+
+  abrirSelectorWhatsapp(p: Paciente): void {
+    this.pacienteWhatsappAbierto.set(p.id);
+    this.sucursalWhatsapp.set(this.sucursales()[0]?.id ?? '');
+  }
+
+  cerrarSelectorWhatsapp(): void {
+    this.pacienteWhatsappAbierto.set(null);
+  }
+
+  enviarWhatsapp(p: Paciente): void {
+    const telefono = (p.telefono || '').replace(/\D/g, '');
+    const empresa = this.auth.empresaActiva()?.empresa_nombre;
+    const sucursal = this.sucursales().find((s) => s.id === this.sucursalWhatsapp());
+    const usuario = this.auth.usuario()?.nombre;
+    const ahora = new Date();
+    const fecha = `${String(ahora.getDate()).padStart(2, '0')}/${String(ahora.getMonth() + 1).padStart(2, '0')}/${ahora.getFullYear()}`;
+    const hora = formatoAmPm(`${String(ahora.getHours()).padStart(2, '0')}:${String(ahora.getMinutes()).padStart(2, '0')}`);
+
+    const lineas = [
+      `Hola ${p.nombre}, le escribimos de ${empresa || 'la clinica'}${sucursal ? ' - ' + sucursal.nombre : ''}.`,
+      `Atiende: ${usuario || 'Personal de la clinica'}`,
+      `Fecha: ${fecha} · Hora: ${hora}`,
+    ];
+    const url = `https://wa.me/${telefono}?text=${encodeURIComponent(lineas.join('\n'))}`;
+    window.open(url, '_blank', 'noopener');
+    this.cerrarSelectorWhatsapp();
   }
 
   // Solo tiene sentido ofrecer "compartir ubicacion con el doctor" si la
