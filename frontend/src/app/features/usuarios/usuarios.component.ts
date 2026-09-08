@@ -47,6 +47,8 @@ export class UsuariosComponent implements OnInit {
     nombre: [''],
     email: ['', [Validators.required, Validators.email]],
     password: [''],
+    telefono: [''],
+    acepta_whatsapp: [false],
     rol: ['recepcionista' as Rol],
     activo: [true],
   });

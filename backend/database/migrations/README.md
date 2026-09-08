@@ -41,6 +41,7 @@ docker run --rm -i -e PGPASSWORD='<password>' postgres:16 \
 | `021_citas_domicilio.sql` | Columna `es_domicilio` en `citas` (marca visita a domicilio del paciente) | ✅ Aplicada 2026-09-07 | ✅ Aplicada 2026-09-07 |
 | `022_citas_urgencia.sql` | Columna `es_urgencia` en `citas` (permite asignar cualquier doctor sin validar su horario configurado ni choques de campaña) | ✅ Aplicada 2026-09-07 | ✅ Aplicada 2026-09-07 |
 | `023_pacientes_comparte_ubicacion.sql` | Columna `comparte_ubicacion` en `pacientes` (consentimiento para mostrar los botones de ubicacion) | ✅ Aplicada 2026-09-08 | ✅ Aplicada 2026-09-08 |
+| `024_usuarios_telefono.sql` | Columnas `telefono` y `acepta_whatsapp` en `usuarios` | ✅ Aplicada 2026-09-08 | ✅ Aplicada 2026-09-08 |
 
 **Verificado 2026-09-02**: comparacion completa de esquema (tablas, columnas,
 indices, constraints, funciones, triggers) entre `.19` y Neon — identicos

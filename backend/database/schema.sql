@@ -35,6 +35,10 @@ create table if not exists usuarios (
     nombre          text not null,
     email           text not null unique,
     password_hash   text not null,
+    telefono        text,
+    -- Indica si "telefono" recibe WhatsApp, mismo patron que
+    -- doctores.acepta_whatsapp / pacientes.acepta_whatsapp.
+    acepta_whatsapp boolean not null default false,
     activo          boolean not null default true,
     -- Acceso global de super-administracion (gestiona todas las clinicas),
     -- independiente del rol que tenga en usuarios_empresas_rol.

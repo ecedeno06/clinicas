@@ -8,6 +8,8 @@ export interface Usuario {
   // (usuarios_empresas_rol), no de la persona en si.
   rol: Rol | null;
   activo: boolean;
+  telefono?: string | null;
+  acepta_whatsapp?: boolean;
   avatar?: string | null;
   es_super_admin?: boolean;
   empresa_id?: string | null;

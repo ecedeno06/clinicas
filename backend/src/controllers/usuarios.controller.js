@@ -5,7 +5,7 @@ const { pool } = require('../config/db');
 async function listar(req, res, next) {
   try {
     const { rows } = await pool.query(
-      `select u.id, u.nombre, u.email, u.activo, u.avatar, u.es_super_admin,
+      `select u.id, u.nombre, u.email, u.telefono, u.acepta_whatsapp, u.activo, u.avatar, u.es_super_admin,
               uer.rol, u.created_at
        from usuarios u
        join usuarios_empresas_rol uer on uer.usuario_id = u.id
@@ -20,7 +20,7 @@ async function listar(req, res, next) {
 async function obtener(req, res, next) {
   try {
     const { rows } = await pool.query(
-      `select u.id, u.nombre, u.email, u.activo, u.avatar, u.es_super_admin,
+      `select u.id, u.nombre, u.email, u.telefono, u.acepta_whatsapp, u.activo, u.avatar, u.es_super_admin,
               uer.rol, u.created_at
        from usuarios u
        join usuarios_empresas_rol uer on uer.usuario_id = u.id
@@ -44,10 +44,10 @@ async function buscarPorEmail(req, res, next) {
   } catch (err) { next(err); }
 }
 
-// POST /api/usuarios  { nombre, email, password, rol, activo, empresa_id? }
+// POST /api/usuarios  { nombre, email, password, telefono, acepta_whatsapp, rol, activo, empresa_id? }
 async function crear(req, res, next) {
   try {
-    const { nombre, email, password, rol, activo, empresa_id } = req.body;
+    const { nombre, email, password, telefono, acepta_whatsapp, rol, activo, empresa_id } = req.body;
     if (!email) return res.status(400).json({ mensaje: 'email es requerido' });
 
     let empresaDestino = req.empresaId;
@@ -68,9 +68,9 @@ async function crear(req, res, next) {
       }
       const password_hash = await bcrypt.hash(password, 10);
       const { rows } = await pool.query(
-        `insert into usuarios (nombre, email, password_hash, activo)
-         values ($1,$2,$3, coalesce($4, true)) returning id`,
-        [nombre, email, password_hash, activo]
+        `insert into usuarios (nombre, email, password_hash, telefono, acepta_whatsapp, activo)
+         values ($1,$2,$3,$4, coalesce($5, false), coalesce($6, true)) returning id`,
+        [nombre, email, password_hash, telefono, acepta_whatsapp, activo]
       );
       usuarioId = rows[0].id;
     }
@@ -84,7 +84,7 @@ async function crear(req, res, next) {
     );
 
     const { rows: usuarioRows } = await pool.query(
-      'select id, nombre, email, activo, avatar, es_super_admin, created_at from usuarios where id = $1',
+      'select id, nombre, email, telefono, acepta_whatsapp, activo, avatar, es_super_admin, created_at from usuarios where id = $1',
       [usuarioId]
     );
 
@@ -92,10 +92,10 @@ async function crear(req, res, next) {
   } catch (err) { next(err); }
 }
 
-// PUT /api/usuarios/:id  { nombre, password, avatar, activo, rol }
+// PUT /api/usuarios/:id  { nombre, password, avatar, telefono, acepta_whatsapp, activo, rol }
 async function actualizar(req, res, next) {
   try {
-    const { nombre, password, avatar, activo, rol } = req.body;
+    const { nombre, password, avatar, telefono, acepta_whatsapp, activo, rol } = req.body;
 
     const pertenece = await pool.query(
       'select 1 from usuarios_empresas_rol where usuario_id = $1 and empresa_id = $2',
@@ -108,10 +108,12 @@ async function actualizar(req, res, next) {
       `update usuarios set
          nombre = coalesce($1, nombre),
          avatar = coalesce($2, avatar),
-         activo = coalesce($3, activo),
-         password_hash = coalesce($4, password_hash)
-       where id = $5`,
-      [nombre, avatar, activo, password_hash, req.params.id]
+         telefono = coalesce($3, telefono),
+         acepta_whatsapp = coalesce($4, acepta_whatsapp),
+         activo = coalesce($5, activo),
+         password_hash = coalesce($6, password_hash)
+       where id = $7`,
+      [nombre, avatar, telefono, acepta_whatsapp, activo, password_hash, req.params.id]
     );
 
     if (rol) {
@@ -122,7 +124,7 @@ async function actualizar(req, res, next) {
     }
 
     const { rows } = await pool.query(
-      `select u.id, u.nombre, u.email, u.activo, u.avatar, u.es_super_admin, uer.rol, u.created_at
+      `select u.id, u.nombre, u.email, u.telefono, u.acepta_whatsapp, u.activo, u.avatar, u.es_super_admin, uer.rol, u.created_at
        from usuarios u
        join usuarios_empresas_rol uer on uer.usuario_id = u.id
        where u.id = $1 and uer.empresa_id = $2`,

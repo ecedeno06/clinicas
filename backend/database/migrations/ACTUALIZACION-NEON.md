@@ -39,6 +39,7 @@ para el registro vivo de que esta aplicado en cada entorno.
 | 21 | `021_citas_domicilio.sql` | Columna nueva `es_domicilio` en `citas` | ✅ Aplicada 2026-09-07 |
 | 22 | `022_citas_urgencia.sql` | Columna nueva `es_urgencia` en `citas` | ✅ Aplicada 2026-09-07 |
 | 23 | `023_pacientes_comparte_ubicacion.sql` | Columna nueva `comparte_ubicacion` en `pacientes` | ✅ Aplicada 2026-09-08 |
+| 24 | `024_usuarios_telefono.sql` | Columnas nuevas `telefono`/`acepta_whatsapp` en `usuarios` | ✅ Aplicada 2026-09-08 |
 
 ---
 
@@ -450,6 +451,21 @@ anterior, sin relacion con ubicacion) no dependen de este campo.
 Probada con Postgres desechable (creacion limpia + re-ejecucion
 idempotente) y verificada end-to-end contra `.17`. Aplicada a `.17` y a
 Neon el 2026-09-08.
+
+---
+
+## 24. `024_usuarios_telefono.sql` — Telefono y WhatsApp del usuario del sistema
+
+Columnas aditivas `telefono text` y `acepta_whatsapp boolean not null
+default false` en `usuarios` (cuentas de acceso: admin, recepcionista,
+doctor), mismo patron que `doctores`/`pacientes`. Campo "Telefono" +
+checkbox "Recibe WhatsApp" agregados al formulario de Nuevo/Editar
+usuario. Registros existentes quedan en `false` por defecto.
+
+Probada con Postgres desechable (creacion limpia + re-ejecucion
+idempotente) y verificada end-to-end contra `.17` via el controlador
+real (crear, actualizar, listar). Aplicada a `.17` y a Neon el
+2026-09-08.
 
 ---
 
