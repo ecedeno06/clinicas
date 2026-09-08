@@ -171,6 +171,7 @@ export class CitasComponent implements OnInit {
     diagnostico: [''],
     tratamiento: [''],
     notas: [''],
+    estado: ['atendida' as EstadoCita],
   });
 
   signosForm = this.fb.group({
@@ -519,16 +520,21 @@ export class CitasComponent implements OnInit {
     this.citaHistoria.set(c);
     this.tabHistoria.set('consulta');
     this.historia.set(null);
+    // El dropdown de estado solo maneja los 3 desenlaces de una consulta
+    // (atendida/cancelada/reagendar) -- si la cita esta en otro estado
+    // (pendiente, confirmada, no_asistio), se ofrece "Atendida" por
+    // defecto en vez de un valor que el dropdown no puede representar.
+    const estadoInicial = (['atendida', 'cancelada', 'reagendar'] as EstadoCita[]).includes(c.estado) ? c.estado : 'atendida';
     // Si todavia no existe historia clinica para esta cita, se precarga el
     // motivo que ya quedo anotado al agendarla (c.motivo) para que el
     // doctor no tenga que volver a escribirlo -- si ya hay una historia
     // guardada, se respeta tal cual lo que el doctor escribio ahi.
-    this.historiaForm.reset({ motivo_consulta: c.motivo ?? '' });
+    this.historiaForm.reset({ motivo_consulta: c.motivo ?? '', estado: estadoInicial });
     this.cargandoHistoria.set(true);
     this.srv.obtenerHistoria(c.id).subscribe({
       next: (data) => {
         this.historia.set(data);
-        this.historiaForm.reset({ ...data });
+        this.historiaForm.reset({ ...data, estado: estadoInicial });
         this.cargandoHistoria.set(false);
       },
       error: () => this.cargandoHistoria.set(false), // 404: todavia no tiene historia, se crea desde cero

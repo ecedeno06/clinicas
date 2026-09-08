@@ -84,7 +84,7 @@
               </button>
             }
             @if (puedeVerHistoria()) {
-              <button type="button" class="btn-icon" title="Consulta" aria-label="Consulta" (click)="abrirHistoria(c)">
+              <button type="button" class="btn-icon" [class.boton-urgencia]="c.es_urgencia && c.estado !== 'atendida' && c.estado !== 'cancelada'" title="Consulta" aria-label="Consulta" (click)="abrirHistoria(c)">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="12" height="16" rx="2"/><path d="M9 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"/><path d="M9 11h6M9 15h4"/></svg>
                 @if (c.tiene_historia) {
                   <span class="icon-check-badge badge-check-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
@@ -462,6 +462,14 @@
               <div class="form-group mt-16">
                 <label>Notas</label>
                 <textarea class="input" rows="3" formControlName="notas"></textarea>
+              </div>
+              <div class="form-group mt-16">
+                <label>Estado de la cita</label>
+                <select class="input" formControlName="estado">
+                  <option value="atendida">Atendida</option>
+                  <option value="cancelada">Cancelada</option>
+                  <option value="reagendar">Reprogramar</option>
+                </select>
               </div>
               <div class="form-actions">
                 <button type="submit" class="btn btn-primary">{{ historia() ? 'Guardar cambios' : 'Registrar consulta' }}</button>

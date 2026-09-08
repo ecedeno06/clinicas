@@ -887,6 +887,23 @@ table.data-table {
   .nombre-urgencia { animation: none; color: #ff3b30; }
 }
 
+/* Mismo latido rojo luminoso, aplicado a un boton-icono puntual (ej. el
+   icono de "Consulta") mientras la cita de urgencia siga sin atender. */
+.boton-urgencia {
+  animation: nombre-urgencia-flash 1s ease-in-out infinite;
+}
+.boton-urgencia svg {
+  animation: boton-urgencia-scale 1s ease-in-out infinite;
+}
+@keyframes boton-urgencia-scale {
+  0%, 100% { transform: scale(1); filter: none; }
+  50%      { transform: scale(1.15); filter: drop-shadow(0 0 3px rgba(255,59,48,0.8)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .boton-urgencia, .boton-urgencia svg { animation: none; }
+  .boton-urgencia { color: #ff3b30; }
+}
+
 /* ---------- Utilidades ---------- */
 .flex { display: flex; }
 .items-center { align-items: center; }
