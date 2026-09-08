@@ -31,7 +31,9 @@ export class SelectorFotoComponent implements OnDestroy {
 
   mostrarSelector = signal(false);
   capturandoCamara = signal(false);
+  hayVariasCamaras = signal(false);
   private camaraStream: MediaStream | null = null;
+  private facingMode: 'user' | 'environment' = 'user';
 
   @ViewChild('videoFoto') videoFotoRef?: ElementRef<HTMLVideoElement>;
   @ViewChild('fileInputFoto') fileInputFotoRef?: ElementRef<HTMLInputElement>;
@@ -70,14 +72,35 @@ export class SelectorFotoComponent implements OnDestroy {
 
   async iniciarCamara(): Promise<void> {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: this.facingMode } });
       this.camaraStream = stream;
       this.capturandoCamara.set(true);
       setTimeout(() => {
         if (this.videoFotoRef) this.videoFotoRef.nativeElement.srcObject = stream;
       });
+      // Labels/cantidad exacta de camaras solo son confiables una vez
+      // concedido el permiso -- por eso se revisa despues de iniciar,
+      // no antes, para decidir si mostrar el boton de cambiar camara.
+      navigator.mediaDevices.enumerateDevices()
+        .then((dispositivos) => this.hayVariasCamaras.set(dispositivos.filter((d) => d.kind === 'videoinput').length > 1))
+        .catch(() => this.hayVariasCamaras.set(false));
     } catch {
       alert('No se pudo acceder a la camara. Revisa los permisos del navegador.');
+    }
+  }
+
+  // Alterna frontal/trasera reiniciando el stream con el nuevo
+  // facingMode -- funciona en moviles (donde tiene sentido); en equipos
+  // con una sola camara el boton no se muestra (hayVariasCamaras).
+  async cambiarCamara(): Promise<void> {
+    this.facingMode = this.facingMode === 'user' ? 'environment' : 'user';
+    this.camaraStream?.getTracks().forEach((t) => t.stop());
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: this.facingMode } });
+      this.camaraStream = stream;
+      if (this.videoFotoRef) this.videoFotoRef.nativeElement.srcObject = stream;
+    } catch {
+      alert('No se pudo cambiar de camara.');
     }
   }
 
@@ -97,6 +120,7 @@ export class SelectorFotoComponent implements OnDestroy {
     this.camaraStream?.getTracks().forEach((t) => t.stop());
     this.camaraStream = null;
     this.capturandoCamara.set(false);
+    this.facingMode = 'user';
   }
 
   onPasteFoto(event: ClipboardEvent): void {

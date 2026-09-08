@@ -103,4 +103,22 @@
   width: 100%;
   border-radius: 8px;
   background: #000;
+  display: block;
 }
+
+.selector-foto-flip {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.6);
+  color: var(--white);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.selector-foto-flip:hover { background: rgba(15, 23, 42, 0.8); }
