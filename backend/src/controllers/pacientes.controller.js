@@ -54,7 +54,7 @@ async function crear(req, res, next) {
   try {
     const {
       nombre, identificacion, fecha_nacimiento, sexo, telefono, acepta_whatsapp, email,
-      direccion, google_maps_url, contacto_emergencia, alergias, activo, foto,
+      direccion, google_maps_url, comparte_ubicacion, contacto_emergencia, alergias, activo, foto,
     } = req.body;
 
     await client.query('begin');
@@ -80,11 +80,11 @@ async function crear(req, res, next) {
         return res.status(400).json({ mensaje: 'nombre es requerido para un paciente nuevo' });
       }
       const ins = await client.query(
-        `insert into pacientes (nombre, identificacion, fecha_nacimiento, sexo, telefono, acepta_whatsapp, email, direccion, google_maps_url, contacto_emergencia, alergias, foto)
-         values ($1,$2,$3,$4,$5, coalesce($6, false),$7,$8,$9,$10,$11,$12) returning *`,
+        `insert into pacientes (nombre, identificacion, fecha_nacimiento, sexo, telefono, acepta_whatsapp, email, direccion, google_maps_url, comparte_ubicacion, contacto_emergencia, alergias, foto)
+         values ($1,$2,$3,$4,$5, coalesce($6, false),$7,$8,$9, coalesce($10, false),$11,$12,$13) returning *`,
         [
           nombre, identificacion || null, fecha_nacimiento || null, sexo, telefono, acepta_whatsapp, email,
-          direccion, google_maps_url || null, contacto_emergencia ? JSON.stringify(contacto_emergencia) : null, alergias, foto || null,
+          direccion, google_maps_url || null, comparte_ubicacion, contacto_emergencia ? JSON.stringify(contacto_emergencia) : null, alergias, foto || null,
         ]
       );
       paciente = ins.rows[0];
@@ -121,7 +121,7 @@ async function actualizar(req, res, next) {
   try {
     const {
       nombre, identificacion, fecha_nacimiento, sexo, telefono, acepta_whatsapp, email,
-      direccion, google_maps_url, contacto_emergencia, alergias, activo, foto,
+      direccion, google_maps_url, comparte_ubicacion, contacto_emergencia, alergias, activo, foto,
     } = req.body;
 
     const vinculo = await pool.query(
@@ -141,13 +141,14 @@ async function actualizar(req, res, next) {
          email = coalesce($7, email),
          direccion = coalesce($8, direccion),
          google_maps_url = coalesce($9, google_maps_url),
-         contacto_emergencia = coalesce($10, contacto_emergencia),
-         alergias = coalesce($11, alergias),
-         foto = coalesce($12, foto)
-       where id = $13 returning *`,
+         comparte_ubicacion = coalesce($10, comparte_ubicacion),
+         contacto_emergencia = coalesce($11, contacto_emergencia),
+         alergias = coalesce($12, alergias),
+         foto = coalesce($13, foto)
+       where id = $14 returning *`,
       [
         nombre, identificacion, fecha_nacimiento || null, sexo, telefono, acepta_whatsapp, email,
-        direccion, google_maps_url, contacto_emergencia ? JSON.stringify(contacto_emergencia) : null, alergias, foto,
+        direccion, google_maps_url, comparte_ubicacion, contacto_emergencia ? JSON.stringify(contacto_emergencia) : null, alergias, foto,
         req.params.id,
       ]
     );

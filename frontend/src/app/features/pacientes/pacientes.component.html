@@ -36,7 +36,7 @@
           <td>{{ p.telefono || '-' }}</td>
           <td><span class="badge" [class.badge-green]="p.activo" [class.badge-slate]="!p.activo">{{ p.activo ? 'Activo' : 'Inactivo' }}</span></td>
           <td class="table-actions">
-            @if (p.google_maps_url) {
+            @if (p.google_maps_url && p.comparte_ubicacion) {
               <a [href]="p.google_maps_url" target="_blank" rel="noopener" class="btn-icon" title="Ver ubicacion en el mapa (visita a domicilio)" aria-label="Ver ubicacion en el mapa">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
               </a>
@@ -155,13 +155,14 @@
         </div>
         <div class="form-group mt-16">
           <label>Enlace de Google Maps</label>
-          <div class="flex gap-8">
+          <div class="flex items-center gap-8">
             <input class="input" type="url" formControlName="google_maps_url" placeholder="https://maps.google.com/..." style="flex:1" />
             <button type="button" class="btn-icon" title="Elegir en el mapa" aria-label="Elegir en el mapa" (click)="abrirMapa()">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
             </button>
+            <label class="flex items-center gap-8" style="white-space:nowrap;"><input type="checkbox" formControlName="comparte_ubicacion" /> Comparte ubicacion</label>
           </div>
-          <div class="text-muted text-sm mt-8">Pega el enlace de Google Maps o usa el boton para elegir el punto en un mapa. Sirve para ubicar visitas a domicilio.</div>
+          <div class="text-muted text-sm mt-8">Pega el enlace de Google Maps o usa el boton para elegir el punto en un mapa. Sirve para ubicar visitas a domicilio. Los botones de ubicacion solo se muestran si el paciente marco que la comparte.</div>
         </div>
         <div class="form-group mt-16">
           <label>Alergias</label>

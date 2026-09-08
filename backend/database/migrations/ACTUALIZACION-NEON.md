@@ -38,6 +38,7 @@ para el registro vivo de que esta aplicado en cada entorno.
 | 20 | `020_pacientes_google_maps.sql` | Columna nueva `google_maps_url` en `pacientes` | ✅ Aplicada 2026-09-07 |
 | 21 | `021_citas_domicilio.sql` | Columna nueva `es_domicilio` en `citas` | ✅ Aplicada 2026-09-07 |
 | 22 | `022_citas_urgencia.sql` | Columna nueva `es_urgencia` en `citas` | ✅ Aplicada 2026-09-07 |
+| 23 | `023_pacientes_comparte_ubicacion.sql` | Columna nueva `comparte_ubicacion` en `pacientes` | ✅ Aplicada 2026-09-08 |
 
 ---
 
@@ -431,6 +432,24 @@ de urgencia que se cruza con un compromiso de campaña confirmado del
 doctor (falla sin urgencia, pasa con urgencia); el choque de horario del
 paciente se sigue bloqueando igual. Aplicada a `.17` y a Neon el
 2026-09-07.
+
+---
+
+## 23. `023_pacientes_comparte_ubicacion.sql` — Consentimiento para compartir ubicacion
+
+Columna aditiva `comparte_ubicacion boolean not null default false` en
+`pacientes`. Checkbox "Comparte ubicacion" junto al enlace de Google Maps
+en el formulario de Pacientes: controla si los botones de ubicacion (Ver
+en el mapa, Waze en el listado; compartir por WhatsApp con el doctor en
+una visita a domicilio, en el historial) se muestran, aunque el enlace ya
+este guardado. Registros existentes quedan en `false` por defecto -- no
+se asume consentimiento hasta que alguien lo marque explicitamente. Los
+botones de llamada y de WhatsApp directo (agregados en la migracion
+anterior, sin relacion con ubicacion) no dependen de este campo.
+
+Probada con Postgres desechable (creacion limpia + re-ejecucion
+idempotente) y verificada end-to-end contra `.17`. Aplicada a `.17` y a
+Neon el 2026-09-08.
 
 ---
 

@@ -133,6 +133,7 @@ export class PacientesComponent implements OnInit {
     email: [''],
     direccion: [''],
     google_maps_url: [''],
+    comparte_ubicacion: [false],
     alergias: [''],
     contacto_emergencia: this.fb.group({
       nombre: [''],
@@ -240,7 +241,8 @@ export class PacientesComponent implements OnInit {
   // (telefono del doctor, marcado explicitamente como que recibe
   // WhatsApp) y que mandar (enlace guardado en el paciente).
   puedeCompartirUbicacionDoctor(h: HistoriaClinica): boolean {
-    return !!h.es_domicilio && !!h.doctor_telefono && !!h.doctor_acepta_whatsapp && !!this.pacienteHistorial()?.google_maps_url;
+    const paciente = this.pacienteHistorial();
+    return !!h.es_domicilio && !!h.doctor_telefono && !!h.doctor_acepta_whatsapp && !!paciente?.google_maps_url && !!paciente?.comparte_ubicacion;
   }
 
   whatsappUrlDoctor(h: HistoriaClinica): string {

@@ -120,6 +120,7 @@ export interface Paciente {
   email?: string;
   direccion?: string;
   google_maps_url?: string | null;
+  comparte_ubicacion?: boolean;
   contacto_emergencia?: ContactoEmergencia | null;
   alergias?: string;
   foto?: string | null;

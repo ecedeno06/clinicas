@@ -95,6 +95,10 @@ create table if not exists pacientes (
     -- ubicar y navegar hacia visitas a domicilio (mismo patron que
     -- sucursales.google_maps_url).
     google_maps_url     text,
+    -- Consentimiento explicito para compartir esa ubicacion con el
+    -- personal/doctor -- controla si los botones de ubicacion se
+    -- muestran, aunque el enlace ya este guardado.
+    comparte_ubicacion  boolean not null default false,
     -- Contacto de emergencia: { nombre, telefono, parentesco }
     contacto_emergencia jsonb,
     alergias            text,
