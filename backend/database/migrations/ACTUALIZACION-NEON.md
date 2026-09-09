@@ -41,6 +41,8 @@ para el registro vivo de que esta aplicado en cada entorno.
 | 23 | `023_pacientes_comparte_ubicacion.sql` | Columna nueva `comparte_ubicacion` en `pacientes` | ✅ Aplicada 2026-09-08 |
 | 24 | `024_usuarios_telefono.sql` | Columnas nuevas `telefono`/`acepta_whatsapp` en `usuarios` | ✅ Aplicada 2026-09-08 |
 | 25 | `025_direcciones_paciente.sql` | Tabla nueva `direcciones_paciente` (multiples direcciones por paciente, una principal); elimina `pacientes.direccion`/`google_maps_url`/`comparte_ubicacion` | ✅ Aplicada 2026-09-08 |
+| 26 | `026_sesiones.sql` | Tabla nueva `sesiones` (bitacora de inicios de sesion: clinica/sucursal, token, expiracion, razon de salida) | ✅ Aplicada 2026-09-08 |
+| 27 | `027_auth_2fa_pista.sql` | Columnas `pista`, `two_factor_enabled`/`two_factor_secret` en `usuarios` (2FA por app autenticadora) | ✅ Aplicada 2026-09-08 |
 
 ---
 
@@ -500,6 +502,53 @@ verificado identico, backfill 1:1 confirmado en ambos).
 
 **Pendiente**: agregar la variable de entorno `MAPKEY` en Render cuando
 se despliegue esta version (no aplica a Neon, es solo del backend).
+
+---
+
+## 26. `026_sesiones.sql` — Bitacora de sesiones de usuario
+
+Tabla nueva `sesiones`: una fila por cada JWT final emitido (login
+completo, seleccion de empresa, o verificacion de 2FA), con
+`empresa_id`/`empresa_nombre`, `sucursal_id`/`sucursal_nombre`, `rol`,
+`token`, `expira_en`, y al cerrarse `activo=false` + `razon_salida` +
+`duracion_segundos`. Es solo auditoria: el middleware de autenticacion
+sigue validando unicamente la firma del JWT (no consulta esta tabla en
+cada request), asi que no agrega costo de base de datos por peticion.
+Ver `DISENO-AUTENTICACION-2FA-SESION.md`.
+
+Probada con Postgres desechable (instalacion limpia + migracion aislada
+corrida dos veces sin error) y verificada end-to-end contra `.17` real
+(login/logout con una cuenta de prueba, fila insertada y cerrada
+correctamente con la razon y duracion esperadas). Aplicada a `.17` y a
+Neon el 2026-09-08 (estructura de tabla verificada identica).
+
+---
+
+## 27. `027_auth_2fa_pista.sql` — 2FA por app autenticadora y pista de contrasena
+
+Columnas nuevas en `usuarios`: `pista` (hint de contrasena, mostrado en
+el login via `GET /auth/pista`, endpoint publico con rate-limit),
+`two_factor_enabled`/`two_factor_secret` (verificacion en dos pasos con
+apps tipo Google Authenticator/Authy -- `otplib` + `qrcode`, secreto
+cifrado AES-256-CBC con la clave de entorno `CRYPTO_SECRET_KEY`, nunca en
+texto plano). `two_factor_enabled` queda en `false` por defecto para
+todos los usuarios existentes: el 2FA se implemento completo pero nadie
+lo tiene activo hasta que se enrole explicitamente desde "Seguridad" en
+el menu de usuario.
+
+Probada con Postgres desechable (instalacion limpia + migracion aislada
+idempotente) y verificada end-to-end contra `.17` real: ciclo completo de
+setup/enable/verify-login/disable de 2FA con una cuenta de prueba (creada
+y eliminada despues de la prueba), y cambio de contrasena con pista
+(rechazando una pista con 100% de similitud, aceptando una razonable).
+Tambien se verifico en un navegador real (Chrome vía DevTools Protocol)
+el flujo de login con codigo 2FA y la apertura del drawer de "Seguridad"
+en el menu. Aplicada a `.17` y a Neon el 2026-09-08 (columnas verificadas
+identicas).
+
+**Pendiente**: agregar `CRYPTO_SECRET_KEY` en Render cuando se despliegue
+esta version (no aplica a Neon, es solo del backend; sin esta variable el
+2FA no se puede activar en produccion).
 
 ---
 
