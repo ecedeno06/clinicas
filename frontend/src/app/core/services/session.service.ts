@@ -11,6 +11,7 @@ export class SessionService {
 
   private limiteInactividadMs = 15 * 60 * 1000;
   private avisoAntesMs = 2 * 60 * 1000;
+  private refrescoIntervaloMs = 10 * 60 * 1000;
 
   private readonly eventosActividad = ['click', 'mousemove', 'keydown', 'scroll', 'touchstart'];
   private readonly manejadorActividad = () => this.reiniciarTemporizador();
@@ -18,6 +19,7 @@ export class SessionService {
   private timerAviso: ReturnType<typeof setTimeout> | null = null;
   private timerCierre: ReturnType<typeof setTimeout> | null = null;
   private timerCountdown: ReturnType<typeof setInterval> | null = null;
+  private timerRefresco: ReturnType<typeof setInterval> | null = null;
   private expiraEn = 0;
 
   mostrarAviso = signal(false);
@@ -35,11 +37,16 @@ export class SessionService {
       next: (config) => {
         this.limiteInactividadMs = config.inactivityLimitMinutes * 60 * 1000;
         this.avisoAntesMs = config.warningBeforeMinutes * 60 * 1000;
+        this.refrescoIntervaloMs = config.refreshIntervalMinutes * 60 * 1000;
         this.reiniciarTemporizador();
+        this.iniciarRefrescoPeriodico();
       },
       // Si el backend no responde, se sigue con los valores por defecto
       // en vez de dejar la sesion sin ningun control de inactividad.
-      error: () => this.reiniciarTemporizador(),
+      error: () => {
+        this.reiniciarTemporizador();
+        this.iniciarRefrescoPeriodico();
+      },
     });
 
     this.eventosActividad.forEach((evento) =>
@@ -51,6 +58,21 @@ export class SessionService {
     this.inicializado = false;
     this.eventosActividad.forEach((evento) => document.removeEventListener(evento, this.manejadorActividad));
     this.limpiarTemporizadores();
+    if (this.timerRefresco) clearInterval(this.timerRefresco);
+    this.timerRefresco = null;
+  }
+
+  // Renueva el access token en segundo plano mientras el usuario sigue
+  // activo, para que en uso normal nunca llegue a expirar (el reintento
+  // reactivo del interceptor ante un 401 queda como red de seguridad, no
+  // como mecanismo principal). No se renueva mientras se muestra el aviso
+  // de inactividad -- si el usuario esta inactivo, se deja que expire.
+  private iniciarRefrescoPeriodico(): void {
+    if (this.timerRefresco) clearInterval(this.timerRefresco);
+    this.timerRefresco = setInterval(() => {
+      if (this.mostrarAviso()) return;
+      this.auth.refrescarToken().subscribe({ error: () => {} });
+    }, this.refrescoIntervaloMs);
   }
 
   extenderSesion(): void {

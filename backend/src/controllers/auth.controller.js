@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { authenticator } = require('otplib');
@@ -6,24 +7,41 @@ const { pool } = require('../config/db');
 const { encriptar, desencriptar } = require('../utils/cifrado2fa');
 const { porcentajeSimilitud } = require('../utils/levenshtein');
 
-function firmarToken(payload, expiresIn) {
-  return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: expiresIn || process.env.JWT_EXPIRES_IN || '8h' });
+// Access token: corto (JWT_EXPIRES_IN, recomendado 15-30m) y stateless --
+// se verifica solo por firma, sin tocar la base de datos, en cada request.
+// Refresh token: opaco y de vida larga (REFRESH_TOKEN_EXPIRES_IN_HOURS),
+// guardado en la tabla "sesiones" (migracion 026) -- es lo unico que se
+// valida contra la BD, y solo cuando se pide /auth/refresh (no en cada
+// request). Se rota en cada uso: cada refresh invalida el anterior, para
+// que un refresh token filtrado no sirva mas de una vez sin ser detectado.
+function firmarAccessToken(payload, expiresIn) {
+  return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: expiresIn || process.env.JWT_EXPIRES_IN || '30m' });
 }
 
-// Bitacora de sesiones (tabla "sesiones", migracion 026): se inserta una
-// fila cada vez que se emite un JWT final (login completo, seleccion de
-// empresa, o verificacion de 2FA) -- nunca para los tokens parciales
-// (10 min, en espera de elegir empresa o de completar 2FA). El middleware
-// de autenticacion sigue validando solo la firma del JWT, esta tabla es
-// solo para auditoria (quien esta/estuvo conectado y por cuanto tiempo).
-async function crearRegistroSesion({ usuarioId, empresaId, empresaNombre, rol, token }) {
-  const decodificado = jwt.decode(token);
-  const expiraEn = decodificado?.exp ? new Date(decodificado.exp * 1000) : new Date(Date.now() + 8 * 60 * 60 * 1000);
+function generarRefreshToken() {
+  return 'ref_' + crypto.randomBytes(32).toString('hex');
+}
+
+function horasRefreshToken() {
+  return Number(process.env.REFRESH_TOKEN_EXPIRES_IN_HOURS) || 12;
+}
+
+// Emite el par access+refresh de un login completo (o de una seleccion de
+// empresa) e inserta la fila de "sesiones" -- nunca se llama para los
+// tokens parciales (10 min, en espera de elegir empresa o completar 2FA),
+// esos no tienen refresh token.
+async function emitirTokens({ usuarioId, empresaId, empresaNombre, rol, payloadAccessToken }) {
+  const accessToken = firmarAccessToken(payloadAccessToken);
+  const refreshToken = generarRefreshToken();
+  const expiraEn = new Date(Date.now() + horasRefreshToken() * 60 * 60 * 1000);
+
   await pool.query(
     `insert into sesiones (usuario_id, empresa_id, empresa_nombre, rol, token, expira_en)
      values ($1, $2, $3, $4, $5, $6)`,
-    [usuarioId, empresaId || null, empresaNombre || null, rol || null, token, expiraEn]
+    [usuarioId, empresaId || null, empresaNombre || null, rol || null, refreshToken, expiraEn]
   );
+
+  return { accessToken, refreshToken };
 }
 
 // Continua el login despues de validar password (o codigo 2FA): resuelve
@@ -50,15 +68,14 @@ async function continuarLoginTrasPassword(usuario, res) {
         rol: null, empresa_id: null, empresa_nombre: null, empresa_logo: null,
         es_super_admin: true, avatar: usuario.avatar,
       };
-      const token = firmarToken({
-        id: payload.id, nombre: payload.nombre, email: payload.email,
-        rol: null, empresa_id: null, es_super_admin: true,
+      const { accessToken, refreshToken } = await emitirTokens({
+        usuarioId: usuario.id, empresaId: null, empresaNombre: null, rol: null,
+        payloadAccessToken: { id: payload.id, nombre: payload.nombre, email: payload.email, rol: null, empresa_id: null, es_super_admin: true },
       });
-      await crearRegistroSesion({ usuarioId: usuario.id, empresaId: null, empresaNombre: null, rol: null, token });
-      return res.json({ token, usuario: payload });
+      return res.json({ token: accessToken, refreshToken, usuario: payload });
     }
 
-    const tokenParcial = firmarToken(
+    const tokenParcial = firmarAccessToken(
       { id: usuario.id, nombre: usuario.nombre, email: usuario.email, parcial: true },
       '10m'
     );
@@ -83,7 +100,7 @@ async function continuarLoginTrasPassword(usuario, res) {
   }
 
   if (empresas.length > 1) {
-    const tokenParcial = firmarToken(
+    const tokenParcial = firmarAccessToken(
       { id: usuario.id, nombre: usuario.nombre, email: usuario.email, parcial: true },
       '10m'
     );
@@ -106,17 +123,12 @@ async function continuarLoginTrasPassword(usuario, res) {
     es_super_admin: usuario.es_super_admin,
     avatar: usuario.avatar,
   };
-  const token = firmarToken({
-    id: payload.id,
-    nombre: payload.nombre,
-    email: payload.email,
-    rol: payload.rol,
-    empresa_id: payload.empresa_id,
-    es_super_admin: payload.es_super_admin,
+  const { accessToken, refreshToken } = await emitirTokens({
+    usuarioId: usuario.id, empresaId: payload.empresa_id, empresaNombre: payload.empresa_nombre, rol: payload.rol,
+    payloadAccessToken: { id: payload.id, nombre: payload.nombre, email: payload.email, rol: payload.rol, empresa_id: payload.empresa_id, es_super_admin: payload.es_super_admin },
   });
-  await crearRegistroSesion({ usuarioId: usuario.id, empresaId: payload.empresa_id, empresaNombre: payload.empresa_nombre, rol: payload.rol, token });
 
-  res.json({ token, usuario: payload });
+  res.json({ token: accessToken, refreshToken, usuario: payload });
 }
 
 // POST /api/auth/login
@@ -256,19 +268,77 @@ async function disable2FA(req, res, next) {
   }
 }
 
-// POST /api/auth/logout  { razon? }  (autenticado)
-// Cierra la fila de "sesiones" del token actual. Razones esperadas:
-// 'logout_usuario' (default), 'inactividad'.
+// POST /api/auth/logout  { refreshToken, razon? }  (autenticado)
+// Cierra la fila de "sesiones" duena de ese refresh token. Razones
+// esperadas: 'logout_usuario' (default), 'inactividad'.
 async function logout(req, res, next) {
   try {
-    const razonSalida = req.body?.razon || 'logout_usuario';
-    await pool.query(
-      `update sesiones set activo = false, razon_salida = $1,
-         duracion_segundos = extract(epoch from (now() - created_at))::integer
-       where token = $2 and activo = true`,
-      [razonSalida, req.token]
-    );
+    const { refreshToken, razon } = req.body || {};
+    const razonSalida = razon || 'logout_usuario';
+    if (refreshToken) {
+      await pool.query(
+        `update sesiones set activo = false, razon_salida = $1,
+           duracion_segundos = extract(epoch from (now() - created_at))::integer
+         where token = $2 and activo = true`,
+        [razonSalida, refreshToken]
+      );
+    }
     res.json({ mensaje: 'Sesion cerrada' });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// POST /api/auth/refresh  { refreshToken }  (publico -- se usa cuando el
+// access token ya expiro, asi que no puede exigir requireAuth)
+// Valida el refresh token contra "sesiones" (la unica consulta a BD de
+// todo el ciclo de autenticacion) y, si sigue activo y vigente, emite un
+// access token nuevo + ROTA el refresh token (invalida el anterior) para
+// que uno filtrado no se pueda reutilizar sin ser detectado.
+async function refrescarToken(req, res, next) {
+  try {
+    const { refreshToken } = req.body || {};
+    if (!refreshToken) return res.status(400).json({ mensaje: 'refreshToken es requerido' });
+
+    const { rows } = await pool.query(
+      `select s.id as sesion_id, s.usuario_id, s.empresa_id, s.empresa_nombre, s.rol as sesion_rol,
+              u.nombre, u.email, u.avatar, u.es_super_admin, u.activo as usuario_activo
+       from sesiones s
+       join usuarios u on u.id = s.usuario_id
+       where s.token = $1 and s.activo = true and s.expira_en > now()`,
+      [refreshToken]
+    );
+    const sesion = rows[0];
+    if (!sesion || !sesion.usuario_activo) {
+      return res.status(401).json({ mensaje: 'Sesion invalida o expirada, inicia sesion nuevamente' });
+    }
+
+    const accessToken = firmarAccessToken({
+      id: sesion.usuario_id,
+      nombre: sesion.nombre,
+      email: sesion.email,
+      rol: sesion.sesion_rol,
+      empresa_id: sesion.empresa_id,
+      es_super_admin: sesion.es_super_admin,
+    });
+    const nuevoRefreshToken = generarRefreshToken();
+    const nuevaExpiracion = new Date(Date.now() + horasRefreshToken() * 60 * 60 * 1000);
+    await pool.query('update sesiones set token = $1, expira_en = $2 where id = $3', [nuevoRefreshToken, nuevaExpiracion, sesion.sesion_id]);
+
+    res.json({
+      token: accessToken,
+      refreshToken: nuevoRefreshToken,
+      usuario: {
+        id: sesion.usuario_id,
+        nombre: sesion.nombre,
+        email: sesion.email,
+        rol: sesion.sesion_rol,
+        empresa_id: sesion.empresa_id,
+        empresa_nombre: sesion.empresa_nombre,
+        es_super_admin: sesion.es_super_admin,
+        avatar: sesion.avatar,
+      },
+    });
   } catch (err) {
     next(err);
   }
@@ -296,6 +366,7 @@ function sessionConfig(req, res) {
     inactivityLimitMinutes: Number(process.env.SESSION_INACTIVITY_LIMIT_MINUTES) || 15,
     warningBeforeMinutes: Number(process.env.SESSION_WARNING_BEFORE_MINUTES) || 2,
     passwordHintMaxSimilarity: Number(process.env.PASSWORD_HINT_MAX_SIMILARITY) || 70,
+    refreshIntervalMinutes: Number(process.env.SESSION_REFRESH_INTERVAL_MINUTES) || 10,
   });
 }
 
@@ -349,17 +420,12 @@ async function seleccionarEmpresa(req, res, next) {
       es_super_admin: usuario.es_super_admin,
       avatar: usuario.avatar,
     };
-    const token = firmarToken({
-      id: payload.id,
-      nombre: payload.nombre,
-      email: payload.email,
-      rol: payload.rol,
-      empresa_id: payload.empresa_id,
-      es_super_admin: payload.es_super_admin,
+    const { accessToken, refreshToken } = await emitirTokens({
+      usuarioId: usuario.id, empresaId: empresa_id, empresaNombre, rol,
+      payloadAccessToken: { id: payload.id, nombre: payload.nombre, email: payload.email, rol: payload.rol, empresa_id: payload.empresa_id, es_super_admin: payload.es_super_admin },
     });
-    await crearRegistroSesion({ usuarioId: usuario.id, empresaId: empresa_id, empresaNombre, rol, token });
 
-    res.json({ token, usuario: payload });
+    res.json({ token: accessToken, refreshToken, usuario: payload });
   } catch (err) {
     next(err);
   }
@@ -482,6 +548,7 @@ module.exports = {
   enable2FA,
   disable2FA,
   logout,
+  refrescarToken,
   obtenerPista,
   sessionConfig,
   seleccionarEmpresa,

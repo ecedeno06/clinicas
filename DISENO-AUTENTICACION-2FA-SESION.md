@@ -95,11 +95,43 @@ SESSION_WARNING_BEFORE_MINUTES=2         # minutos antes de expirar en que se mu
 - Cronómetro de tiempo conectado en el topbar (`layout.component`), con
   clase de aviso cuando el modal de inactividad está activo.
 
+## Actualización 2026-09-09 — access token corto + refresh token revocable
+
+Se implementó el "término medio" entre JWT stateless puro y el patrón
+completo de cookies `httpOnly` (evaluado y descartado por el costo de
+infraestructura: exige HTTPS en `.17` y en dev local, y toca el
+interceptor de autenticación, el punto de mayor radio de impacto posible
+en la app):
+
+- **Access token**: JWT normal, ahora corto (`JWT_EXPIRES_IN`, recomendado
+  `30m`), verificado solo por firma en cada request (sin tocar la BD).
+- **Refresh token**: opaco (`ref_` + 32 bytes hex), reemplaza el contenido
+  de `sesiones.token` (mismo campo que ya existía para la bitácora --
+  no hizo falta migración nueva). Vive `REFRESH_TOKEN_EXPIRES_IN_HOURS`
+  (recomendado 12h) independientemente de la inactividad, y se valida
+  contra `sesiones` solo al llamar `POST /auth/refresh` (no en cada
+  request). **Rota en cada uso**: cada refresh devuelve un refresh token
+  nuevo e invalida el anterior, para que uno filtrado no sirva dos veces
+  sin ser detectado.
+- **Frontend**: el interceptor de auth reintenta automáticamente ante un
+  401 (renueva una vez con el refresh token y repite la petición
+  original) antes de forzar logout; `SessionService` además renueva de
+  forma proactiva cada `SESSION_REFRESH_INTERVAL_MINUTES` mientras el
+  usuario sigue activo, para que el access token nunca llegue a expirar
+  en uso normal.
+- `POST /auth/logout` pasó a identificar la sesión por `refreshToken` (ya
+  no por el JWT crudo) y dejó de requerir `requireAuth` -- no necesita
+  ningún dato del token para cerrar la fila.
+- Probado end-to-end (login → uso → refresh con rotación → refresh viejo
+  rechazado → logout → refresh tras logout rechazado) y verificado en un
+  navegador real que el interceptor renueva sola la sesión ante un access
+  token corrompido, sin desloguear al usuario.
+
 ## Fuera de alcance (por ahora)
 
-- Refresh token / renovación del JWT en sí (el JWT sigue expirando a las
-  `JWT_EXPIRES_IN` horas como hoy; el logout por inactividad es un control
-  de UX del lado del cliente, no extiende la vida real del JWT).
+- Cookies `httpOnly` para el refresh token (evaluado, ver arriba) -- el
+  refresh token sigue viajando en el body y guardándose en `localStorage`,
+  igual que el access token.
 - OTP por email/SMS.
 - Selección de sucursal en el login / en la bitácora de sesiones.
 - Panel de administración de "sesiones activas" (listar/forzar cierre de

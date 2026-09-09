@@ -1,12 +1,13 @@
 import { Injectable, signal, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { Observable, tap } from 'rxjs';
+import { Observable, tap, shareReplay, finalize, throwError } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { Usuario, EmpresaSeleccionable } from '../models/models';
 
 interface LoginResponse {
   token: string;
+  refreshToken: string;
   usuario: Usuario;
 }
 
@@ -27,6 +28,7 @@ export interface SessionConfig {
   inactivityLimitMinutes: number;
   warningBeforeMinutes: number;
   passwordHintMaxSimilarity: number;
+  refreshIntervalMinutes: number;
 }
 
 const STORAGE_KEY = 'clinica_auth';
@@ -52,6 +54,12 @@ export class AuthService {
   // a mas de una (login queda "a medias" hasta llamar a seleccionarEmpresa).
   private _seleccionPendiente = signal<EmpresaSeleccionable[] | null>(null);
   seleccionPendiente = computed(() => this._seleccionPendiente());
+
+  // Evita disparar varios POST /auth/refresh en paralelo si varias
+  // peticiones fallan con 401 al mismo tiempo (el refresh token rota en
+  // cada uso, asi que una segunda llamada simultanea fallaria). Todas
+  // comparten el mismo refresh en curso via shareReplay.
+  private refrescando$: Observable<LoginResponse> | null = null;
 
   constructor(private http: HttpClient, private router: Router) {}
 
@@ -95,20 +103,50 @@ export class AuthService {
       .pipe(tap((res) => this.guardarSesionFinal(res)));
   }
 
-  private guardarSesionFinal(res: LoginResponse): void {
+  // POST /auth/refresh -- pide un access token nuevo con el refresh token
+  // guardado (que a su vez rota: el backend devuelve uno nuevo). La usa
+  // tanto el interceptor (reactivo, ante un 401) como SessionService
+  // (proactivo, cada SESSION_REFRESH_INTERVAL_MINUTES mientras hay
+  // actividad) -- por eso el resultado se comparte entre llamadas
+  // simultaneas en vez de disparar un refresh por cada una.
+  refrescarToken(): Observable<LoginResponse> {
+    if (this.refrescando$) return this.refrescando$;
+
+    const refreshToken = this.refreshToken;
+    if (!refreshToken) {
+      return throwError(() => new Error('No hay una sesion que renovar'));
+    }
+
+    this.refrescando$ = this.http.post<LoginResponse>(`${environment.apiUrl}/auth/refresh`, { refreshToken }).pipe(
+      // A diferencia de un login real, un refresh NO reinicia
+      // SESSION_START_KEY -- el cronometro de "tiempo conectado" del
+      // header debe seguir contando desde el login original.
+      tap((res) => this.guardarTokens(res)),
+      shareReplay(1),
+      finalize(() => { this.refrescando$ = null; })
+    );
+    return this.refrescando$;
+  }
+
+  private guardarTokens(res: LoginResponse): void {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(res));
-    localStorage.setItem(SESSION_START_KEY, String(Date.now()));
     this._usuario.set(res.usuario);
     this._seleccionPendiente.set(null);
+  }
+
+  private guardarSesionFinal(res: LoginResponse): void {
+    this.guardarTokens(res);
+    localStorage.setItem(SESSION_START_KEY, String(Date.now()));
   }
 
   // razon: motivo del cierre, guardado en la bitacora de "sesiones" para
   // auditoria ('logout_usuario' por defecto, 'inactividad' desde
   // SessionService). El aviso al backend es "mejor esfuerzo": si falla
-  // (token ya vencido, sin red) igual se cierra la sesion localmente.
+  // (refresh token ya vencido, sin red) igual se cierra la sesion local.
   logout(razon: string = 'logout_usuario'): void {
-    if (this.token) {
-      this.http.post(`${environment.apiUrl}/auth/logout`, { razon }).subscribe({ error: () => {} });
+    const refreshToken = this.refreshToken;
+    if (refreshToken) {
+      this.http.post(`${environment.apiUrl}/auth/logout`, { refreshToken, razon }).subscribe({ error: () => {} });
     }
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(SESSION_START_KEY);
@@ -187,6 +225,18 @@ export class AuthService {
     if (!raw) return null;
     try {
       return JSON.parse(raw).token ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  // Refresh token opaco (rotado en cada /auth/refresh o login). Null para
+  // tokens parciales (seleccion de empresa / 2FA pendiente), que no tienen.
+  get refreshToken(): string | null {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw).refreshToken ?? null;
     } catch {
       return null;
     }
