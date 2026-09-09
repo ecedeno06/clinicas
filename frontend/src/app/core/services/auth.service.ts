@@ -218,6 +218,19 @@ export class AuthService {
     return this.http.get<{ pista: string }>(`${environment.apiUrl}/auth/pista`, { params: { email } });
   }
 
+  // POST /auth/forgot-password -- publico. El backend siempre responde el
+  // mismo mensaje generico exista o no el correo (evita revelar que
+  // usuarios existen).
+  olvidarPassword(email: string): Observable<{ mensaje: string }> {
+    return this.http.post<{ mensaje: string }>(`${environment.apiUrl}/auth/forgot-password`, { email });
+  }
+
+  // POST /auth/reset-password -- publico, usa el token del enlace enviado
+  // por correo (valido 1 hora, un solo uso).
+  restablecerPassword(token: string, passwordNueva: string): Observable<{ mensaje: string }> {
+    return this.http.post<{ mensaje: string }>(`${environment.apiUrl}/auth/reset-password`, { token, password_nueva: passwordNueva });
+  }
+
   sessionConfig(): Observable<SessionConfig> {
     return this.http.get<SessionConfig>(`${environment.apiUrl}/auth/session-config`);
   }

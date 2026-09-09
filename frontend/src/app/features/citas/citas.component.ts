@@ -505,10 +505,21 @@ export class CitasComponent implements OnInit {
     if (this.form.invalid) return;
     this.errorGuardar.set(null);
     const actual = this.editando();
+    const esNueva = !actual;
     const data = this.form.getRawValue();
     const req = actual ? this.srv.actualizar(actual.id, data) : this.srv.crear(data);
     req.subscribe({
-      next: () => { this.cerrarPanel(); this.cargar(); },
+      next: (citaGuardada) => {
+        this.cerrarPanel();
+        this.cargar();
+        // Solo al crear (no al editar/reagendar): si se puede compartir la
+        // ubicacion por WhatsApp, se abre solo el chat con el mensaje ya
+        // redactado -- falta un clic humano en "Enviar" (WhatsApp no
+        // permite enviar sin esa confirmacion sin la API de negocio).
+        if (esNueva && this.puedeCompartirUbicacion(citaGuardada)) {
+          window.open(this.whatsappUrl(citaGuardada), '_blank');
+        }
+      },
       error: (err) => this.errorGuardar.set(err?.error?.mensaje || 'No se pudo guardar la cita'),
     });
   }

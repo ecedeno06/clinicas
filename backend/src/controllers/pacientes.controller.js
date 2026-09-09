@@ -150,7 +150,7 @@ async function crear(req, res, next) {
     res.status(201).json(rows[0]);
   } catch (err) {
     await client.query('rollback');
-    if (err.code === '23505') return res.status(409).json({ mensaje: 'Ya existe un paciente con esa identificacion o correo.' });
+    if (err.code === '23505') return res.status(409).json({ mensaje: 'Ya existe un paciente con esa identificacion.' });
     next(err);
   } finally {
     client.release();
@@ -222,7 +222,7 @@ async function actualizar(req, res, next) {
     res.json(final[0] || rows[0]);
   } catch (err) {
     await client.query('rollback');
-    if (err.code === '23505') return res.status(409).json({ mensaje: 'Ya existe un paciente con esa identificacion o correo.' });
+    if (err.code === '23505') return res.status(409).json({ mensaje: 'Ya existe un paciente con esa identificacion.' });
     next(err);
   } finally {
     client.release();
@@ -234,11 +234,26 @@ async function actualizar(req, res, next) {
 // su historial en otras clinicas donde este vinculado.
 async function eliminar(req, res, next) {
   try {
-    const { rowCount } = await pool.query(
-      'delete from pacientes_empresas where paciente_id = $1 and empresa_id = $2',
+    const vinculo = await pool.query(
+      'select 1 from pacientes_empresas where paciente_id = $1 and empresa_id = $2',
       [req.params.id, req.empresaId]
     );
-    if (!rowCount) return res.status(404).json({ mensaje: 'Paciente no encontrado' });
+    if (!vinculo.rows[0]) return res.status(404).json({ mensaje: 'Paciente no encontrado' });
+
+    // No se puede desvincular a un paciente que ya tiene citas en esta
+    // clinica: quedarian huerfanas (historias/recetas/laboratorio cuelgan
+    // de la cita, no del vinculo) -- el historial() de mas abajo exige el
+    // vinculo activo para mostrarse, asi que desvincular las dejaria
+    // inaccesibles desde la UI aunque sigan existiendo en la base de datos.
+    const tieneCitas = await pool.query(
+      'select 1 from citas where paciente_id = $1 and empresa_id = $2 limit 1',
+      [req.params.id, req.empresaId]
+    );
+    if (tieneCitas.rows[0]) {
+      return res.status(409).json({ mensaje: 'No se puede eliminar: este paciente ya tiene citas registradas en esta clinica.' });
+    }
+
+    await pool.query('delete from pacientes_empresas where paciente_id = $1 and empresa_id = $2', [req.params.id, req.empresaId]);
     res.status(204).send();
   } catch (err) { next(err); }
 }

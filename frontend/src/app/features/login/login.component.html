@@ -21,6 +21,25 @@
       </form>
 
       <button type="button" class="btn btn-outline w-full mt-16" (click)="cancelar2FA()">Volver</button>
+    } @else if (mostrarOlvidoPassword()) {
+      <h1>Recuperar contrasena</h1>
+      <p class="text-muted text-sm">Te enviaremos un enlace a tu correo para restablecerla.</p>
+
+      <form [formGroup]="emailOlvidoForm" (ngSubmit)="enviarOlvidoPassword()" class="mt-16">
+        <div class="form-group">
+          <label>Correo electronico</label>
+          <input class="input" type="email" formControlName="email" placeholder="tucorreo@clinica.com" />
+        </div>
+        <button class="btn btn-primary w-full mt-16" type="submit" [disabled]="emailOlvidoForm.invalid || cargandoOlvido()">
+          {{ cargandoOlvido() ? 'Enviando...' : 'Enviar enlace' }}
+        </button>
+      </form>
+
+      @if (mensajeOlvido()) {
+        <div class="auth-hint mt-16">{{ mensajeOlvido() }}</div>
+      }
+
+      <button type="button" class="btn btn-outline w-full mt-16" (click)="cerrarOlvidoPassword()">Volver</button>
     } @else if (!empresasParaElegir()) {
       <h1>Ingresar</h1>
       <p class="text-muted text-sm">Gestion de clinica medica</p>
@@ -43,9 +62,14 @@
         </button>
       </form>
 
-      <button type="button" class="btn-link text-sm mt-16" (click)="verPista()" [disabled]="cargandoPista()">
-        {{ cargandoPista() ? 'Buscando pista...' : '¿Olvidaste tu pista de contrasena?' }}
-      </button>
+      <div class="flex items-center gap-12 mt-16">
+        <button type="button" class="btn-link text-sm" (click)="verPista()" [disabled]="cargandoPista()">
+          {{ cargandoPista() ? 'Buscando pista...' : '¿Olvidaste tu pista?' }}
+        </button>
+        <button type="button" class="btn-link text-sm" (click)="abrirOlvidoPassword()">
+          ¿Olvidaste tu contrasena?
+        </button>
+      </div>
       @if (pista()) {
         <div class="auth-hint mt-8">Pista: {{ pista() }}</div>
       }

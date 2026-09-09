@@ -95,8 +95,12 @@ create table if not exists especialidades (
 -- ---------------------------------------------------------
 -- Tabla: pacientes. Es GLOBAL (mismo patron que usuarios): una
 -- misma persona puede ser atendida en varias clinicas de la red
--- sin duplicar su registro (ver pacientes_empresas). identificacion
--- y email son unicos en toda la plataforma, no por clinica.
+-- sin duplicar su registro (ver pacientes_empresas). La identificacion
+-- es unica en toda la plataforma (documento legal), no por clinica.
+-- El email NO es unico: varios pacientes pueden compartir uno (ej. un
+-- familiar/cuidador presta su correo para alguien que no tiene propio) --
+-- es solo un dato de contacto, no una credencial de acceso como en
+-- usuarios.email.
 -- ---------------------------------------------------------
 create table if not exists pacientes (
     id                  uuid primary key default gen_random_uuid(),
@@ -108,7 +112,7 @@ create table if not exists pacientes (
     -- Indica si "telefono" recibe WhatsApp (se usa para decidir si mostrar
     -- la opcion de "compartir ubicacion por WhatsApp" en Citas).
     acepta_whatsapp     boolean not null default false,
-    email               text unique,
+    email               text,
     -- Contacto de emergencia: { nombre, telefono, parentesco }
     contacto_emergencia jsonb,
     alergias            text,
@@ -444,10 +448,12 @@ create table if not exists orden_laboratorio_examenes (
 );
 
 -- ---------------------------------------------------------
--- Tabla: sesiones (registro en BD de sesiones de usuario, para auditar
--- quien esta/estuvo conectado, desde que clinica/sucursal y por cuanto
--- tiempo). Fase 1: solo la tabla -- el login/logout/middleware de
--- autenticacion (JWT firmado, sin consulta a BD) no la usa todavia.
+-- Tabla: sesiones. "token" guarda el refresh token opaco (no el JWT --
+-- el access token es corto y stateless, se verifica solo por firma). Se
+-- valida contra esta tabla unicamente en POST /auth/refresh, rotando el
+-- valor en cada uso; sirve tambien de bitacora (quien esta/estuvo
+-- conectado, desde que clinica/sucursal, por cuanto tiempo y por que
+-- se cerro). Ver DISENO-AUTENTICACION-2FA-SESION.md.
 -- ---------------------------------------------------------
 create table if not exists sesiones (
     id                uuid primary key default gen_random_uuid(),
@@ -467,11 +473,27 @@ create table if not exists sesiones (
 );
 
 -- ---------------------------------------------------------
+-- Tabla: password_reset_tokens (recuperar contrasena por correo,
+-- self-service). Token de un solo uso, corta duracion -- ver
+-- POST /auth/forgot-password y /auth/reset-password.
+-- ---------------------------------------------------------
+create table if not exists password_reset_tokens (
+    id          uuid primary key default gen_random_uuid(),
+    usuario_id  uuid not null references usuarios(id) on delete cascade,
+    token       text not null unique,
+    expira_en   timestamptz not null,
+    usado       boolean not null default false,
+    created_at  timestamptz not null default now()
+);
+
+-- ---------------------------------------------------------
 -- Indices
 -- ---------------------------------------------------------
 create index if not exists idx_sesiones_usuario on sesiones(usuario_id);
 create index if not exists idx_sesiones_empresa on sesiones(empresa_id);
 create index if not exists idx_sesiones_token_activo on sesiones(token) where activo = true;
+create index if not exists idx_password_reset_tokens_usuario on password_reset_tokens(usuario_id);
+create index if not exists idx_password_reset_tokens_token_activo on password_reset_tokens(token) where usado = false;
 create index if not exists idx_usuarios_empresas_rol_usuario on usuarios_empresas_rol(usuario_id);
 create index if not exists idx_usuarios_empresas_rol_empresa on usuarios_empresas_rol(empresa_id);
 create index if not exists idx_pacientes_empresas_paciente on pacientes_empresas(paciente_id);

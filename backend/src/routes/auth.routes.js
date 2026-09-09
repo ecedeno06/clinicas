@@ -7,6 +7,8 @@ const {
   disable2FA,
   logout,
   refrescarToken,
+  olvidoPassword,
+  restablecerPassword,
   obtenerPista,
   sessionConfig,
   seleccionarEmpresa,
@@ -17,10 +19,13 @@ const {
 } = require('../controllers/auth.controller');
 const { requireAuth } = require('../middleware/auth');
 const rateLimitPista = require('../middleware/rateLimitPista');
+const rateLimitOlvidoPassword = require('../middleware/rateLimitOlvidoPassword');
 
 router.post('/login', login);
 router.post('/2fa/verify-login', verificar2FA);
 router.post('/refresh', refrescarToken);
+router.post('/forgot-password', rateLimitOlvidoPassword, olvidoPassword);
+router.post('/reset-password', restablecerPassword);
 router.get('/pista', rateLimitPista, obtenerPista);
 router.get('/session-config', sessionConfig);
 router.post('/seleccionar-empresa', requireAuth, seleccionarEmpresa);

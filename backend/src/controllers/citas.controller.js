@@ -2,6 +2,57 @@ const { pool } = require('../config/db');
 const { registrarEventosCita, primerEventoLog } = require('../utils/citaLog');
 const { resolverSucursal } = require('../utils/sucursales');
 const { hayChoqueCampanaParaCita } = require('../utils/choqueCampana');
+const { enviarCorreo } = require('../utils/correo');
+const { formatearFechaLarga, formatoAmPm } = require('../utils/formatoFecha');
+
+// Select con todo lo que necesitan la respuesta de crear() (para que el
+// frontend pueda abrir WhatsApp automaticamente con los datos correctos,
+// igual que en el listado) y el correo de confirmacion -- una sola
+// consulta, sin duplicar el join.
+const SELECT_CITA_DETALLE = `
+  select c.*, p.nombre as paciente_nombre, p.telefono as paciente_telefono,
+         p.acepta_whatsapp as paciente_acepta_whatsapp, p.email as paciente_email,
+         d.nombre as doctor_nombre,
+         coalesce(
+           (select esp.nombre from especialidades esp where esp.id = c.especialidad_id),
+           (select string_agg(esp2.nombre, ', ' order by esp2.nombre)
+            from doctor_especialidades de2 join especialidades esp2 on esp2.id = de2.especialidad_id
+            where de2.doctor_id = d.id)
+         ) as especialidad_nombre,
+         s.nombre as sucursal_nombre, s.direccion as sucursal_direccion, s.google_maps_url as sucursal_google_maps_url,
+         s.hora_apertura as sucursal_hora_apertura, s.hora_cierre as sucursal_hora_cierre,
+         e.nombre as empresa_nombre
+  from citas c
+  join pacientes p on p.id = c.paciente_id
+  join doctores d on d.id = c.doctor_id
+  join sucursales s on s.id = c.sucursal_id
+  join empresas e on e.id = c.empresa_id
+  where c.id = $1
+`;
+
+// Envia el correo de confirmacion de una cita recien creada, si el
+// paciente tiene email registrado. Nunca bloquea ni rompe la creacion de
+// la cita: se dispara en segundo plano y cualquier error solo se loguea
+// (mismo criterio que el correo de recuperacion de contrasena).
+async function enviarCorreoConfirmacionCita(info) {
+  if (!info.paciente_email) return;
+
+  const lineas = [
+    `Hola ${info.paciente_nombre}, te confirmamos los datos de tu cita en ${info.empresa_nombre}:`,
+    '',
+    `Fecha: ${formatearFechaLarga(info.fecha)}`,
+    `Hora: ${formatoAmPm(info.hora_inicio)} - ${formatoAmPm(info.hora_fin)}`,
+    `Doctor: ${info.doctor_nombre}${info.especialidad_nombre ? ' (' + info.especialidad_nombre + ')' : ''}`,
+    `Sucursal: ${info.sucursal_nombre}${info.sucursal_direccion ? ' - ' + info.sucursal_direccion : ''}`,
+  ];
+  if (info.sucursal_google_maps_url) {
+    lineas.push('', `Ubicacion (Google Maps): ${info.sucursal_google_maps_url}`);
+  }
+  const texto = lineas.join('\n');
+  const html = lineas.map((l) => (l ? `<p>${l}</p>` : '')).join('');
+
+  await enviarCorreo({ destinatario: info.paciente_email, asunto: `Confirmacion de tu cita - ${info.empresa_nombre}`, texto, html });
+}
 
 // GET /api/citas?doctor_id=&paciente_id=&estado=&desde=&hasta=&sucursal_id=&campana_id=
 async function listar(req, res, next) {
@@ -230,7 +281,12 @@ async function crear(req, res, next) {
        values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13, coalesce($14, 'pendiente'), $15::jsonb) returning *`,
       [req.empresaId, sucursalId, paciente_id, doctor_id, campana_id || null, especialidad_id || null, !!es_domicilio, !!es_urgencia, fecha, hora_inicio, hora_fin, motivo, observaciones, estado, log]
     );
-    res.status(201).json(rows[0]);
+
+    const { rows: detalle } = await pool.query(SELECT_CITA_DETALLE, [rows[0].id]);
+    const citaCreada = detalle[0];
+    enviarCorreoConfirmacionCita(citaCreada).catch((err) => console.error('Error enviando correo de confirmacion de cita:', err.message));
+
+    res.status(201).json(citaCreada);
   } catch (err) { next(err); }
 }
 

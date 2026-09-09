@@ -1,6 +1,6 @@
 import { Component, OnDestroy, OnInit, computed, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, ReactiveFormsModule, ValidationErrors, Validators, AbstractControl } from '@angular/forms';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
 import { ThemeService } from '../../core/services/theme.service';
@@ -8,6 +8,7 @@ import { SessionService } from '../../core/services/session.service';
 import { SelectorFotoComponent } from '../../core/components/selector-foto/selector-foto.component';
 import { InactividadComponent } from '../../core/components/inactividad/inactividad.component';
 import { SeguridadComponent } from '../seguridad/seguridad.component';
+import { passwordsCoincidenValidator } from '../../core/utils/password.util';
 
 const SIDEBAR_STORAGE_KEY = 'clinica_sidebar_colapsado';
 
@@ -147,11 +148,4 @@ export class LayoutComponent implements OnInit, OnDestroy {
       error: (err) => alert(err?.error?.mensaje || 'No se pudo cambiar la contrasena'),
     });
   }
-}
-
-function passwordsCoincidenValidator(group: AbstractControl): ValidationErrors | null {
-  const nueva = group.get('password_nueva')?.value;
-  const confirmar = group.get('password_confirmar')?.value;
-  if (!nueva || !confirmar) return null;
-  return nueva === confirmar ? null : { noCoincide: true };
 }

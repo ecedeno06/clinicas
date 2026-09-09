@@ -274,6 +274,12 @@ async function disponibilidad(req, res, next) {
 
     const ocupados = citasResult.rows.map((c) => ({ inicio: aMinutos(c.hora_inicio), fin: aMinutos(c.hora_fin) }));
 
+    // Si la fecha consultada es hoy, las franjas cuya hora de inicio ya
+    // paso no se ofrecen (no tiene sentido agendar a una hora que ya
+    // sucedio). Para una fecha futura esta comparacion nunca descarta nada
+    // (la fecha+hora siempre cae despues de "ahora").
+    const ahora = new Date();
+
     const porSucursal = new Map();
     for (const b of bloquesResult.rows) {
       if (!porSucursal.has(b.sucursal_id)) {
@@ -289,7 +295,9 @@ async function disponibilidad(req, res, next) {
         const libresBloque = restarOcupados(bloqueMinutos, ocupados);
         for (const { inicio, fin } of libresBloque) {
           for (let t = inicio; t + DURACION_SLOT_MINUTOS <= fin; t += DURACION_SLOT_MINUTOS) {
-            libres.push({ hora_inicio: aTexto(t), hora_fin: aTexto(t + DURACION_SLOT_MINUTOS) });
+            const horaInicioTexto = aTexto(t);
+            if (new Date(`${fecha}T${horaInicioTexto}:00`) <= ahora) continue;
+            libres.push({ hora_inicio: horaInicioTexto, hora_fin: aTexto(t + DURACION_SLOT_MINUTOS) });
           }
         }
       }

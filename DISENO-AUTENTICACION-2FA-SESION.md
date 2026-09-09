@@ -157,6 +157,35 @@ la conoce, y no había ningún paso de "cámbiala en tu primer login".
   navegador real (drawer forzado sin cerrar/cancelar tras el login,
   desbloqueo automático al guardar).
 
+## Actualización 2026-09-09 — recuperar contraseña por correo (self-service)
+
+Primer uso real del envío de correo (`backend/src/utils/correo.js`,
+Nodemailer + SMTP de Gmail con contraseña de aplicación mientras se
+define un dominio propio -- ver `Guia_Gmail_2FA_AppPassword.docx`).
+
+- Tabla nueva `password_reset_tokens` (migración 029): token opaco de un
+  solo uso, válido 1 hora, independiente de `sesiones` (login) y de
+  `pista` (esa solo muestra una ayuda, no restablece nada).
+- `POST /auth/forgot-password` (público, rate-limit 3/hora por IP+email
+  vía `rateLimitOlvidoPassword.js`, que ahora comparte la fábrica
+  `crearRateLimit` con `rateLimitPista.js`): **nunca revela si el correo
+  existe** -- responde siempre el mismo mensaje genérico, exista o no la
+  cuenta, y solo manda el correo si sí existe. El envío corre en segundo
+  plano (no bloquea la respuesta si el SMTP falla).
+- `POST /auth/reset-password` (público, con el token del enlace): valida
+  que no esté usado ni vencido, actualiza la contraseña, limpia
+  `debe_cambiar_password` si estaba activo, y **cierra todas las
+  sesiones activas** de ese usuario (si alguien más tenía acceso, motivo
+  más común para pedir esto, queda desconectado).
+- Pantalla nueva `/restablecer-password` (pública, fuera del
+  `authGuard`), y enlace "¿Olvidaste tu contraseña?" en el login junto al
+  de la pista existente.
+- Probado end-to-end contra `.17` (mensaje genérico igual con/sin cuenta,
+  token inválido rechazado, token real acepta el cambio, reuso del mismo
+  token rechazado, login con la contraseña vieja falla y con la nueva
+  funciona) y en navegador real (el flujo completo desde el login hasta
+  la pantalla de éxito).
+
 ## Fuera de alcance (por ahora)
 
 - Cookies `httpOnly` para el refresh token (evaluado, ver arriba) -- el

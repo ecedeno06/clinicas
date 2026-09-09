@@ -14,12 +14,15 @@ function seCruzanHoras(aInicio, aFin, bInicio, bFin) {
 // rango de fechas incluye `fecha` y cuyo horario se cruza con
 // [horaInicio, horaFin). Se usa al crear/editar una cita (normal o de
 // otra campana) para no agendar a un doctor mientras esta comprometido en
-// una campana distinta.
+// una campana distinta. Solo cuentan campanas "aprobada"/"en_curso" -- una
+// campana finalizada, cancelada o rechazada ya no reserva el tiempo del
+// doctor, aunque siga confirmado en campana_doctores.
 async function hayChoqueCampanaParaCita({ doctorId, fecha, horaInicio, horaFin, excluirCampanaId }) {
   const { rows } = await pool.query(
     `select c.hora_inicio, c.hora_fin from campanas c
      join campana_doctores cd on cd.campana_id = c.id
      where cd.doctor_id = $1 and cd.estado = 'confirmado'
+       and c.estado in ('aprobada', 'en_curso')
        and $2::date between c.fecha_inicio and c.fecha_fin
        and c.id is distinct from $3`,
     [doctorId, fecha, excluirCampanaId || null]
@@ -48,6 +51,7 @@ async function hayOtraCampanaConflictiva({ doctorId, campanaId, fechaInicio, fec
     `select c.hora_inicio, c.hora_fin from campanas c
      join campana_doctores cd on cd.campana_id = c.id
      where cd.doctor_id = $1 and cd.estado = 'confirmado' and c.id <> $2
+       and c.estado in ('aprobada', 'en_curso')
        and c.fecha_inicio <= $4 and c.fecha_fin >= $3`,
     [doctorId, campanaId, fechaInicio, fechaFin]
   );

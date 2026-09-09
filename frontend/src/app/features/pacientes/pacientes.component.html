@@ -110,7 +110,7 @@
         <div class="flex gap-16" style="align-items: flex-start;">
           <div class="form-group" style="flex: 1;">
             <label>Nombre *</label>
-            <input class="input" formControlName="nombre" />
+            <input class="input" formControlName="nombre" autocomplete="off" />
           </div>
           <app-selector-foto
             [foto]="form.get('foto')?.value"
@@ -125,7 +125,7 @@
         </div>
         <div class="form-group mt-16">
           <label>Identificacion (cedula / pasaporte)</label>
-          <input class="input" formControlName="identificacion" (blur)="onIdentificacionBlur()" />
+          <input class="input" formControlName="identificacion" autocomplete="off" (blur)="onIdentificacionBlur()" />
         </div>
         <div class="form-group mt-16">
           <label>Fecha de nacimiento</label>
@@ -143,13 +143,13 @@
         <div class="form-group mt-16">
           <label>Telefono</label>
           <div class="flex items-center gap-12">
-            <input class="input" formControlName="telefono" style="flex:1" />
+            <input class="input" formControlName="telefono" autocomplete="off" style="flex:1" />
             <label class="flex items-center gap-8" style="white-space:nowrap;"><input type="checkbox" formControlName="acepta_whatsapp" /> Recibe WhatsApp</label>
           </div>
         </div>
         <div class="form-group mt-16">
           <label>Email</label>
-          <input class="input" type="email" formControlName="email" />
+          <input class="input" type="email" formControlName="email" autocomplete="off" />
         </div>
         <div class="form-group mt-16">
           <label>Direcciones</label>
@@ -228,11 +228,11 @@
           <h3 style="margin:0;">Contacto de emergencia</h3>
           <div class="form-group mt-16">
             <label>Nombre</label>
-            <input class="input" formControlName="nombre" />
+            <input class="input" formControlName="nombre" autocomplete="off" />
           </div>
           <div class="form-group mt-16">
             <label>Telefono</label>
-            <input class="input" formControlName="telefono" />
+            <input class="input" formControlName="telefono" autocomplete="off" />
           </div>
           <div class="form-group mt-16">
             <label>Parentesco</label>

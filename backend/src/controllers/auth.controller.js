@@ -6,6 +6,7 @@ const QRCode = require('qrcode');
 const { pool } = require('../config/db');
 const { encriptar, desencriptar } = require('../utils/cifrado2fa');
 const { porcentajeSimilitud } = require('../utils/levenshtein');
+const { enviarCorreo } = require('../utils/correo');
 
 // Access token: corto (JWT_EXPIRES_IN, recomendado 15-30m) y stateless --
 // se verifica solo por firma, sin tocar la base de datos, en cada request.
@@ -363,6 +364,79 @@ async function obtenerPista(req, res, next) {
   }
 }
 
+function generarTokenReset() {
+  return 'rst_' + crypto.randomBytes(32).toString('hex');
+}
+
+// POST /api/auth/forgot-password  { email }  (publico, con rate-limit en la ruta)
+// Nunca revela si el correo existe o no (evita enumeracion de usuarios) --
+// la respuesta es siempre el mismo mensaje generico, exista o no la cuenta.
+async function olvidoPassword(req, res, next) {
+  try {
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    if (!email) return res.status(400).json({ mensaje: 'email es requerido' });
+
+    const { rows } = await pool.query('select id, nombre from usuarios where email = $1 and activo = true', [email]);
+    const usuario = rows[0];
+
+    if (usuario) {
+      const token = generarTokenReset();
+      const expiraEn = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
+      await pool.query(
+        'insert into password_reset_tokens (usuario_id, token, expira_en) values ($1, $2, $3)',
+        [usuario.id, token, expiraEn]
+      );
+
+      const enlace = `${process.env.CORS_ORIGIN || 'http://localhost:4201'}/restablecer-password?token=${token}`;
+      // El envio de correo no debe tumbar la respuesta si falla (SMTP
+      // caido, etc.) -- de todas formas el mensaje al cliente es generico.
+      enviarCorreo({
+        destinatario: email,
+        asunto: 'Recuperar tu contrasena',
+        texto: `Hola ${usuario.nombre},\n\nRecibimos una solicitud para restablecer tu contrasena. Este enlace es valido por 1 hora:\n${enlace}\n\nSi no fuiste tu, ignora este correo.`,
+        html: `<p>Hola ${usuario.nombre},</p><p>Recibimos una solicitud para restablecer tu contrasena. Este enlace es valido por 1 hora:</p><p><a href="${enlace}">${enlace}</a></p><p>Si no fuiste tu, ignora este correo.</p>`,
+      }).catch((err) => console.error('Error enviando correo de recuperacion de contrasena:', err.message));
+    }
+
+    res.json({ mensaje: 'Si el correo existe en nuestro sistema, recibiras un enlace para restablecer tu contrasena.' });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// POST /api/auth/reset-password  { token, password_nueva }  (publico)
+async function restablecerPassword(req, res, next) {
+  try {
+    const { token, password_nueva } = req.body || {};
+    if (!token || !password_nueva) return res.status(400).json({ mensaje: 'token y password_nueva son requeridos' });
+    if (password_nueva.length < 6) return res.status(400).json({ mensaje: 'La nueva contrasena debe tener al menos 6 caracteres' });
+
+    const { rows } = await pool.query(
+      `select id, usuario_id from password_reset_tokens where token = $1 and usado = false and expira_en > now()`,
+      [token]
+    );
+    const registro = rows[0];
+    if (!registro) return res.status(400).json({ mensaje: 'El enlace es invalido o ya expiro. Solicita uno nuevo.' });
+
+    const password_hash = await bcrypt.hash(password_nueva, 10);
+    await pool.query('update usuarios set password_hash = $1, debe_cambiar_password = false where id = $2', [password_hash, registro.usuario_id]);
+    await pool.query('update password_reset_tokens set usado = true where id = $1', [registro.id]);
+    // Cierra todas las sesiones activas de este usuario: si alguien mas
+    // tenia acceso (motivo mas comun para pedir esto), queda desconectado
+    // de inmediato en cuanto su access token vigente expire/intente refrescar.
+    await pool.query(
+      `update sesiones set activo = false, razon_salida = 'reset_password',
+         duracion_segundos = extract(epoch from (now() - created_at))::integer
+       where usuario_id = $1 and activo = true`,
+      [registro.usuario_id]
+    );
+
+    res.json({ mensaje: 'Contrasena actualizada correctamente. Ya puedes iniciar sesion.' });
+  } catch (err) {
+    next(err);
+  }
+}
+
 // GET /api/auth/session-config  (publico -- el login lo necesita antes de autenticarse)
 function sessionConfig(req, res) {
   res.json({
@@ -568,6 +642,8 @@ module.exports = {
   disable2FA,
   logout,
   refrescarToken,
+  olvidoPassword,
+  restablecerPassword,
   obtenerPista,
   sessionConfig,
   seleccionarEmpresa,

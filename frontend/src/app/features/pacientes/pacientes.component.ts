@@ -158,7 +158,14 @@ export class PacientesComponent implements OnInit {
   }
   cargar(): void { this.srv.listar().subscribe((data) => this.pacientes.set(data)); }
 
+  // Se incrementa cada vez que se abre el panel (nuevo o editar) para que
+  // una respuesta tardia de buscarPorIdentificacion() (si el usuario cierra
+  // y reabre el panel mientras esa consulta seguia en curso) no contamine
+  // un formulario que ya se reseteo -- ver onIdentificacionBlur().
+  private tokenBusquedaIdentificacion = 0;
+
   abrirNuevo(): void {
+    this.tokenBusquedaIdentificacion++;
     this.editando.set(null);
     this.pacienteExistente.set(null);
     this.form.reset({ activo: true, contacto_emergencia: { nombre: '', telefono: '', parentesco: '' } });
@@ -169,6 +176,7 @@ export class PacientesComponent implements OnInit {
   }
 
   abrirEditar(p: Paciente): void {
+    this.tokenBusquedaIdentificacion++;
     this.editando.set(p);
     this.pacienteExistente.set(null);
     this.form.reset({
@@ -379,8 +387,10 @@ export class PacientesComponent implements OnInit {
       this.habilitarCamposIdentidad();
       return;
     }
+    const token = ++this.tokenBusquedaIdentificacion;
     this.srv.buscarPorIdentificacion(identificacion).subscribe({
       next: (res) => {
+        if (token !== this.tokenBusquedaIdentificacion) return;
         if (res.existe && res.paciente) {
           this.pacienteExistente.set(res.paciente);
           this.form.patchValue({
@@ -406,7 +416,11 @@ export class PacientesComponent implements OnInit {
           this.habilitarCamposIdentidad();
         }
       },
-      error: () => { this.pacienteExistente.set(null); this.habilitarCamposIdentidad(); },
+      error: () => {
+        if (token !== this.tokenBusquedaIdentificacion) return;
+        this.pacienteExistente.set(null);
+        this.habilitarCamposIdentidad();
+      },
     });
   }
 
@@ -431,7 +445,10 @@ export class PacientesComponent implements OnInit {
 
   eliminar(p: Paciente): void {
     if (!confirm(`Eliminar al paciente "${p.nombre}"?`)) return;
-    this.srv.eliminar(p.id).subscribe(() => this.cargar());
+    this.srv.eliminar(p.id).subscribe({
+      next: () => this.cargar(),
+      error: (err) => alert(err?.error?.mensaje || 'No se pudo eliminar el paciente'),
+    });
   }
 
   verHistorial(p: Paciente): void {

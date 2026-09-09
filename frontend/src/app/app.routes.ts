@@ -3,6 +3,7 @@ import { authGuard } from './core/guards/auth.guard';
 import { superAdminGuard } from './core/guards/super-admin.guard';
 import { LayoutComponent } from './features/layout/layout.component';
 import { LoginComponent } from './features/login/login.component';
+import { RestablecerPasswordComponent } from './features/restablecer-password/restablecer-password.component';
 import { DashboardComponent } from './features/dashboard/dashboard.component';
 import { PacientesComponent } from './features/pacientes/pacientes.component';
 import { DoctoresComponent } from './features/doctores/doctores.component';
@@ -17,6 +18,7 @@ import { ReporteCitasComponent } from './features/reportes/reporte-citas/reporte
 
 export const routes: Routes = [
   { path: 'login', component: LoginComponent },
+  { path: 'restablecer-password', component: RestablecerPasswordComponent },
   {
     path: '',
     component: LayoutComponent,

@@ -46,6 +46,8 @@ docker run --rm -i -e PGPASSWORD='<password>' postgres:16 \
 | `026_sesiones.sql` | Tabla nueva `sesiones` (registro en BD de sesiones de usuario -- clinica/sucursal, token, expiracion, razon de salida). Bitacora de auditoria: el login/logout/middleware (JWT sin consulta a BD) no la usa para autenticar | ✅ Aplicada 2026-09-08 | ✅ Aplicada 2026-09-08 |
 | `027_auth_2fa_pista.sql` | Columnas `pista` (hint de contrasena), `two_factor_enabled`/`two_factor_secret` (2FA por app autenticadora, TOTP) en `usuarios` | ✅ Aplicada 2026-09-08 | ✅ Aplicada 2026-09-08 |
 | `028_usuarios_debe_cambiar_password.sql` | Columna `debe_cambiar_password` en `usuarios` (fuerza cambio de contrasena en el siguiente login al crear un usuario o resetearle la contrasena desde Usuarios) | ✅ Aplicada 2026-09-09 | ✅ Aplicada 2026-09-09 |
+| `029_password_reset_tokens.sql` | Tabla nueva `password_reset_tokens` (recuperar contrasena por correo, self-service: token de un solo uso, 1 hora de vigencia) | ✅ Aplicada 2026-09-09 | ✅ Aplicada 2026-09-09 |
+| `030_pacientes_email_no_unico.sql` | Quita la restriccion de unicidad de `pacientes.email` (varios pacientes pueden compartir un email, ej. un familiar/cuidador) | ✅ Aplicada 2026-09-09 | ✅ Aplicada 2026-09-09 |
 
 **Verificado 2026-09-02**: comparacion completa de esquema (tablas, columnas,
 indices, constraints, funciones, triggers) entre `.19` y Neon — identicos

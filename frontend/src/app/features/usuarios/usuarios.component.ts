@@ -58,7 +58,14 @@ export class UsuariosComponent implements OnInit {
   ngOnInit(): void { this.cargar(); }
   cargar(): void { this.srv.listar().subscribe((data) => this.usuarios.set(data)); }
 
+  // Se incrementa cada vez que se abre el panel (nuevo o editar) para que
+  // una respuesta tardia de buscarPorEmail() (si el usuario cierra y
+  // reabre el panel mientras esa consulta seguia en curso) no contamine
+  // un formulario que ya se reseteo -- ver onEmailBlur().
+  private tokenBusquedaEmail = 0;
+
   abrirNuevo(): void {
+    this.tokenBusquedaEmail++;
     this.editando.set(null);
     this.usuarioExistente.set(null);
     this.form.reset({ rol: 'recepcionista', activo: true });
@@ -69,6 +76,7 @@ export class UsuariosComponent implements OnInit {
   }
 
   abrirEditar(u: Usuario): void {
+    this.tokenBusquedaEmail++;
     this.editando.set(u);
     this.usuarioExistente.set(null);
     this.form.reset({ ...u, password: '' });
@@ -86,9 +94,16 @@ export class UsuariosComponent implements OnInit {
       this.usuarioExistente.set(null);
       return;
     }
+    const token = ++this.tokenBusquedaEmail;
     this.srv.buscarPorEmail(email).subscribe({
-      next: (res) => this.usuarioExistente.set(res.existe ? { nombre: res.nombre! } : null),
-      error: () => this.usuarioExistente.set(null),
+      next: (res) => {
+        if (token !== this.tokenBusquedaEmail) return;
+        this.usuarioExistente.set(res.existe ? { nombre: res.nombre! } : null);
+      },
+      error: () => {
+        if (token !== this.tokenBusquedaEmail) return;
+        this.usuarioExistente.set(null);
+      },
     });
   }
 

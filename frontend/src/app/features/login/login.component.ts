@@ -26,6 +26,15 @@ export class LoginComponent {
   pista = signal<string | null>(null);
   pistaError = signal<string | null>(null);
 
+  // "Olvidaste tu contrasena" -- envia un enlace de restablecimiento por
+  // correo. mensajeOlvido siempre es el mensaje generico del backend
+  // (nunca revela si el correo existe), tanto en exito como en error de
+  // formato -- solo un fallo real de red muestra algo distinto.
+  mostrarOlvidoPassword = signal(false);
+  emailOlvidoForm = this.fb.group({ email: ['', [Validators.required, Validators.email]] });
+  cargandoOlvido = signal(false);
+  mensajeOlvido = signal<string | null>(null);
+
   form = this.fb.group({
     email: ['', [Validators.required, Validators.email]],
     password: ['', Validators.required],
@@ -102,6 +111,33 @@ export class LoginComponent {
       error: (err) => {
         this.cargandoPista.set(false);
         this.pistaError.set(err?.error?.mensaje || 'No se pudo obtener la pista');
+      },
+    });
+  }
+
+  abrirOlvidoPassword(): void {
+    this.mostrarOlvidoPassword.set(true);
+    this.emailOlvidoForm.reset({ email: this.form.getRawValue().email || '' });
+    this.mensajeOlvido.set(null);
+  }
+
+  cerrarOlvidoPassword(): void {
+    this.mostrarOlvidoPassword.set(false);
+    this.mensajeOlvido.set(null);
+  }
+
+  enviarOlvidoPassword(): void {
+    if (this.emailOlvidoForm.invalid) return;
+    this.cargandoOlvido.set(true);
+    this.mensajeOlvido.set(null);
+    this.auth.olvidarPassword(this.emailOlvidoForm.getRawValue().email!).subscribe({
+      next: (res) => {
+        this.cargandoOlvido.set(false);
+        this.mensajeOlvido.set(res.mensaje);
+      },
+      error: (err) => {
+        this.cargandoOlvido.set(false);
+        this.mensajeOlvido.set(err?.error?.mensaje || 'No se pudo procesar la solicitud. Intenta de nuevo.');
       },
     });
   }
