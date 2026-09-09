@@ -13,6 +13,9 @@ export interface Usuario {
   avatar?: string | null;
   es_super_admin?: boolean;
   two_factor_enabled?: boolean;
+  // Fuerza el formulario de cambio de contrasena al iniciar sesion (lo
+  // activa un admin al crear el usuario o resetearle la contrasena).
+  debe_cambiar_password?: boolean;
   empresa_id?: string | null;
   empresa_nombre?: string | null;
   empresa_logo?: string | null;

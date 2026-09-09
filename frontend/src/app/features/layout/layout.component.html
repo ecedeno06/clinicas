@@ -181,13 +181,21 @@
 
 <app-inactividad></app-inactividad>
 
-@if (panelPasswordAbierto()) {
+@if (panelPasswordAbierto() || cambioPasswordObligatorio()) {
   <div class="overlay">
     <div class="drawer">
       <div class="drawer-header">
         <h2>Cambiar contrasena</h2>
-        <button class="close" (click)="cerrarCambioPassword()">&times;</button>
+        @if (!cambioPasswordObligatorio()) {
+          <button class="close" (click)="cerrarCambioPassword()">&times;</button>
+        }
       </div>
+      @if (cambioPasswordObligatorio()) {
+        <div class="auth-error mt-16">
+          Un administrador puso una contrasena temporal para tu cuenta -- debes
+          cambiarla antes de continuar.
+        </div>
+      }
       <form [formGroup]="passwordForm" (ngSubmit)="guardarPassword()">
         <div class="form-group">
           <label>Contrasena actual *</label>
@@ -214,7 +222,9 @@
         </div>
         <div class="form-actions">
           <button type="submit" class="btn btn-primary" [disabled]="passwordForm.invalid">Guardar</button>
-          <button type="button" class="btn btn-outline" (click)="cerrarCambioPassword()">Cancelar</button>
+          @if (!cambioPasswordObligatorio()) {
+            <button type="button" class="btn btn-outline" (click)="cerrarCambioPassword()">Cancelar</button>
+          }
         </div>
       </form>
     </div>

@@ -55,6 +55,11 @@ create table if not exists usuarios (
     -- enrolarse explicitamente desde la pantalla de seguridad.
     two_factor_enabled boolean not null default false,
     two_factor_secret  text,
+    -- Fuerza cambio de contrasena en el siguiente login: se activa al
+    -- crear el usuario o al resetearle la contrasena desde Usuarios (el
+    -- admin conoce esa contrasena, es temporal); se limpia sola cuando el
+    -- usuario la cambia el mismo via /auth/password.
+    debe_cambiar_password boolean not null default false,
     created_at      timestamptz not null default now(),
     updated_at      timestamptz not null default now()
 );

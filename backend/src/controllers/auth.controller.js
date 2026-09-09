@@ -66,11 +66,11 @@ async function continuarLoginTrasPassword(usuario, res) {
       const payload = {
         id: usuario.id, nombre: usuario.nombre, email: usuario.email,
         rol: null, empresa_id: null, empresa_nombre: null, empresa_logo: null,
-        es_super_admin: true, avatar: usuario.avatar,
+        es_super_admin: true, avatar: usuario.avatar, debe_cambiar_password: usuario.debe_cambiar_password,
       };
       const { accessToken, refreshToken } = await emitirTokens({
         usuarioId: usuario.id, empresaId: null, empresaNombre: null, rol: null,
-        payloadAccessToken: { id: payload.id, nombre: payload.nombre, email: payload.email, rol: null, empresa_id: null, es_super_admin: true },
+        payloadAccessToken: { id: payload.id, nombre: payload.nombre, email: payload.email, rol: null, empresa_id: null, es_super_admin: true, debe_cambiar_password: usuario.debe_cambiar_password },
       });
       return res.json({ token: accessToken, refreshToken, usuario: payload });
     }
@@ -122,10 +122,11 @@ async function continuarLoginTrasPassword(usuario, res) {
     empresa_logo: empresaActiva ? empresaActiva.empresa_logo : null,
     es_super_admin: usuario.es_super_admin,
     avatar: usuario.avatar,
+    debe_cambiar_password: usuario.debe_cambiar_password,
   };
   const { accessToken, refreshToken } = await emitirTokens({
     usuarioId: usuario.id, empresaId: payload.empresa_id, empresaNombre: payload.empresa_nombre, rol: payload.rol,
-    payloadAccessToken: { id: payload.id, nombre: payload.nombre, email: payload.email, rol: payload.rol, empresa_id: payload.empresa_id, es_super_admin: payload.es_super_admin },
+    payloadAccessToken: { id: payload.id, nombre: payload.nombre, email: payload.email, rol: payload.rol, empresa_id: payload.empresa_id, es_super_admin: payload.es_super_admin, debe_cambiar_password: payload.debe_cambiar_password },
   });
 
   res.json({ token: accessToken, refreshToken, usuario: payload });
@@ -144,7 +145,7 @@ async function login(req, res, next) {
 
     const { rows } = await pool.query(
       `select id, nombre, email, password_hash, activo, avatar, es_super_admin,
-              two_factor_enabled, two_factor_secret
+              two_factor_enabled, two_factor_secret, debe_cambiar_password
        from usuarios where email = $1`,
       [email]
     );
@@ -178,7 +179,7 @@ async function verificar2FA(req, res, next) {
     }
 
     const { rows } = await pool.query(
-      `select id, nombre, email, activo, avatar, es_super_admin, two_factor_enabled, two_factor_secret
+      `select id, nombre, email, activo, avatar, es_super_admin, two_factor_enabled, two_factor_secret, debe_cambiar_password
        from usuarios where id = $1`,
       [usuarioId]
     );
@@ -302,7 +303,7 @@ async function refrescarToken(req, res, next) {
 
     const { rows } = await pool.query(
       `select s.id as sesion_id, s.usuario_id, s.empresa_id, s.empresa_nombre, s.rol as sesion_rol,
-              u.nombre, u.email, u.avatar, u.es_super_admin, u.activo as usuario_activo
+              u.nombre, u.email, u.avatar, u.es_super_admin, u.activo as usuario_activo, u.debe_cambiar_password
        from sesiones s
        join usuarios u on u.id = s.usuario_id
        where s.token = $1 and s.activo = true and s.expira_en > now()`,
@@ -320,6 +321,7 @@ async function refrescarToken(req, res, next) {
       rol: sesion.sesion_rol,
       empresa_id: sesion.empresa_id,
       es_super_admin: sesion.es_super_admin,
+      debe_cambiar_password: sesion.debe_cambiar_password,
     });
     const nuevoRefreshToken = generarRefreshToken();
     const nuevaExpiracion = new Date(Date.now() + horasRefreshToken() * 60 * 60 * 1000);
@@ -337,6 +339,7 @@ async function refrescarToken(req, res, next) {
         empresa_nombre: sesion.empresa_nombre,
         es_super_admin: sesion.es_super_admin,
         avatar: sesion.avatar,
+        debe_cambiar_password: sesion.debe_cambiar_password,
       },
     });
   } catch (err) {
@@ -381,7 +384,7 @@ async function seleccionarEmpresa(req, res, next) {
     if (!empresa_id) return res.status(400).json({ mensaje: 'empresa_id es requerido' });
 
     const { rows: usuarioRows } = await pool.query(
-      'select id, nombre, email, avatar, es_super_admin from usuarios where id = $1',
+      'select id, nombre, email, avatar, es_super_admin, debe_cambiar_password from usuarios where id = $1',
       [req.usuario.id]
     );
     const usuario = usuarioRows[0];
@@ -419,10 +422,11 @@ async function seleccionarEmpresa(req, res, next) {
       empresa_logo: empresaLogo,
       es_super_admin: usuario.es_super_admin,
       avatar: usuario.avatar,
+      debe_cambiar_password: usuario.debe_cambiar_password,
     };
     const { accessToken, refreshToken } = await emitirTokens({
       usuarioId: usuario.id, empresaId: empresa_id, empresaNombre, rol,
-      payloadAccessToken: { id: payload.id, nombre: payload.nombre, email: payload.email, rol: payload.rol, empresa_id: payload.empresa_id, es_super_admin: payload.es_super_admin },
+      payloadAccessToken: { id: payload.id, nombre: payload.nombre, email: payload.email, rol: payload.rol, empresa_id: payload.empresa_id, es_super_admin: payload.es_super_admin, debe_cambiar_password: payload.debe_cambiar_password },
     });
 
     res.json({ token: accessToken, refreshToken, usuario: payload });
@@ -530,12 +534,27 @@ async function cambiarPassword(req, res, next) {
 
     const password_hash = await bcrypt.hash(password_nueva, 10);
     if (pista !== undefined) {
-      await pool.query('update usuarios set password_hash = $1, pista = $2 where id = $3', [password_hash, pistaFinal, req.usuario.id]);
+      await pool.query('update usuarios set password_hash = $1, pista = $2, debe_cambiar_password = false where id = $3', [password_hash, pistaFinal, req.usuario.id]);
     } else {
-      await pool.query('update usuarios set password_hash = $1 where id = $2', [password_hash, req.usuario.id]);
+      await pool.query('update usuarios set password_hash = $1, debe_cambiar_password = false where id = $2', [password_hash, req.usuario.id]);
     }
 
-    res.json({ mensaje: 'Contrasena actualizada correctamente' });
+    // Reemite el access token con debe_cambiar_password=false para que,
+    // si este cambio era obligatorio, el frontend quede desbloqueado de
+    // inmediato -- sin esto tendria que esperar hasta el proximo refresh
+    // (proactivo cada SESSION_REFRESH_INTERVAL_MINUTES) para dejar de
+    // recibir el 403 de "debes cambiar tu contrasena".
+    const token = firmarAccessToken({
+      id: req.usuario.id,
+      nombre: req.usuario.nombre,
+      email: req.usuario.email,
+      rol: req.usuario.rol,
+      empresa_id: req.usuario.empresa_id,
+      es_super_admin: req.usuario.es_super_admin,
+      debe_cambiar_password: false,
+    });
+
+    res.json({ mensaje: 'Contrasena actualizada correctamente', token });
   } catch (err) {
     next(err);
   }

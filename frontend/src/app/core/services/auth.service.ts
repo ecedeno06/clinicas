@@ -176,11 +176,40 @@ export class AuthService {
 
   // pista es opcional: si se omite, el backend no toca la pista ya
   // guardada; si se envia vacia o con texto, la reemplaza (validando
-  // similitud con la nueva contrasena en el segundo caso).
-  cambiarPassword(passwordActual: string, passwordNueva: string, pista?: string): Observable<{ mensaje: string }> {
+  // similitud con la nueva contrasena en el segundo caso). El backend
+  // reemite un access token (debe_cambiar_password=false) para desbloquear
+  // de inmediato si el cambio era obligatorio -- sin esperar al proximo
+  // refresh proactivo.
+  cambiarPassword(passwordActual: string, passwordNueva: string, pista?: string): Observable<{ mensaje: string; token?: string }> {
     const body: Record<string, string> = { password_actual: passwordActual, password_nueva: passwordNueva };
     if (pista !== undefined) body['pista'] = pista;
-    return this.http.put<{ mensaje: string }>(`${environment.apiUrl}/auth/password`, body);
+    return this.http.put<{ mensaje: string; token?: string }>(`${environment.apiUrl}/auth/password`, body).pipe(
+      tap((res) => {
+        if (res.token) this.actualizarTrasCambioPassword(res.token);
+      })
+    );
+  }
+
+  private actualizarTrasCambioPassword(token: string): void {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const actual = raw ? JSON.parse(raw) : {};
+    const usuarioActualizado = actual.usuario ? { ...actual.usuario, debe_cambiar_password: false } : actual.usuario;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...actual, token, usuario: usuarioActualizado }));
+    if (usuarioActualizado) this._usuario.set(usuarioActualizado);
+  }
+
+  // Llamado por el interceptor cuando el backend rechaza una peticion con
+  // requiereCambioPassword: true (el access token en uso quedo "viejo" --
+  // se emitio antes de que un admin reseteara esta contrasena). Fuerza el
+  // formulario obligatorio sin esperar al proximo refresh.
+  marcarCambioPasswordObligatorio(): void {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const actual = JSON.parse(raw);
+    if (!actual.usuario) return;
+    const usuarioActualizado = { ...actual.usuario, debe_cambiar_password: true };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...actual, usuario: usuarioActualizado }));
+    this._usuario.set(usuarioActualizado);
   }
 
   // GET /auth/pista -- publico, sin autenticacion (se usa desde la

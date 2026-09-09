@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, ValidationErrors, Validators, AbstractControl } from '@angular/forms';
 import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
@@ -23,6 +23,10 @@ export class LayoutComponent implements OnInit, OnDestroy {
   menuAbierto = signal(false);
   panelPasswordAbierto = signal(false);
   panelSeguridadAbierto = signal(false);
+  // Un admin marco esta cuenta con debe_cambiar_password (al crearla o al
+  // resetearle la contrasena) -- se fuerza el formulario, sin poder
+  // cancelarlo, hasta que el usuario ponga una contrasena propia.
+  cambioPasswordObligatorio = computed(() => !!this.auth.usuario()?.debe_cambiar_password);
   reportesAbierto = signal(false);
   sidebarColapsado = signal(localStorage.getItem(SIDEBAR_STORAGE_KEY) === '1');
 
@@ -118,7 +122,10 @@ export class LayoutComponent implements OnInit, OnDestroy {
     this.panelPasswordAbierto.set(true);
   }
 
-  cerrarCambioPassword(): void { this.panelPasswordAbierto.set(false); }
+  cerrarCambioPassword(): void {
+    if (this.cambioPasswordObligatorio()) return;
+    this.panelPasswordAbierto.set(false);
+  }
 
   abrirSeguridad(): void {
     this.menuAbierto.set(false);

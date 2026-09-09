@@ -68,8 +68,8 @@ async function crear(req, res, next) {
       }
       const password_hash = await bcrypt.hash(password, 10);
       const { rows } = await pool.query(
-        `insert into usuarios (nombre, email, password_hash, telefono, acepta_whatsapp, activo)
-         values ($1,$2,$3,$4, coalesce($5, false), coalesce($6, true)) returning id`,
+        `insert into usuarios (nombre, email, password_hash, telefono, acepta_whatsapp, activo, debe_cambiar_password)
+         values ($1,$2,$3,$4, coalesce($5, false), coalesce($6, true), true) returning id`,
         [nombre, email, password_hash, telefono, acepta_whatsapp, activo]
       );
       usuarioId = rows[0].id;
@@ -104,6 +104,9 @@ async function actualizar(req, res, next) {
     if (!pertenece.rows[0]) return res.status(404).json({ mensaje: 'Usuario no encontrado en esta clinica' });
 
     const password_hash = password ? await bcrypt.hash(password, 10) : null;
+    // Si un admin le pone una contrasena nueva a otro usuario (reset), esa
+    // contrasena es temporal -- la conoce el admin, no la eligio el
+    // usuario, asi que se le exige cambiarla en su siguiente login.
     await pool.query(
       `update usuarios set
          nombre = coalesce($1, nombre),
@@ -111,7 +114,8 @@ async function actualizar(req, res, next) {
          telefono = coalesce($3, telefono),
          acepta_whatsapp = coalesce($4, acepta_whatsapp),
          activo = coalesce($5, activo),
-         password_hash = coalesce($6, password_hash)
+         password_hash = coalesce($6, password_hash),
+         debe_cambiar_password = case when $6::text is not null then true else debe_cambiar_password end
        where id = $7`,
       [nombre, avatar, telefono, acepta_whatsapp, activo, password_hash, req.params.id]
     );

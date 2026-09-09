@@ -19,6 +19,17 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
 
   return next(authReq).pipe(
     catchError((err: HttpErrorResponse) => {
+      // El backend bloquea todo menos /auth/password, /auth/logout y
+      // /auth/me mientras debe_cambiar_password este activo. Esto ocurre
+      // normalmente cuando el access token en uso se emitio ANTES de que
+      // un admin reseteara esta contrasena -- se marca localmente para
+      // que el formulario obligatorio se muestre sin esperar el proximo
+      // refresh.
+      if (err.status === 403 && (err.error as { requiereCambioPassword?: boolean } | null)?.requiereCambioPassword) {
+        auth.marcarCambioPasswordObligatorio();
+        return throwError(() => err);
+      }
+
       // El access token dura poco a proposito (ver JWT_EXPIRES_IN) -- si
       // vencio a mitad de una sesion activa, se intenta renovar una sola
       // vez con el refresh token y se reintenta la peticion original.

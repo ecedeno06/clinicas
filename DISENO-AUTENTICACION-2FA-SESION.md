@@ -127,6 +127,36 @@ en la app):
   navegador real que el interceptor renueva sola la sesión ante un access
   token corrompido, sin desloguear al usuario.
 
+## Actualización 2026-09-09 — cambio de contraseña obligatorio (debe_cambiar_password)
+
+Inspirado en `agro 1.1`: hoy en la clínica, cuando un admin crea un
+usuario o le resetea la contraseña desde la pantalla de Usuarios, el
+admin escribe directamente la contraseña que esa persona va a usar --
+la conoce, y no había ningún paso de "cámbiala en tu primer login".
+
+- Columna nueva `usuarios.debe_cambiar_password` (migración 028). Se
+  activa al **crear** un usuario nuevo y al **resetear** la contraseña de
+  uno existente desde `PUT /api/usuarios/:id` (un admin cambiando la
+  contraseña de otro siempre es un reset temporal); NO se activa cuando
+  el propio usuario cambia su contraseña via `/auth/password`
+  (auto-servicio, con su contraseña actual) -- ese camino la limpia.
+- **Aplicado servidor + cliente**: el flag viaja como claim en el access
+  token (sin costo extra de BD, igual que `rol`/`empresa_id`) y
+  `requireAuth` bloquea con 403 (`requiereCambioPassword: true`)
+  cualquier ruta que no sea `/auth/password`, `/auth/logout` o
+  `/auth/me`. El frontend fuerza el drawer de "Cambiar contraseña" sin
+  botón de cerrar ni Cancelar mientras el flag siga activo.
+- Al cambiar la contraseña exitosamente, el backend reemite el access
+  token (`debe_cambiar_password: false`) en la misma respuesta, para que
+  el desbloqueo sea inmediato -- sin esperar al próximo refresh
+  proactivo (hasta `SESSION_REFRESH_INTERVAL_MINUTES` de retraso si no
+  se hiciera esto).
+- Probado end-to-end contra `.17` (creación de usuario, bloqueo de rutas,
+  excepciones funcionando, cambio de contraseña desbloqueando, reset por
+  admin re-activando el flag, edición sin contraseña sin tocarlo) y en
+  navegador real (drawer forzado sin cerrar/cancelar tras el login,
+  desbloqueo automático al guardar).
+
 ## Fuera de alcance (por ahora)
 
 - Cookies `httpOnly` para el refresh token (evaluado, ver arriba) -- el
