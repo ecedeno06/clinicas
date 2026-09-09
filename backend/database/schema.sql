@@ -45,6 +45,16 @@ create table if not exists usuarios (
     es_super_admin  boolean not null default false,
     -- Foto de perfil en base64 (data URI)
     avatar          text,
+    -- Pista de contrasena, mostrada en el login (GET /auth/pista). Se
+    -- valida al guardarla que no se parezca demasiado a la contrasena
+    -- (ver PASSWORD_HINT_MAX_SIMILARITY).
+    pista           text,
+    -- 2FA por app autenticadora (TOTP). El secreto se guarda cifrado
+    -- (AES-256-CBC, ver CRYPTO_SECRET_KEY), nunca en texto plano.
+    -- two_factor_enabled queda en false por defecto: el usuario debe
+    -- enrolarse explicitamente desde la pantalla de seguridad.
+    two_factor_enabled boolean not null default false,
+    two_factor_secret  text,
     created_at      timestamptz not null default now(),
     updated_at      timestamptz not null default now()
 );
@@ -429,8 +439,34 @@ create table if not exists orden_laboratorio_examenes (
 );
 
 -- ---------------------------------------------------------
+-- Tabla: sesiones (registro en BD de sesiones de usuario, para auditar
+-- quien esta/estuvo conectado, desde que clinica/sucursal y por cuanto
+-- tiempo). Fase 1: solo la tabla -- el login/logout/middleware de
+-- autenticacion (JWT firmado, sin consulta a BD) no la usa todavia.
+-- ---------------------------------------------------------
+create table if not exists sesiones (
+    id                uuid primary key default gen_random_uuid(),
+    usuario_id        uuid not null references usuarios(id) on delete cascade,
+    empresa_id        uuid references empresas(id) on delete cascade,
+    empresa_nombre    text,
+    sucursal_id       uuid references sucursales(id) on delete set null,
+    sucursal_nombre   text,
+    rol               text check (rol is null or rol in ('admin', 'doctor', 'recepcionista')),
+    token             text not null unique,
+    activo            boolean not null default true,
+    razon_salida      text,
+    duracion_segundos integer,
+    expira_en         timestamptz not null,
+    created_at        timestamptz not null default now(),
+    updated_at        timestamptz not null default now()
+);
+
+-- ---------------------------------------------------------
 -- Indices
 -- ---------------------------------------------------------
+create index if not exists idx_sesiones_usuario on sesiones(usuario_id);
+create index if not exists idx_sesiones_empresa on sesiones(empresa_id);
+create index if not exists idx_sesiones_token_activo on sesiones(token) where activo = true;
 create index if not exists idx_usuarios_empresas_rol_usuario on usuarios_empresas_rol(usuario_id);
 create index if not exists idx_usuarios_empresas_rol_empresa on usuarios_empresas_rol(empresa_id);
 create index if not exists idx_pacientes_empresas_paciente on pacientes_empresas(paciente_id);
@@ -485,7 +521,7 @@ do $$
 declare
     t text;
 begin
-    foreach t in array array['empresas','usuarios','usuarios_empresas_rol','especialidades','pacientes','pacientes_empresas','direcciones_paciente','sucursales','doctores','doctor_especialidades','doctor_horarios','campanas','campana_doctores','citas','historias_clinicas','signos_vitales','recetas','ordenes_laboratorio']
+    foreach t in array array['empresas','usuarios','usuarios_empresas_rol','especialidades','pacientes','pacientes_empresas','direcciones_paciente','sucursales','doctores','doctor_especialidades','doctor_horarios','campanas','campana_doctores','citas','historias_clinicas','signos_vitales','recetas','ordenes_laboratorio','sesiones']
     loop
         execute format('drop trigger if exists trg_set_updated_at on %I', t);
         execute format('create trigger trg_set_updated_at before update on %I for each row execute function set_updated_at()', t);

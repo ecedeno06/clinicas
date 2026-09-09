@@ -1,9 +1,31 @@
 const router = require('express').Router();
-const { login, seleccionarEmpresa, misEmpresas, me, actualizarPerfil, cambiarPassword } = require('../controllers/auth.controller');
+const {
+  login,
+  verificar2FA,
+  setup2FA,
+  enable2FA,
+  disable2FA,
+  logout,
+  obtenerPista,
+  sessionConfig,
+  seleccionarEmpresa,
+  misEmpresas,
+  me,
+  actualizarPerfil,
+  cambiarPassword,
+} = require('../controllers/auth.controller');
 const { requireAuth } = require('../middleware/auth');
+const rateLimitPista = require('../middleware/rateLimitPista');
 
 router.post('/login', login);
+router.post('/2fa/verify-login', verificar2FA);
+router.get('/pista', rateLimitPista, obtenerPista);
+router.get('/session-config', sessionConfig);
 router.post('/seleccionar-empresa', requireAuth, seleccionarEmpresa);
+router.post('/logout', requireAuth, logout);
+router.post('/2fa/setup', requireAuth, setup2FA);
+router.post('/2fa/enable', requireAuth, enable2FA);
+router.post('/2fa/disable', requireAuth, disable2FA);
 router.get('/mis-empresas', requireAuth, misEmpresas);
 router.get('/me', requireAuth, me);
 router.put('/me', requireAuth, actualizarPerfil);

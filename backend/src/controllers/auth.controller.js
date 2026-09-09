@@ -1,15 +1,128 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { authenticator } = require('otplib');
+const QRCode = require('qrcode');
 const { pool } = require('../config/db');
+const { encriptar, desencriptar } = require('../utils/cifrado2fa');
+const { porcentajeSimilitud } = require('../utils/levenshtein');
 
 function firmarToken(payload, expiresIn) {
   return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: expiresIn || process.env.JWT_EXPIRES_IN || '8h' });
 }
 
+// Bitacora de sesiones (tabla "sesiones", migracion 026): se inserta una
+// fila cada vez que se emite un JWT final (login completo, seleccion de
+// empresa, o verificacion de 2FA) -- nunca para los tokens parciales
+// (10 min, en espera de elegir empresa o de completar 2FA). El middleware
+// de autenticacion sigue validando solo la firma del JWT, esta tabla es
+// solo para auditoria (quien esta/estuvo conectado y por cuanto tiempo).
+async function crearRegistroSesion({ usuarioId, empresaId, empresaNombre, rol, token }) {
+  const decodificado = jwt.decode(token);
+  const expiraEn = decodificado?.exp ? new Date(decodificado.exp * 1000) : new Date(Date.now() + 8 * 60 * 60 * 1000);
+  await pool.query(
+    `insert into sesiones (usuario_id, empresa_id, empresa_nombre, rol, token, expira_en)
+     values ($1, $2, $3, $4, $5, $6)`,
+    [usuarioId, empresaId || null, empresaNombre || null, rol || null, token, expiraEn]
+  );
+}
+
+// Continua el login despues de validar password (o codigo 2FA): resuelve
+// la(s) clinica(s) del usuario y emite el JWT final, o pide seleccionar
+// empresa si tiene mas de una. Compartido entre login() y verificar2FA().
+async function continuarLoginTrasPassword(usuario, res) {
+  // Un super-admin elige SIEMPRE la clinica activa al iniciar sesion
+  // (incluso si solo tiene una), viendo todas las clinicas del sistema.
+  if (usuario.es_super_admin) {
+    const { rows: todasEmpresas } = await pool.query(
+      `select e.id as empresa_id, e.nombre as empresa_nombre,
+              coalesce(uer.rol, 'admin') as rol
+       from empresas e
+       left join usuarios_empresas_rol uer
+              on uer.empresa_id = e.id and uer.usuario_id = $1
+       where e.activo = true
+       order by e.nombre`,
+      [usuario.id]
+    );
+
+    if (todasEmpresas.length === 0) {
+      const payload = {
+        id: usuario.id, nombre: usuario.nombre, email: usuario.email,
+        rol: null, empresa_id: null, empresa_nombre: null, empresa_logo: null,
+        es_super_admin: true, avatar: usuario.avatar,
+      };
+      const token = firmarToken({
+        id: payload.id, nombre: payload.nombre, email: payload.email,
+        rol: null, empresa_id: null, es_super_admin: true,
+      });
+      await crearRegistroSesion({ usuarioId: usuario.id, empresaId: null, empresaNombre: null, rol: null, token });
+      return res.json({ token, usuario: payload });
+    }
+
+    const tokenParcial = firmarToken(
+      { id: usuario.id, nombre: usuario.nombre, email: usuario.email, parcial: true },
+      '10m'
+    );
+    return res.json({
+      requiereSeleccionEmpresa: true,
+      tokenParcial,
+      empresas: todasEmpresas.map((e) => ({ empresa_id: e.empresa_id, empresa_nombre: e.empresa_nombre, rol: e.rol })),
+    });
+  }
+
+  const { rows: empresas } = await pool.query(
+    `select uer.empresa_id, uer.rol, e.nombre as empresa_nombre, e.logo as empresa_logo
+     from usuarios_empresas_rol uer
+     join empresas e on e.id = uer.empresa_id
+     where uer.usuario_id = $1 and e.activo = true
+     order by e.nombre`,
+    [usuario.id]
+  );
+
+  if (empresas.length === 0) {
+    return res.status(401).json({ mensaje: 'El usuario no tiene ninguna clinica asignada' });
+  }
+
+  if (empresas.length > 1) {
+    const tokenParcial = firmarToken(
+      { id: usuario.id, nombre: usuario.nombre, email: usuario.email, parcial: true },
+      '10m'
+    );
+    return res.json({
+      requiereSeleccionEmpresa: true,
+      tokenParcial,
+      empresas: empresas.map((e) => ({ empresa_id: e.empresa_id, empresa_nombre: e.empresa_nombre, rol: e.rol })),
+    });
+  }
+
+  const empresaActiva = empresas[0];
+  const payload = {
+    id: usuario.id,
+    nombre: usuario.nombre,
+    email: usuario.email,
+    rol: empresaActiva ? empresaActiva.rol : null,
+    empresa_id: empresaActiva ? empresaActiva.empresa_id : null,
+    empresa_nombre: empresaActiva ? empresaActiva.empresa_nombre : null,
+    empresa_logo: empresaActiva ? empresaActiva.empresa_logo : null,
+    es_super_admin: usuario.es_super_admin,
+    avatar: usuario.avatar,
+  };
+  const token = firmarToken({
+    id: payload.id,
+    nombre: payload.nombre,
+    email: payload.email,
+    rol: payload.rol,
+    empresa_id: payload.empresa_id,
+    es_super_admin: payload.es_super_admin,
+  });
+  await crearRegistroSesion({ usuarioId: usuario.id, empresaId: payload.empresa_id, empresaNombre: payload.empresa_nombre, rol: payload.rol, token });
+
+  res.json({ token, usuario: payload });
+}
+
 // POST /api/auth/login
-// Si el usuario pertenece a una sola clinica activa, entrega el JWT final
-// directamente. Si pertenece a varias, entrega un token parcial + la lista
-// de clinicas, y el frontend debe llamar a /auth/seleccionar-empresa.
+// Si el usuario tiene 2FA activo, responde { requiere2FA, usuarioId } y el
+// frontend debe llamar a /auth/2fa/verify-login con el codigo. Si no,
+// continua el flujo normal (una clinica: JWT final; varias: seleccion).
 async function login(req, res, next) {
   try {
     const { email, password } = req.body;
@@ -18,7 +131,9 @@ async function login(req, res, next) {
     }
 
     const { rows } = await pool.query(
-      'select id, nombre, email, password_hash, activo, avatar, es_super_admin from usuarios where email = $1',
+      `select id, nombre, email, password_hash, activo, avatar, es_super_admin,
+              two_factor_enabled, two_factor_secret
+       from usuarios where email = $1`,
       [email]
     );
     const usuario = rows[0];
@@ -32,95 +147,156 @@ async function login(req, res, next) {
       return res.status(401).json({ mensaje: 'Credenciales invalidas' });
     }
 
-    // Un super-admin elige SIEMPRE la clinica activa al iniciar sesion
-    // (incluso si solo tiene una), viendo todas las clinicas del sistema.
-    if (usuario.es_super_admin) {
-      const { rows: todasEmpresas } = await pool.query(
-        `select e.id as empresa_id, e.nombre as empresa_nombre,
-                coalesce(uer.rol, 'admin') as rol
-         from empresas e
-         left join usuarios_empresas_rol uer
-                on uer.empresa_id = e.id and uer.usuario_id = $1
-         where e.activo = true
-         order by e.nombre`,
-        [usuario.id]
-        
-      );
-
-      if (todasEmpresas.length === 0) {
-        const payload = {
-          id: usuario.id, nombre: usuario.nombre, email: usuario.email,
-          rol: null, empresa_id: null, empresa_nombre: null, empresa_logo: null,
-          es_super_admin: true, avatar: usuario.avatar,
-        };
-        const token = firmarToken({
-          id: payload.id, nombre: payload.nombre, email: payload.email,
-          rol: null, empresa_id: null, es_super_admin: true,
-        });
-        return res.json({ token, usuario: payload });
-      }
-
-      const tokenParcial = firmarToken(
-        { id: usuario.id, nombre: usuario.nombre, email: usuario.email, parcial: true },
-        '10m'
-      );
-      return res.json({
-        requiereSeleccionEmpresa: true,
-        tokenParcial,
-        empresas: todasEmpresas.map((e) => ({ empresa_id: e.empresa_id, empresa_nombre: e.empresa_nombre, rol: e.rol })),
-      });
+    if (usuario.two_factor_enabled) {
+      return res.json({ requiere2FA: true, usuarioId: usuario.id });
     }
 
-    const { rows: empresas } = await pool.query(
-      `select uer.empresa_id, uer.rol, e.nombre as empresa_nombre, e.logo as empresa_logo
-       from usuarios_empresas_rol uer
-       join empresas e on e.id = uer.empresa_id
-       where uer.usuario_id = $1 and e.activo = true
-       order by e.nombre`,
-      [usuario.id]
-    );
-
-    if (empresas.length === 0) {
-      return res.status(401).json({ mensaje: 'El usuario no tiene ninguna clinica asignada' });
-    }
-
-    if (empresas.length > 1) {
-      const tokenParcial = firmarToken(
-        { id: usuario.id, nombre: usuario.nombre, email: usuario.email, parcial: true },
-        '10m'
-      );
-      return res.json({
-        requiereSeleccionEmpresa: true,
-        tokenParcial,
-        empresas: empresas.map((e) => ({ empresa_id: e.empresa_id, empresa_nombre: e.empresa_nombre, rol: e.rol })),
-      });
-    }
-
-    const empresaActiva = empresas[0];
-    const payload = {
-      id: usuario.id,
-      nombre: usuario.nombre,
-      email: usuario.email,
-      rol: empresaActiva ? empresaActiva.rol : null,
-      empresa_id: empresaActiva ? empresaActiva.empresa_id : null,
-      empresa_nombre: empresaActiva ? empresaActiva.empresa_nombre : null,
-      empresa_logo: empresaActiva ? empresaActiva.empresa_logo : null,
-      es_super_admin: usuario.es_super_admin,
-      avatar: usuario.avatar,
-    };
-    const token = firmarToken({
-      id: payload.id,
-      nombre: payload.nombre,
-      email: payload.email,
-      rol: payload.rol,
-      empresa_id: payload.empresa_id,
-      es_super_admin: payload.es_super_admin,
-    });
-
-    res.json({ token, usuario: payload });
+    await continuarLoginTrasPassword(usuario, res);
   } catch (err) {
     next(err);
   }
+}
+
+// POST /api/auth/2fa/verify-login  { usuarioId, code }
+async function verificar2FA(req, res, next) {
+  try {
+    const { usuarioId, code } = req.body;
+    if (!usuarioId || !code) {
+      return res.status(400).json({ mensaje: 'usuarioId y code son requeridos' });
+    }
+
+    const { rows } = await pool.query(
+      `select id, nombre, email, activo, avatar, es_super_admin, two_factor_enabled, two_factor_secret
+       from usuarios where id = $1`,
+      [usuarioId]
+    );
+    const usuario = rows[0];
+
+    if (!usuario || !usuario.activo || !usuario.two_factor_enabled || !usuario.two_factor_secret) {
+      return res.status(401).json({ mensaje: 'Sesion invalida, inicia sesion nuevamente' });
+    }
+
+    const secret = desencriptar(usuario.two_factor_secret);
+    const esValido = authenticator.check(String(code).trim(), secret);
+    if (!esValido) {
+      return res.status(401).json({ mensaje: 'Codigo invalido' });
+    }
+
+    await continuarLoginTrasPassword(usuario, res);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// POST /api/auth/2fa/setup  (autenticado)
+// Genera un secreto nuevo + QR de enrolamiento. No se guarda todavia --
+// se confirma con /auth/2fa/enable una vez el usuario escanea y valida un
+// codigo, para evitar guardar un secreto que el usuario nunca configuro.
+async function setup2FA(req, res, next) {
+  try {
+    const { rows } = await pool.query('select email from usuarios where id = $1', [req.usuario.id]);
+    const usuario = rows[0];
+    if (!usuario) return res.status(404).json({ mensaje: 'Usuario no encontrado' });
+
+    const secret = authenticator.generateSecret();
+    const otpauth = authenticator.keyuri(usuario.email, 'Clinica', secret);
+    const qrCode = await QRCode.toDataURL(otpauth);
+
+    res.json({ secret, qrCode });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// POST /api/auth/2fa/enable  { secret, code }  (autenticado)
+async function enable2FA(req, res, next) {
+  try {
+    const { secret, code } = req.body;
+    if (!secret || !code) return res.status(400).json({ mensaje: 'secret y code son requeridos' });
+
+    const esValido = authenticator.check(String(code).trim(), secret);
+    if (!esValido) return res.status(400).json({ mensaje: 'Codigo invalido' });
+
+    const secretCifrado = encriptar(secret);
+    await pool.query(
+      'update usuarios set two_factor_secret = $1, two_factor_enabled = true where id = $2',
+      [secretCifrado, req.usuario.id]
+    );
+
+    res.json({ mensaje: '2FA activado correctamente' });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// POST /api/auth/2fa/disable  { code }  (autenticado)
+async function disable2FA(req, res, next) {
+  try {
+    const { code } = req.body;
+    if (!code) return res.status(400).json({ mensaje: 'code es requerido' });
+
+    const { rows } = await pool.query('select two_factor_secret from usuarios where id = $1', [req.usuario.id]);
+    const usuario = rows[0];
+    if (!usuario || !usuario.two_factor_secret) {
+      return res.status(400).json({ mensaje: 'El 2FA no esta activo' });
+    }
+
+    const secret = desencriptar(usuario.two_factor_secret);
+    const esValido = authenticator.check(String(code).trim(), secret);
+    if (!esValido) return res.status(400).json({ mensaje: 'Codigo invalido' });
+
+    await pool.query(
+      'update usuarios set two_factor_secret = null, two_factor_enabled = false where id = $1',
+      [req.usuario.id]
+    );
+
+    res.json({ mensaje: '2FA desactivado correctamente' });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// POST /api/auth/logout  { razon? }  (autenticado)
+// Cierra la fila de "sesiones" del token actual. Razones esperadas:
+// 'logout_usuario' (default), 'inactividad'.
+async function logout(req, res, next) {
+  try {
+    const razonSalida = req.body?.razon || 'logout_usuario';
+    await pool.query(
+      `update sesiones set activo = false, razon_salida = $1,
+         duracion_segundos = extract(epoch from (now() - created_at))::integer
+       where token = $2 and activo = true`,
+      [razonSalida, req.token]
+    );
+    res.json({ mensaje: 'Sesion cerrada' });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// GET /api/auth/pista?email=...  (publico, con rate-limit en la ruta)
+async function obtenerPista(req, res, next) {
+  try {
+    const email = String(req.query.email || '').trim().toLowerCase();
+    if (!email) return res.status(400).json({ mensaje: 'email es requerido' });
+
+    const { rows } = await pool.query('select pista from usuarios where email = $1 and activo = true', [email]);
+    const pista = rows[0]?.pista;
+    if (!pista) return res.status(404).json({ mensaje: 'No hay una pista configurada para ese usuario' });
+
+    res.json({ pista });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// GET /api/auth/session-config  (publico -- el login lo necesita antes de autenticarse)
+function sessionConfig(req, res) {
+  res.json({
+    inactivityLimitMinutes: Number(process.env.SESSION_INACTIVITY_LIMIT_MINUTES) || 15,
+    warningBeforeMinutes: Number(process.env.SESSION_WARNING_BEFORE_MINUTES) || 2,
+    passwordHintMaxSimilarity: Number(process.env.PASSWORD_HINT_MAX_SIMILARITY) || 70,
+  });
 }
 
 // POST /api/auth/seleccionar-empresa  { empresa_id }
@@ -181,6 +357,7 @@ async function seleccionarEmpresa(req, res, next) {
       empresa_id: payload.empresa_id,
       es_super_admin: payload.es_super_admin,
     });
+    await crearRegistroSesion({ usuarioId: usuario.id, empresaId: empresa_id, empresaNombre, rol, token });
 
     res.json({ token, usuario: payload });
   } catch (err) {
@@ -223,7 +400,7 @@ async function misEmpresas(req, res, next) {
 async function me(req, res, next) {
   try {
     const { rows } = await pool.query(
-      'select id, nombre, email, activo, avatar, es_super_admin, created_at from usuarios where id = $1',
+      'select id, nombre, email, activo, avatar, es_super_admin, two_factor_enabled, created_at from usuarios where id = $1',
       [req.usuario.id]
     );
     if (!rows[0]) return res.status(404).json({ mensaje: 'Usuario no encontrado' });
@@ -249,10 +426,13 @@ async function actualizarPerfil(req, res, next) {
   }
 }
 
-// PUT /api/auth/password  { password_actual, password_nueva }
+// PUT /api/auth/password  { password_actual, password_nueva, pista? }
+// "pista" es opcional: si no se envia la clave en el body, no se toca la
+// pista guardada; si se envia vacia, se borra; si se envia con texto, se
+// valida que no se parezca demasiado a la nueva contrasena.
 async function cambiarPassword(req, res, next) {
   try {
-    const { password_actual, password_nueva } = req.body;
+    const { password_actual, password_nueva, pista } = req.body;
     if (!password_actual || !password_nueva) {
       return res.status(400).json({ mensaje: 'password_actual y password_nueva son requeridos' });
     }
@@ -268,8 +448,26 @@ async function cambiarPassword(req, res, next) {
       return res.status(401).json({ mensaje: 'La contrasena actual no es correcta' });
     }
 
+    let pistaFinal;
+    if (pista !== undefined) {
+      pistaFinal = String(pista).trim() || null;
+      if (pistaFinal) {
+        const maxSimilitud = Number(process.env.PASSWORD_HINT_MAX_SIMILARITY) || 70;
+        const similitud = porcentajeSimilitud(password_nueva, pistaFinal);
+        if (similitud > maxSimilitud) {
+          return res.status(400).json({
+            mensaje: `La pista es demasiado obvia (${similitud.toFixed(0)}% de similitud con la contrasena). Debe parecerse menos de un ${maxSimilitud}%.`,
+          });
+        }
+      }
+    }
+
     const password_hash = await bcrypt.hash(password_nueva, 10);
-    await pool.query('update usuarios set password_hash = $1 where id = $2', [password_hash, req.usuario.id]);
+    if (pista !== undefined) {
+      await pool.query('update usuarios set password_hash = $1, pista = $2 where id = $3', [password_hash, pistaFinal, req.usuario.id]);
+    } else {
+      await pool.query('update usuarios set password_hash = $1 where id = $2', [password_hash, req.usuario.id]);
+    }
 
     res.json({ mensaje: 'Contrasena actualizada correctamente' });
   } catch (err) {
@@ -277,4 +475,18 @@ async function cambiarPassword(req, res, next) {
   }
 }
 
-module.exports = { login, seleccionarEmpresa, misEmpresas, me, actualizarPerfil, cambiarPassword };
+module.exports = {
+  login,
+  verificar2FA,
+  setup2FA,
+  enable2FA,
+  disable2FA,
+  logout,
+  obtenerPista,
+  sessionConfig,
+  seleccionarEmpresa,
+  misEmpresas,
+  me,
+  actualizarPerfil,
+  cambiarPassword,
+};

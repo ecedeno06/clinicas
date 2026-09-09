@@ -136,6 +136,10 @@
           }
         </button>
 
+        <span class="session-timer" [class.warning]="sessionService.mostrarAviso()" title="Tiempo de sesion activa">
+          ⏱ {{ tiempoConectado() }}
+        </span>
+
         <div class="user-menu">
           <button class="user-pill user-pill-btn" (click)="menuAbierto.set(!menuAbierto())">
             @if (auth.usuario()?.avatar) {
@@ -157,6 +161,7 @@
                 <button type="button" class="dropdown-item dropdown-item-danger" (click)="eliminarFotoPerfil()">Eliminar foto de perfil</button>
               }
               <button type="button" class="dropdown-item" (click)="abrirCambioPassword()">Cambiar contrasena</button>
+              <button type="button" class="dropdown-item" (click)="abrirSeguridad()">Seguridad (2FA)</button>
               <button type="button" class="dropdown-item dropdown-item-danger" (click)="auth.logout()">Salir</button>
             </div>
           }
@@ -173,6 +178,8 @@
     <footer class="page-footer">&copy; {{ anioActual }} Edwin Cedeno H. Todos los derechos reservados.</footer>
   </div>
 </div>
+
+<app-inactividad></app-inactividad>
 
 @if (panelPasswordAbierto()) {
   <div class="overlay">
@@ -197,11 +204,31 @@
             <div class="error-text">Las contrasenas no coinciden.</div>
           }
         </div>
+        <div class="form-group mt-16">
+          <label>Pista de contrasena (opcional)</label>
+          <input class="input" type="text" formControlName="pista" placeholder="Ej: mi mascota + ano de graduacion" />
+          <div class="text-muted text-sm mt-8">
+            Se muestra en la pantalla de login si olvidas tu contrasena. Dejar en blanco
+            para no cambiar la pista ya guardada.
+          </div>
+        </div>
         <div class="form-actions">
           <button type="submit" class="btn btn-primary" [disabled]="passwordForm.invalid">Guardar</button>
           <button type="button" class="btn btn-outline" (click)="cerrarCambioPassword()">Cancelar</button>
         </div>
       </form>
+    </div>
+  </div>
+}
+
+@if (panelSeguridadAbierto()) {
+  <div class="overlay">
+    <div class="drawer">
+      <div class="drawer-header">
+        <h2>Seguridad</h2>
+        <button class="close" (click)="cerrarSeguridad()">&times;</button>
+      </div>
+      <app-seguridad></app-seguridad>
     </div>
   </div>
 }

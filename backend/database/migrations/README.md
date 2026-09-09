@@ -43,6 +43,8 @@ docker run --rm -i -e PGPASSWORD='<password>' postgres:16 \
 | `023_pacientes_comparte_ubicacion.sql` | Columna `comparte_ubicacion` en `pacientes` (consentimiento para mostrar los botones de ubicacion) | ✅ Aplicada 2026-09-08 | ✅ Aplicada 2026-09-08 |
 | `024_usuarios_telefono.sql` | Columnas `telefono` y `acepta_whatsapp` en `usuarios` | ✅ Aplicada 2026-09-08 | ✅ Aplicada 2026-09-08 |
 | `025_direcciones_paciente.sql` | Tabla `direcciones_paciente` (un paciente puede tener varias direcciones, una principal; incluye pais/provincia/distrito/corregimiento y comparte_ubicacion por direccion); elimina `pacientes.direccion`/`google_maps_url`/`comparte_ubicacion` | ✅ Aplicada 2026-09-08 | ✅ Aplicada 2026-09-08 |
+| `026_sesiones.sql` | Tabla nueva `sesiones` (registro en BD de sesiones de usuario -- clinica/sucursal, token, expiracion, razon de salida). Fase 1 solamente: el login/logout/middleware actual (JWT sin consulta a BD) no la usa todavia | ✅ Aplicada 2026-09-08 | ⏳ Pendiente |
+| `027_auth_2fa_pista.sql` | Columnas `pista` (hint de contrasena), `two_factor_enabled`/`two_factor_secret` (2FA por app autenticadora, TOTP) en `usuarios`. Fase 1 de DISENO-AUTENTICACION-2FA-SESION.md: solo el esquema, sin wiring de backend/frontend todavia | ✅ Aplicada 2026-09-08 | ⏳ Pendiente |
 
 **Verificado 2026-09-02**: comparacion completa de esquema (tablas, columnas,
 indices, constraints, funciones, triggers) entre `.19` y Neon — identicos

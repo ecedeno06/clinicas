@@ -472,6 +472,17 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; colo
 }
 .user-pill-btn:hover { background: var(--slate-50); }
 
+.session-timer {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--slate-500);
+  white-space: nowrap;
+}
+.session-timer.warning {
+  color: var(--text-on-tint-red);
+  font-weight: 700;
+}
+
 .dropdown-backdrop {
   position: fixed;
   inset: 0;
@@ -852,6 +863,15 @@ table.data-table {
   background: #fee2e2; color: #dc2626;
   padding: 8px 12px; border-radius: 8px; font-size: 12.5px; margin-bottom: 12px;
 }
+.auth-hint {
+  background: #eef1f6; color: #2a3654;
+  padding: 8px 12px; border-radius: 8px; font-size: 12.5px;
+}
+.btn-link {
+  background: none; border: none; padding: 0;
+  color: #2563eb; cursor: pointer; text-decoration: underline;
+}
+.btn-link:disabled { opacity: 0.6; cursor: not-allowed; }
 
 /* ---------- Icono de cita de urgencia (sirena, brillo + balanceo) ---------- */
 .icono-urgencia {

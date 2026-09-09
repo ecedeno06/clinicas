@@ -11,6 +11,7 @@ function requireAuth(req, res, next) {
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET);
     req.usuario = payload; // { id, nombre, email, rol, empresa_id, es_super_admin } o { id, nombre, email, parcial: true }
+    req.token = token; // el JWT crudo, usado por ejemplo para cerrar la fila de "sesiones" en logout
     next();
   } catch (err) {
     return res.status(401).json({ mensaje: 'Token invalido o expirado' });

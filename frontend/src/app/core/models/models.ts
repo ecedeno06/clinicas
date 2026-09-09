@@ -12,6 +12,7 @@ export interface Usuario {
   acepta_whatsapp?: boolean;
   avatar?: string | null;
   es_super_admin?: boolean;
+  two_factor_enabled?: boolean;
   empresa_id?: string | null;
   empresa_nombre?: string | null;
   empresa_logo?: string | null;

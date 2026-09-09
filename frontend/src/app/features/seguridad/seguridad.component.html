@@ -1,0 +1,75 @@
+@if (error()) {
+  <div class="auth-error mt-16">{{ error() }}</div>
+}
+
+@if (paso() === 'inicial') {
+  <div class="flex items-center gap-8">
+    <strong>Verificacion en dos pasos</strong>
+    @if (usuario()?.two_factor_enabled) {
+      <span class="badge badge-green">Activada</span>
+    } @else {
+      <span class="badge badge-slate">Desactivada</span>
+    }
+  </div>
+  <p class="text-muted text-sm mt-8">
+    Usa una app autenticadora (Google Authenticator, Authy, etc.) para pedir
+    un codigo adicional cada vez que inicies sesion.
+  </p>
+  <div class="form-actions">
+    @if (usuario()?.two_factor_enabled) {
+      <button type="button" class="btn btn-danger" (click)="iniciarDesactivacion()">Desactivar</button>
+    } @else {
+      <button type="button" class="btn btn-primary" [disabled]="cargando()" (click)="iniciarEnrolamiento()">
+        {{ cargando() ? 'Generando...' : 'Activar 2FA' }}
+      </button>
+    }
+  </div>
+}
+
+@if (paso() === 'enrolando') {
+  <p class="text-muted text-sm">
+    Abre tu app autenticadora, escanea el codigo y escribe el codigo de 6 digitos que genera para confirmar.
+  </p>
+
+  <div class="mt-16" style="display:flex; gap:24px; flex-wrap:wrap; align-items:flex-start;">
+    @if (qrTemporal()) {
+      <img [src]="qrTemporal()" alt="Codigo QR de 2FA" style="width:180px;height:180px;" />
+    }
+    <div style="flex:1; min-width:220px;">
+      <p class="text-muted text-sm">
+        Si no puedes escanear el QR, ingresa este codigo manualmente en tu app:
+      </p>
+      <code style="display:block; padding:8px; background:var(--slate-50); border-radius:6px; word-break:break-all;">{{ secretoTemporal() }}</code>
+    </div>
+  </div>
+
+  <form [formGroup]="codeForm" (ngSubmit)="confirmarEnrolamiento()">
+    <div class="form-group mt-16">
+      <label>Codigo de 6 digitos</label>
+      <input class="input" type="text" inputmode="numeric" maxlength="6" formControlName="code" placeholder="000000" />
+    </div>
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary" [disabled]="codeForm.invalid || cargando()">
+        {{ cargando() ? 'Confirmando...' : 'Confirmar y activar' }}
+      </button>
+      <button type="button" class="btn btn-outline" (click)="cancelarEnrolamiento()">Cancelar</button>
+    </div>
+  </form>
+}
+
+@if (paso() === 'desactivando') {
+  <p class="text-muted text-sm">Ingresa un codigo actual de tu app autenticadora para confirmar.</p>
+
+  <form [formGroup]="codeForm" (ngSubmit)="confirmarDesactivacion()">
+    <div class="form-group mt-16">
+      <label>Codigo de 6 digitos</label>
+      <input class="input" type="text" inputmode="numeric" maxlength="6" formControlName="code" placeholder="000000" />
+    </div>
+    <div class="form-actions">
+      <button type="submit" class="btn btn-danger" [disabled]="codeForm.invalid || cargando()">
+        {{ cargando() ? 'Desactivando...' : 'Confirmar y desactivar' }}
+      </button>
+      <button type="button" class="btn btn-outline" (click)="cancelarDesactivacion()">Cancelar</button>
+    </div>
+  </form>
+}

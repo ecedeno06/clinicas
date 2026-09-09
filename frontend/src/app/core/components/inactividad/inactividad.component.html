@@ -1,0 +1,14 @@
+@if (sessionService.mostrarAviso()) {
+  <div class="inactividad-overlay">
+    <div class="inactividad-dialog">
+      <h2>Tu sesion esta por cerrarse</h2>
+      <p class="text-muted text-sm">Por inactividad, tu sesion se cerrara en:</p>
+      <div class="inactividad-countdown">{{ sessionService.countdownTexto() }}</div>
+      <p class="text-muted text-sm">¿Deseas continuar trabajando?</p>
+      <div class="form-actions">
+        <button type="button" class="btn btn-outline" (click)="sessionService.cerrarPorInactividad()">Cerrar sesion</button>
+        <button type="button" class="btn btn-primary" (click)="sessionService.extenderSesion()">Continuar trabajando</button>
+      </div>
+    </div>
+  </div>
+}
