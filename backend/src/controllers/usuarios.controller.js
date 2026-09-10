@@ -44,11 +44,17 @@ async function buscarPorEmail(req, res, next) {
   } catch (err) { next(err); }
 }
 
-// POST /api/usuarios  { nombre, email, password, telefono, acepta_whatsapp, rol, activo, empresa_id? }
+// POST /api/usuarios  { nombre, email, password, telefono, acepta_whatsapp, rol, activo, empresa_id?, es_super_admin? }
 async function crear(req, res, next) {
   try {
-    const { nombre, email, password, telefono, acepta_whatsapp, rol, activo, empresa_id } = req.body;
+    const { nombre, email, password, telefono, acepta_whatsapp, rol, activo, empresa_id, es_super_admin } = req.body;
     if (!email) return res.status(400).json({ mensaje: 'email es requerido' });
+
+    // es_super_admin es un permiso global (independiente de la clinica) --
+    // solo otro super-admin puede otorgarlo, igual que solo un super-admin
+    // puede elegir a que clinica va este usuario (empresa_id abajo). Un
+    // admin normal que intente mandar este campo simplemente se ignora.
+    const otorgarSuperAdmin = req.usuario.es_super_admin && es_super_admin === true;
 
     let empresaDestino = req.empresaId;
     if (req.usuario.es_super_admin && empresa_id) {
@@ -62,15 +68,18 @@ async function crear(req, res, next) {
 
     if (existente.rows[0]) {
       usuarioId = existente.rows[0].id;
+      if (otorgarSuperAdmin) {
+        await pool.query('update usuarios set es_super_admin = true where id = $1', [usuarioId]);
+      }
     } else {
       if (!nombre || !password) {
         return res.status(400).json({ mensaje: 'nombre y password son requeridos para un usuario nuevo' });
       }
       const password_hash = await bcrypt.hash(password, 10);
       const { rows } = await pool.query(
-        `insert into usuarios (nombre, email, password_hash, telefono, acepta_whatsapp, activo, debe_cambiar_password)
-         values ($1,$2,$3,$4, coalesce($5, false), coalesce($6, true), true) returning id`,
-        [nombre, email, password_hash, telefono, acepta_whatsapp, activo]
+        `insert into usuarios (nombre, email, password_hash, telefono, acepta_whatsapp, activo, debe_cambiar_password, es_super_admin)
+         values ($1,$2,$3,$4, coalesce($5, false), coalesce($6, true), true, $7) returning id`,
+        [nombre, email, password_hash, telefono, acepta_whatsapp, activo, otorgarSuperAdmin]
       );
       usuarioId = rows[0].id;
     }
@@ -92,10 +101,10 @@ async function crear(req, res, next) {
   } catch (err) { next(err); }
 }
 
-// PUT /api/usuarios/:id  { nombre, password, avatar, telefono, acepta_whatsapp, activo, rol }
+// PUT /api/usuarios/:id  { nombre, password, avatar, telefono, acepta_whatsapp, activo, rol, es_super_admin? }
 async function actualizar(req, res, next) {
   try {
-    const { nombre, password, avatar, telefono, acepta_whatsapp, activo, rol } = req.body;
+    const { nombre, password, avatar, telefono, acepta_whatsapp, activo, rol, es_super_admin } = req.body;
 
     const pertenece = await pool.query(
       'select 1 from usuarios_empresas_rol where usuario_id = $1 and empresa_id = $2',
@@ -104,6 +113,10 @@ async function actualizar(req, res, next) {
     if (!pertenece.rows[0]) return res.status(404).json({ mensaje: 'Usuario no encontrado en esta clinica' });
 
     const password_hash = password ? await bcrypt.hash(password, 10) : null;
+    // es_super_admin es un permiso global -- solo otro super-admin puede
+    // otorgarlo o quitarlo; un admin normal que lo mande se ignora
+    // silenciosamente (coalesce deja el valor actual sin tocar).
+    const nuevoSuperAdmin = req.usuario.es_super_admin && es_super_admin !== undefined ? es_super_admin : null;
     // Si un admin le pone una contrasena nueva a otro usuario (reset), esa
     // contrasena es temporal -- la conoce el admin, no la eligio el
     // usuario, asi que se le exige cambiarla en su siguiente login.
@@ -115,9 +128,10 @@ async function actualizar(req, res, next) {
          acepta_whatsapp = coalesce($4, acepta_whatsapp),
          activo = coalesce($5, activo),
          password_hash = coalesce($6, password_hash),
-         debe_cambiar_password = case when $6::text is not null then true else debe_cambiar_password end
+         debe_cambiar_password = case when $6::text is not null then true else debe_cambiar_password end,
+         es_super_admin = coalesce($8, es_super_admin)
        where id = $7`,
-      [nombre, avatar, telefono, acepta_whatsapp, activo, password_hash, req.params.id]
+      [nombre, avatar, telefono, acepta_whatsapp, activo, password_hash, req.params.id, nuevoSuperAdmin]
     );
 
     if (rol) {

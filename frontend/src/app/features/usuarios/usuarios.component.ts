@@ -51,6 +51,7 @@ export class UsuariosComponent implements OnInit {
     acepta_whatsapp: [false],
     rol: ['recepcionista' as Rol],
     activo: [true],
+    es_super_admin: [false],
   });
 
   constructor(private fb: FormBuilder, private srv: UsuariosService, public auth: AuthService) {}
@@ -68,7 +69,7 @@ export class UsuariosComponent implements OnInit {
     this.tokenBusquedaEmail++;
     this.editando.set(null);
     this.usuarioExistente.set(null);
-    this.form.reset({ rol: 'recepcionista', activo: true });
+    this.form.reset({ rol: 'recepcionista', activo: true, es_super_admin: false });
     // nombre/password no son obligatorios aqui: si el email ya existe en el
     // sistema (otra clinica), el backend solo lo asocia a esta clinica (como
     // recepcionista por defecto; el rol se ajusta despues editando).

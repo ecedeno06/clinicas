@@ -102,6 +102,14 @@
         <div class="form-group mt-16">
           <label class="flex items-center gap-8"><input type="checkbox" formControlName="activo" /> Usuario activo</label>
         </div>
+        @if (auth.esSuperAdmin()) {
+          <div class="form-group mt-16">
+            <label class="flex items-center gap-8"><input type="checkbox" formControlName="es_super_admin" /> Super administrador</label>
+            <div class="text-muted text-sm mt-8">
+              Gestiona todas las clinicas del sistema, sin importar el rol elegido arriba. Solo otro super administrador puede otorgar o quitar este permiso.
+            </div>
+          </div>
+        }
         <div class="form-actions">
           <button type="submit" class="btn btn-primary" [disabled]="form.invalid">Guardar</button>
           <button type="button" class="btn btn-outline" (click)="cerrarPanel()">Cancelar</button>
