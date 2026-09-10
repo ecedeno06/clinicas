@@ -438,6 +438,80 @@ async function restablecerPassword(req, res, next) {
   }
 }
 
+function generarTokenRecuperacion2FA() {
+  return 'r2f_' + crypto.randomBytes(32).toString('hex');
+}
+
+// POST /api/auth/2fa/recovery  { usuarioId }  (publico, con rate-limit en la
+// ruta) -- se llama desde la pantalla que pide el codigo de la app
+// autenticadora ("perdi acceso a mi 2FA"), NO desde el login inicial. El
+// usuarioId ya viene validado por contrasena (lo devolvio POST /auth/login
+// al detectar 2FA activo), asi que no hace falta pedir el email de nuevo.
+// No revela si el 2FA sigue activo o no -- respuesta generica siempre.
+async function solicitarRecuperacion2FA(req, res, next) {
+  try {
+    const usuarioId = String(req.body?.usuarioId || '').trim();
+    if (!usuarioId) return res.status(400).json({ mensaje: 'usuarioId es requerido' });
+
+    const { rows } = await pool.query(
+      'select id, nombre, email from usuarios where id = $1 and activo = true and two_factor_enabled = true',
+      [usuarioId]
+    );
+    const usuario = rows[0];
+
+    if (usuario) {
+      const token = generarTokenRecuperacion2FA();
+      const expiraEn = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
+      await pool.query(
+        'insert into dos_factor_recovery_tokens (usuario_id, token, expira_en) values ($1, $2, $3)',
+        [usuario.id, token, expiraEn]
+      );
+
+      const enlace = `${process.env.CORS_ORIGIN || 'http://localhost:4201'}/recuperar-2fa?token=${token}`;
+      enviarCorreo({
+        destinatario: usuario.email,
+        asunto: 'Recuperar acceso (perdiste tu autenticador)',
+        texto: `Hola ${usuario.nombre},\n\nRecibimos una solicitud para desactivar la verificacion en dos pasos de tu cuenta porque perdiste acceso a tu app autenticadora. Este enlace es valido por 1 hora:\n${enlace}\n\nUna vez confirmes, podras iniciar sesion solo con tu contrasena y, si quieres, activar el 2FA de nuevo en otro equipo.\n\nSi no fuiste tu, ignora este correo.`,
+        html: `<p>Hola ${usuario.nombre},</p><p>Recibimos una solicitud para desactivar la verificacion en dos pasos de tu cuenta porque perdiste acceso a tu app autenticadora. Este enlace es valido por 1 hora:</p><p><a href="${enlace}">${enlace}</a></p><p>Una vez confirmes, podras iniciar sesion solo con tu contrasena y, si quieres, activar el 2FA de nuevo en otro equipo.</p><p>Si no fuiste tu, ignora este correo.</p>`,
+      }).catch((err) => console.error('Error enviando correo de recuperacion de 2FA:', err.message));
+    }
+
+    res.json({ mensaje: 'Si la cuenta tiene el 2FA activo, enviamos un enlace a su correo para desactivarlo.' });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// POST /api/auth/2fa/recovery/confirm  { token }  (publico)
+async function confirmarRecuperacion2FA(req, res, next) {
+  try {
+    const { token } = req.body || {};
+    if (!token) return res.status(400).json({ mensaje: 'token es requerido' });
+
+    const { rows } = await pool.query(
+      `select id, usuario_id from dos_factor_recovery_tokens where token = $1 and usado = false and expira_en > now()`,
+      [token]
+    );
+    const registro = rows[0];
+    if (!registro) return res.status(400).json({ mensaje: 'El enlace es invalido o ya expiro. Solicita uno nuevo.' });
+
+    await pool.query('update usuarios set two_factor_secret = null, two_factor_enabled = false where id = $1', [registro.usuario_id]);
+    await pool.query('update dos_factor_recovery_tokens set usado = true where id = $1', [registro.id]);
+    // Mismo criterio que reset-password: cierra las sesiones activas, por
+    // si alguien mas tenia acceso.
+    await pool.query(
+      `update sesiones set activo = false, razon_salida = 'recuperacion_2fa',
+         duracion_segundos = extract(epoch from (now() - created_at))::integer
+       where usuario_id = $1 and activo = true`,
+      [registro.usuario_id]
+    );
+
+    res.json({ mensaje: 'Verificacion en dos pasos desactivada. Ya puedes iniciar sesion solo con tu contrasena.' });
+  } catch (err) {
+    next(err);
+  }
+}
+
 // GET /api/auth/session-config  (publico -- el login lo necesita antes de autenticarse)
 function sessionConfig(req, res) {
   res.json({
@@ -645,6 +719,8 @@ module.exports = {
   refrescarToken,
   olvidoPassword,
   restablecerPassword,
+  solicitarRecuperacion2FA,
+  confirmarRecuperacion2FA,
   obtenerPista,
   sessionConfig,
   seleccionarEmpresa,

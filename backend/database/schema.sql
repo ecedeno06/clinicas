@@ -487,6 +487,21 @@ create table if not exists password_reset_tokens (
 );
 
 -- ---------------------------------------------------------
+-- Tabla: dos_factor_recovery_tokens (recuperar acceso cuando se perdio el
+-- dispositivo con la app autenticadora de 2FA). Token de un solo uso; al
+-- confirmarse desactiva el 2FA de la cuenta (no toca la contrasena) -- ver
+-- POST /auth/2fa/recovery y /auth/2fa/recovery/confirm.
+-- ---------------------------------------------------------
+create table if not exists dos_factor_recovery_tokens (
+    id          uuid primary key default gen_random_uuid(),
+    usuario_id  uuid not null references usuarios(id) on delete cascade,
+    token       text not null unique,
+    expira_en   timestamptz not null,
+    usado       boolean not null default false,
+    created_at  timestamptz not null default now()
+);
+
+-- ---------------------------------------------------------
 -- Indices
 -- ---------------------------------------------------------
 create index if not exists idx_sesiones_usuario on sesiones(usuario_id);
@@ -494,6 +509,8 @@ create index if not exists idx_sesiones_empresa on sesiones(empresa_id);
 create index if not exists idx_sesiones_token_activo on sesiones(token) where activo = true;
 create index if not exists idx_password_reset_tokens_usuario on password_reset_tokens(usuario_id);
 create index if not exists idx_password_reset_tokens_token_activo on password_reset_tokens(token) where usado = false;
+create index if not exists idx_dos_factor_recovery_tokens_usuario on dos_factor_recovery_tokens(usuario_id);
+create index if not exists idx_dos_factor_recovery_tokens_token_activo on dos_factor_recovery_tokens(token) where usado = false;
 create index if not exists idx_usuarios_empresas_rol_usuario on usuarios_empresas_rol(usuario_id);
 create index if not exists idx_usuarios_empresas_rol_empresa on usuarios_empresas_rol(empresa_id);
 create index if not exists idx_pacientes_empresas_paciente on pacientes_empresas(paciente_id);

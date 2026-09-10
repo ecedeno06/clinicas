@@ -237,6 +237,21 @@ export class AuthService {
     return this.http.get<SessionConfig>(`${environment.apiUrl}/auth/session-config`);
   }
 
+  // POST /auth/2fa/recovery -- publico. Se llama desde la pantalla que pide
+  // el codigo de la app autenticadora ("perdi acceso a mi 2FA"), usando el
+  // usuarioId que ya devolvio el login (contrasena ya validada). Respuesta
+  // siempre generica, igual que olvidarPassword().
+  solicitarRecuperacion2FA(usuarioId: string): Observable<{ mensaje: string }> {
+    return this.http.post<{ mensaje: string }>(`${environment.apiUrl}/auth/2fa/recovery`, { usuarioId });
+  }
+
+  // POST /auth/2fa/recovery/confirm -- publico, usa el token del enlace
+  // enviado por correo (valido 1 hora, un solo uso). Desactiva el 2FA de
+  // la cuenta -- no toca la contrasena.
+  confirmarRecuperacion2FA(token: string): Observable<{ mensaje: string }> {
+    return this.http.post<{ mensaje: string }>(`${environment.apiUrl}/auth/2fa/recovery/confirm`, { token });
+  }
+
   setup2FA(): Observable<{ secret: string; qrCode: string }> {
     return this.http.post<{ secret: string; qrCode: string }>(`${environment.apiUrl}/auth/2fa/setup`, {});
   }

@@ -35,6 +35,14 @@ export class LoginComponent {
   cargandoOlvido = signal(false);
   mensajeOlvido = signal<string | null>(null);
 
+  // "Perdi acceso a mi 2FA" -- desde la pantalla que pide el codigo de la
+  // app autenticadora. usuarioId ya viene validado por contrasena (lo puso
+  // el login al detectar 2FA activo), asi que no hace falta pedir el email.
+  // mensajeRecuperacion2FA siempre es el mensaje generico del backend.
+  mostrarRecuperacion2FA = signal(false);
+  cargandoRecuperacion2FA = signal(false);
+  mensajeRecuperacion2FA = signal<string | null>(null);
+
   form = this.fb.group({
     email: ['', [Validators.required, Validators.email]],
     password: ['', Validators.required],
@@ -92,6 +100,34 @@ export class LoginComponent {
     this.usuarioId2FA.set(null);
     this.codeForm.reset();
     this.error.set(null);
+    this.mostrarRecuperacion2FA.set(false);
+    this.mensajeRecuperacion2FA.set(null);
+  }
+
+  abrirRecuperacion2FA(): void {
+    this.mostrarRecuperacion2FA.set(true);
+    this.mensajeRecuperacion2FA.set(null);
+  }
+
+  cerrarRecuperacion2FA(): void {
+    this.mostrarRecuperacion2FA.set(false);
+    this.mensajeRecuperacion2FA.set(null);
+  }
+
+  enviarRecuperacion2FA(): void {
+    if (!this.usuarioId2FA()) return;
+    this.cargandoRecuperacion2FA.set(true);
+    this.mensajeRecuperacion2FA.set(null);
+    this.auth.solicitarRecuperacion2FA(this.usuarioId2FA()!).subscribe({
+      next: (res) => {
+        this.cargandoRecuperacion2FA.set(false);
+        this.mensajeRecuperacion2FA.set(res.mensaje);
+      },
+      error: (err) => {
+        this.cargandoRecuperacion2FA.set(false);
+        this.mensajeRecuperacion2FA.set(err?.error?.mensaje || 'No se pudo procesar la solicitud. Intenta de nuevo.');
+      },
+    });
   }
 
   verPista(): void {

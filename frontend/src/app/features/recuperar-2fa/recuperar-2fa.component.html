@@ -1,0 +1,26 @@
+<div class="auth-screen">
+  <div class="auth-card">
+    <div class="auth-logo">CM</div>
+
+    @if (exito()) {
+      <h1>Verificacion en dos pasos desactivada</h1>
+      <p class="text-muted text-sm">Ya puedes iniciar sesion solo con tu contrasena. Si quieres, puedes activarla de nuevo despues desde "Seguridad" en el menu.</p>
+      <button type="button" class="btn btn-primary w-full mt-16" (click)="irALogin()">Ir a iniciar sesion</button>
+    } @else {
+      <h1>Recuperar acceso</h1>
+      <p class="text-muted text-sm">Vamos a desactivar la verificacion en dos pasos de tu cuenta para que puedas entrar de nuevo con tu contrasena.</p>
+
+      @if (error()) {
+        <div class="auth-error mt-16">{{ error() }}</div>
+      }
+
+      @if (token) {
+        <button type="button" class="btn btn-primary w-full mt-16" [disabled]="cargando()" (click)="confirmar()">
+          {{ cargando() ? 'Procesando...' : 'Desactivar verificacion en dos pasos' }}
+        </button>
+      }
+
+      <a routerLink="/login" class="btn-link text-sm mt-16" style="display:inline-block;">Volver a iniciar sesion</a>
+    }
+  </div>
+</div>
