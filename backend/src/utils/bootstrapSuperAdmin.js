@@ -1,9 +1,10 @@
 const { pool } = require('../config/db');
 
-const EMAIL_SUPER_ADMIN_INICIAL = 'admin@clinica';
+const EMAIL_SUPER_ADMIN_INICIAL_DEFAULT = 'admin@clinica';
 
-// Al arrancar el backend, si no existe ningun usuario con este email, lo
-// crea como super administrador usando el hash de SUPER_ADMIN_PASS (env).
+// Al arrancar el backend, si no existe ningun usuario con el email de
+// SUPER_ADMIN_USER (env, o admin@clinica si no se define), lo crea como
+// super administrador usando el hash de SUPER_ADMIN_PASS (env).
 // SUPER_ADMIN_PASS debe ser ya un hash bcrypt (generar uno con
 // "node src/utils/generarPasswordHash.js 'MiContrasena'"), no la
 // contrasena en texto plano -- asi la contrasena real nunca queda escrita
@@ -19,15 +20,17 @@ async function asegurarSuperAdminInicial() {
   const passwordHash = process.env.SUPER_ADMIN_PASS;
   if (!passwordHash) return;
 
-  const { rows } = await pool.query('select id from usuarios where email = $1', [EMAIL_SUPER_ADMIN_INICIAL]);
+  const email = process.env.SUPER_ADMIN_USER || EMAIL_SUPER_ADMIN_INICIAL_DEFAULT;
+
+  const { rows } = await pool.query('select id from usuarios where email = $1', [email]);
   if (rows[0]) return;
 
   await pool.query(
     `insert into usuarios (nombre, email, password_hash, activo, es_super_admin)
      values ($1, $2, $3, true, true)`,
-    ['Super Administrador', EMAIL_SUPER_ADMIN_INICIAL, passwordHash]
+    ['Super Administrador', email, passwordHash]
   );
-  console.log(`Super administrador inicial creado: ${EMAIL_SUPER_ADMIN_INICIAL}`);
+  console.log(`Super administrador inicial creado: ${email}`);
 }
 
-module.exports = { asegurarSuperAdminInicial, EMAIL_SUPER_ADMIN_INICIAL };
+module.exports = { asegurarSuperAdminInicial, EMAIL_SUPER_ADMIN_INICIAL_DEFAULT };
