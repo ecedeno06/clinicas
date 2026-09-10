@@ -114,6 +114,13 @@ export class CitasComponent implements OnInit {
     return disp.sucursales.find((s) => s.sucursal_id === sucursalId) ?? null;
   }
 
+  // Mismo patron: metodo normal (no computed), depende de un FormControl.
+  sucursalSeleccionada() {
+    const sucursalId = this.form.get('sucursal_id')?.value;
+    if (!sucursalId) return null;
+    return this.sucursales().find((s) => s.id === sucursalId) ?? null;
+  }
+
   filtroFecha = signal('');
   filtroPaciente = signal('');
   filtroDoctor = signal('');

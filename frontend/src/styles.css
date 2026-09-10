@@ -893,6 +893,14 @@ table.data-table {
   .icono-urgencia { animation: none; filter: drop-shadow(0 0 3px rgba(255,149,0,0.8)); }
 }
 
+/* Cintillo con la direccion de la sucursal elegida, en el formulario de
+   cita (justo debajo del selector de Sucursal). */
+.cintillo-sucursal {
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: var(--slate-500);
+}
+
 /* Nombre del paciente parpadeando en rojo luminoso mientras la cita de
    urgencia siga sin atender (una vez "atendida" deja de parpadear). */
 .nombre-urgencia {
