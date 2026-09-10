@@ -1,0 +1,12 @@
+.telefono-input {
+  display: flex;
+  gap: 8px;
+}
+.telefono-input-pais {
+  flex: 0 0 auto;
+  width: 130px;
+}
+.telefono-input-numero {
+  flex: 1;
+  min-width: 0;
+}

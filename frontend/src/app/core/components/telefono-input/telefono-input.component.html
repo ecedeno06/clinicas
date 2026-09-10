@@ -1,0 +1,21 @@
+<div class="telefono-input">
+  <select
+    class="input telefono-input-pais"
+    [(ngModel)]="dial"
+    [disabled]="disabled"
+    (ngModelChange)="onDialChange()"
+    title="Codigo de pais">
+    @for (pais of paises; track pais.nombre) {
+      <option [value]="pais.dial">+{{ pais.dial }} {{ pais.nombre }}</option>
+    }
+  </select>
+  <input
+    class="input telefono-input-numero"
+    type="tel"
+    inputmode="numeric"
+    autocomplete="off"
+    [ngModel]="numeroLocal"
+    (ngModelChange)="onNumeroInput($event)"
+    [disabled]="disabled"
+    placeholder="Numero local" />
+</div>

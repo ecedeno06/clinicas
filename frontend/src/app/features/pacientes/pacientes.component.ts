@@ -15,12 +15,13 @@ import { clasificarGlucosa } from '../../core/utils/glucosa.util';
 import { SelectorFotoComponent } from '../../core/components/selector-foto/selector-foto.component';
 import { EscanerDocumentoComponent, DatosDocumentoDetectados } from '../../core/components/escaner-documento/escaner-documento.component';
 import { MapaSelectorComponent, UbicacionSeleccionada, extraerLatLng } from '../../core/components/mapa-selector/mapa-selector.component';
+import { TelefonoInputComponent } from '../../core/components/telefono-input/telefono-input.component';
 import { direccionPrincipal } from '../../core/utils/direccion.util';
 
 @Component({
   selector: 'app-pacientes',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule, SelectorFotoComponent, EscanerDocumentoComponent, MapaSelectorComponent],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, SelectorFotoComponent, EscanerDocumentoComponent, MapaSelectorComponent, TelefonoInputComponent],
   templateUrl: './pacientes.component.html',
   styleUrl: './pacientes.component.css',
 })

@@ -7,11 +7,12 @@ import { SucursalesService } from '../../core/services/sucursales.service';
 import { AuthService } from '../../core/services/auth.service';
 import { Doctor, DoctorEspecialidad, DoctorHorario, Especialidad, Sucursal } from '../../core/models/models';
 import { combinar12, formatoAmPm, HORAS_12, MINUTOS_60, partes12 } from '../../core/utils/hora12.util';
+import { TelefonoInputComponent } from '../../core/components/telefono-input/telefono-input.component';
 
 @Component({
   selector: 'app-doctores',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, TelefonoInputComponent],
   templateUrl: './doctores.component.html',
   styleUrl: './doctores.component.css',
 })

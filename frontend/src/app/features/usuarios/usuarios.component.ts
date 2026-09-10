@@ -4,11 +4,12 @@ import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angu
 import { UsuariosService } from '../../core/services/usuarios.service';
 import { AuthService } from '../../core/services/auth.service';
 import { Usuario, Rol } from '../../core/models/models';
+import { TelefonoInputComponent } from '../../core/components/telefono-input/telefono-input.component';
 
 @Component({
   selector: 'app-usuarios',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, TelefonoInputComponent],
   templateUrl: './usuarios.component.html',
   styleUrl: './usuarios.component.css',
 })
