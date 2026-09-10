@@ -171,7 +171,9 @@ export class AuthService {
   }
 
   obtenerMe(): Observable<Usuario> {
-    return this.http.get<Usuario>(`${environment.apiUrl}/auth/me`);
+    return this.http.get<Usuario>(`${environment.apiUrl}/auth/me`).pipe(
+      tap((usuario) => this.guardarUsuarioActualizado(usuario))
+    );
   }
 
   // pista es opcional: si se omite, el backend no toca la pista ya

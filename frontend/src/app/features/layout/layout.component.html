@@ -120,6 +120,9 @@
           }
           <span class="text-muted text-sm">{{ empresa.empresa_nombre }}</span>
         }
+        @if (auth.usuario()?.base_datos; as baseDatos) {
+          <span class="badge badge-slate" title="Base de datos a la que esta conectado el backend">{{ baseDatos }}</span>
+        }
       </div>
 
       <div class="flex items-center gap-12">

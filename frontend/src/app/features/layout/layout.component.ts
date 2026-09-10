@@ -60,6 +60,11 @@ export class LayoutComponent implements OnInit, OnDestroy {
     const inicio = this.auth.sessionStart ?? Date.now();
     this.actualizarTiempoConectado(inicio);
     this.timerTiempoConectado = setInterval(() => this.actualizarTiempoConectado(inicio), 1000);
+
+    // Trae base_datos (no viene en el token del login) para mostrarla en el
+    // header -- evita confundir en que entorno se esta trabajando
+    // (ej. clinica_medica local vs neondb en la nube).
+    this.auth.obtenerMe().subscribe({ error: () => {} });
   }
 
   ngOnDestroy(): void {

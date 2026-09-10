@@ -20,6 +20,10 @@ export interface Usuario {
   empresa_nombre?: string | null;
   empresa_logo?: string | null;
   created_at?: string;
+  // Nombre de la base de datos a la que esta conectado el backend (ej.
+  // "clinica_medica" en desarrollo, "neondb" en Neon) -- se muestra en el
+  // header para evitar confundir en que entorno se esta trabajando.
+  base_datos?: string;
 }
 
 export interface Empresa {

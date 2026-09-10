@@ -7,6 +7,7 @@ const { pool } = require('../config/db');
 const { encriptar, desencriptar } = require('../utils/cifrado2fa');
 const { porcentajeSimilitud } = require('../utils/levenshtein');
 const { enviarCorreo } = require('../utils/correo');
+const { nombreInstanciaDb } = require('../utils/instanciaDb');
 
 // Access token: corto (JWT_EXPIRES_IN, recomendado 15-30m) y stateless --
 // se verifica solo por firma, sin tocar la base de datos, en cada request.
@@ -548,7 +549,7 @@ async function me(req, res, next) {
       [req.usuario.id]
     );
     if (!rows[0]) return res.status(404).json({ mensaje: 'Usuario no encontrado' });
-    res.json({ ...rows[0], rol: req.usuario.rol, empresa_id: req.usuario.empresa_id, empresa_nombre: req.usuario.empresa_nombre });
+    res.json({ ...rows[0], base_datos: nombreInstanciaDb(), rol: req.usuario.rol, empresa_id: req.usuario.empresa_id, empresa_nombre: req.usuario.empresa_nombre });
   } catch (err) {
     next(err);
   }
