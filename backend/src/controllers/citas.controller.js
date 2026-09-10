@@ -4,6 +4,7 @@ const { resolverSucursal } = require('../utils/sucursales');
 const { hayChoqueCampanaParaCita } = require('../utils/choqueCampana');
 const { enviarCorreo } = require('../utils/correo');
 const { formatearFechaLarga, formatoAmPm } = require('../utils/formatoFecha');
+const { esFechaHoraPasada } = require('../utils/zonaHoraria');
 
 // Select con todo lo que necesitan la respuesta de crear() (para que el
 // frontend pueda abrir WhatsApp automaticamente con los datos correctos,
@@ -260,9 +261,11 @@ async function crear(req, res, next) {
 
       // No se puede agendar una cita de campana en una fecha/hora que ya
       // paso (a diferencia de una cita normal, que si se puede reagendar
-      // libremente hacia atras si hiciera falta corregir un registro).
-      const fechaHoraCita = new Date(`${fecha}T${hora_inicio}:00`);
-      if (fechaHoraCita < new Date()) {
+      // libremente hacia atras si hiciera falta corregir un registro). Se
+      // compara contra la hora actual en la zona horaria DE LA SUCURSAL, no
+      // la del servidor (en produccion corre en UTC).
+      const zonaSucursal = await pool.query('select zona_horaria from sucursales where id = $1', [sucursalId]);
+      if (esFechaHoraPasada(fecha, hora_inicio, zonaSucursal.rows[0]?.zona_horaria)) {
         return res.status(400).json({ mensaje: 'No se puede agendar una cita de campana en una fecha/hora que ya paso.' });
       }
 

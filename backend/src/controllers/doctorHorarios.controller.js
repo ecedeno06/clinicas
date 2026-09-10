@@ -1,6 +1,7 @@
 const { pool } = require('../config/db');
 const { registrarEventoCita } = require('../utils/citaLog');
 const { resolverSucursal } = require('../utils/sucursales');
+const { esFechaHoraPasada } = require('../utils/zonaHoraria');
 
 const DURACION_SLOT_MINUTOS = 30;
 
@@ -257,7 +258,7 @@ async function disponibilidad(req, res, next) {
     );
 
     const bloquesResult = await pool.query(
-      `select dh.sucursal_id, s.nombre as sucursal_nombre, dh.hora_inicio, dh.hora_fin
+      `select dh.sucursal_id, s.nombre as sucursal_nombre, s.zona_horaria, dh.hora_inicio, dh.hora_fin
        from doctor_horarios dh
        join sucursales s on s.id = dh.sucursal_id
        where dh.doctor_id = $1 and dh.dia_semana = $2 and dh.activo = true
@@ -277,18 +278,18 @@ async function disponibilidad(req, res, next) {
     // Si la fecha consultada es hoy, las franjas cuya hora de inicio ya
     // paso no se ofrecen (no tiene sentido agendar a una hora que ya
     // sucedio). Para una fecha futura esta comparacion nunca descarta nada
-    // (la fecha+hora siempre cae despues de "ahora").
-    const ahora = new Date();
-
+    // (la fecha+hora siempre cae despues de "ahora"). Se compara contra la
+    // hora actual en la zona horaria DE LA SUCURSAL, no la del servidor
+    // (en produccion corre en UTC, distinta de la de la clinica).
     const porSucursal = new Map();
     for (const b of bloquesResult.rows) {
       if (!porSucursal.has(b.sucursal_id)) {
-        porSucursal.set(b.sucursal_id, { sucursal_id: b.sucursal_id, sucursal_nombre: b.sucursal_nombre, bloques: [] });
+        porSucursal.set(b.sucursal_id, { sucursal_id: b.sucursal_id, sucursal_nombre: b.sucursal_nombre, zona_horaria: b.zona_horaria, bloques: [] });
       }
       porSucursal.get(b.sucursal_id).bloques.push(b);
     }
 
-    const sucursales = [...porSucursal.values()].map(({ sucursal_id, sucursal_nombre, bloques }) => {
+    const sucursales = [...porSucursal.values()].map(({ sucursal_id, sucursal_nombre, zona_horaria, bloques }) => {
       const libres = [];
       for (const bloque of bloques) {
         const bloqueMinutos = { inicio: aMinutos(bloque.hora_inicio), fin: aMinutos(bloque.hora_fin) };
@@ -296,7 +297,7 @@ async function disponibilidad(req, res, next) {
         for (const { inicio, fin } of libresBloque) {
           for (let t = inicio; t + DURACION_SLOT_MINUTOS <= fin; t += DURACION_SLOT_MINUTOS) {
             const horaInicioTexto = aTexto(t);
-            if (new Date(`${fecha}T${horaInicioTexto}:00`) <= ahora) continue;
+            if (esFechaHoraPasada(fecha, horaInicioTexto, zona_horaria)) continue;
             libres.push({ hora_inicio: horaInicioTexto, hora_fin: aTexto(t + DURACION_SLOT_MINUTOS) });
           }
         }
