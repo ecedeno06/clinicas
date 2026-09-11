@@ -102,3 +102,16 @@
   border-color: var(--text-on-tint-green);
   color: var(--white);
 }
+
+/* Lista de antecedentes patologicos del paciente (tab Antecedentes de la
+   consulta): no mas de ~5 filas visibles, el resto con scroll -- el
+   detalle de la fila seleccionada se muestra en un card debajo. */
+.tabla-antecedentes-scroll {
+  max-height: 230px;
+  overflow-y: auto;
+}
+.tabla-antecedentes-scroll thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}

@@ -585,7 +585,96 @@
         } @else if (tabHistoria() === 'antecedentes') {
           <div class="form-group">
             <label>Alergias</label>
-            <div>{{ pacienteDeHistoria()?.alergias || 'No se han registrado antecedentes.' }}</div>
+            <div>{{ pacienteDeHistoria()?.alergias || 'No se han registrado alergias.' }}</div>
+          </div>
+
+          <div class="form-group mt-16">
+            <label>Antecedentes patologicos</label>
+            <div class="table-wrap tabla-antecedentes-scroll">
+              <table class="data-table">
+                <thead>
+                  <tr><th>Categoria</th><th>Antecedente</th><th>Fecha inicio</th></tr>
+                </thead>
+                <tbody>
+                  @for (a of pacienteDeHistoria()?.antecedentes; track a.id) {
+                    <tr class="row-clickable" [class.row-selected]="antecedenteSeleccionado()?.id === a.id" (click)="antecedenteSeleccionado.set(a)">
+                      <td>{{ a.categoria_nombre }}</td>
+                      <td>{{ a.antecedente_nombre }}</td>
+                      <td>{{ a.fecha_inicio || '-' }}</td>
+                    </tr>
+                  } @empty {
+                    <tr><td colspan="3"><div class="empty-state">Sin antecedentes patologicos registrados.</div></td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+
+            @if (antecedenteSeleccionado(); as sel) {
+              <div class="card mt-16">
+                <h3 style="margin:0;">{{ sel.antecedente_nombre }}</h3>
+                <div class="text-muted text-sm">{{ sel.categoria_nombre }}</div>
+                <div class="form-group mt-16">
+                  <label>Fecha de inicio</label>
+                  <div>{{ sel.fecha_inicio || 'No especificada' }}</div>
+                </div>
+                <div class="form-group mt-16">
+                  <label>Tratamiento</label>
+                  <div>{{ sel.tratamiento || 'No especificado' }}</div>
+                </div>
+                <div class="form-group mt-16">
+                  <label>Observaciones</label>
+                  <div>{{ sel.observacion || 'Sin observaciones' }}</div>
+                </div>
+                <div class="form-group mt-16">
+                  <label>Doctor</label>
+                  <div>{{ sel.doctor_nombre || 'No especificado' }}</div>
+                </div>
+                <div class="form-group mt-16">
+                  <label>Registrado por</label>
+                  <div>{{ sel.creado_por_nombre || 'Desconocido' }}</div>
+                </div>
+                @if (puedeModificarAntecedente(sel)) {
+                  <div class="form-actions">
+                    <button type="button" class="btn btn-danger btn-sm" (click)="eliminarAntecedenteConsulta(sel)">Eliminar</button>
+                  </div>
+                }
+              </div>
+            }
+
+            @if (!mostrarFormAntecedenteConsulta()) {
+              <button type="button" class="btn btn-outline btn-sm mt-16" (click)="abrirFormAntecedenteConsulta()">+ Agregar antecedente</button>
+            } @else {
+              <div class="card mt-16" [formGroup]="antecedenteConsultaForm">
+                <h3 style="margin:0;">Agregar antecedente</h3>
+                <div class="form-group mt-16">
+                  <label>Antecedente *</label>
+                  <select class="input" formControlName="antecedente_id">
+                    <option value="" disabled>Selecciona un antecedente</option>
+                    @for (grupo of catalogoAgrupadoConsulta(); track grupo.categoria) {
+                      <optgroup [label]="grupo.categoria">
+                        @for (item of grupo.items; track item.id) { <option [value]="item.id">{{ item.nombre }}</option> }
+                      </optgroup>
+                    }
+                  </select>
+                </div>
+                <div class="form-group mt-16">
+                  <label>Fecha de inicio</label>
+                  <input class="input" type="date" formControlName="fecha_inicio" />
+                </div>
+                <div class="form-group mt-16">
+                  <label>Tratamiento</label>
+                  <textarea class="input" rows="2" formControlName="tratamiento" placeholder="Medicamento, dosis, frecuencia..."></textarea>
+                </div>
+                <div class="form-group mt-16">
+                  <label>Observaciones</label>
+                  <textarea class="input" rows="2" formControlName="observacion"></textarea>
+                </div>
+                <div class="form-actions">
+                  <button type="button" class="btn btn-primary btn-sm" [disabled]="antecedenteConsultaForm.invalid" (click)="guardarAntecedenteConsulta()">Guardar antecedente</button>
+                  <button type="button" class="btn btn-outline btn-sm" (click)="cerrarFormAntecedenteConsulta()">Cancelar</button>
+                </div>
+              </div>
+            }
           </div>
         } @else if (tabHistoria() === 'recetas') {
           @if (!mostrarFormularioReceta()) {

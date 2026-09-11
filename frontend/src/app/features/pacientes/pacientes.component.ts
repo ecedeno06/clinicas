@@ -3,10 +3,14 @@ import { CommonModule } from '@angular/common';
 import { FormArray, FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { PacientesService } from '../../core/services/pacientes.service';
 import { CitasService } from '../../core/services/citas.service';
+import { DoctoresService } from '../../core/services/doctores.service';
 import { SucursalesService } from '../../core/services/sucursales.service';
 import { GeocodificacionService } from '../../core/services/geocodificacion.service';
 import { AuthService } from '../../core/services/auth.service';
-import { DireccionPaciente, EstadoCita, HistoriaClinica, OrdenLaboratorio, Paciente, Receta, SignosVitales, Sucursal } from '../../core/models/models';
+import { CategoriasAntecedentesService } from '../../core/services/categoriasAntecedentes.service';
+import { AntecedentesPatologicosService } from '../../core/services/antecedentesPatologicos.service';
+import { PacienteAntecedentesService } from '../../core/services/pacienteAntecedentes.service';
+import { DireccionPaciente, Doctor, EstadoCita, FamiliarPaciente, HistoriaClinica, OrdenLaboratorio, Paciente, PacienteAntecedente, Receta, SignosVitales, Sucursal, CategoriaAntecedente, AntecedentePatologico } from '../../core/models/models';
 import { formatoFechaCorta } from '../../core/utils/pdf.util';
 import { formatoAmPm } from '../../core/utils/hora12.util';
 import { clasificarImc } from '../../core/utils/imc.util';
@@ -31,9 +35,10 @@ export class PacientesComponent implements OnInit {
   editando = signal<Paciente | null>(null);
   pacienteExistente = signal<Paciente | null>(null);
 
-  private readonly camposIdentidad = ['nombre', 'fecha_nacimiento', 'sexo', 'telefono', 'email', 'direcciones', 'alergias', 'contacto_emergencia'];
+  private readonly camposIdentidad = ['nombre', 'fecha_nacimiento', 'sexo', 'telefono', 'email', 'direcciones', 'alergias'];
 
   pacienteHistorial = signal<Paciente | null>(null);
+  antecedenteHistorialSeleccionado = signal<PacienteAntecedente | null>(null);
   historial = signal<HistoriaClinica[]>([]);
   cargandoHistorial = signal(false);
 
@@ -85,6 +90,8 @@ export class PacientesComponent implements OnInit {
   // paciente) y abajo (detalle de la consulta seleccionada).
   tabSuperior = signal<'consultas' | 'antecedentes'>('consultas');
   tabInferior = signal<'signos' | 'receta' | 'laboratorio'>('signos');
+  // Tabs del formulario de nuevo/editar paciente.
+  tabFormulario = signal<'generales' | 'familiares' | 'antecedentes'>('generales');
 
   signosVitalesSeleccionado = signal<SignosVitales | null>(null);
   cargandoSignosSeleccionado = signal(false);
@@ -131,18 +138,53 @@ export class PacientesComponent implements OnInit {
     identificacion: [''],
     fecha_nacimiento: [''],
     sexo: [''],
+    estado_civil: [''],
+    estado_laboral: [''],
+    tipo_trabajo: [''],
+    lugar_trabajo: [''],
     telefono: [''],
     acepta_whatsapp: [false],
     email: [''],
     direcciones: this.fb.array([this.crearDireccionGroup()]),
     alergias: [''],
-    contacto_emergencia: this.fb.group({
-      nombre: [''],
-      telefono: [''],
-      parentesco: [''],
-    }),
     activo: [true],
   });
+
+  // ---------- Familiares (lista + card de agregar/editar, no un FormArray:
+  // vive en memoria y se manda completa al guardar el paciente, igual que
+  // direcciones -- ver reemplazarFamiliares en el backend). ----------
+  familiares = signal<FamiliarPaciente[]>([]);
+  mostrarFormFamiliar = signal(false);
+  familiarEditandoIndex = signal<number | null>(null);
+  familiarForm = this.fb.group({
+    nombre: ['', Validators.required],
+    telefono: [''],
+    parentesco: [''],
+  });
+
+  // ---------- Antecedentes patologicos: a diferencia de Familiares, cada
+  // fila tiene su propio autor (creado_por) y su propio CRUD independiente
+  // (crear/editar/eliminar pegan directo al backend, no se reemplaza como
+  // conjunto al guardar el paciente) -- ver
+  // pacienteAntecedentes.controller.js. El catalogo (categorias +
+  // antecedentes disponibles) se carga una vez en ngOnInit. ----------
+  categoriasCatalogo = signal<CategoriaAntecedente[]>([]);
+  antecedentesCatalogo = signal<AntecedentePatologico[]>([]);
+
+  antecedentes = signal<PacienteAntecedente[]>([]);
+  mostrarFormAntecedente = signal(false);
+  antecedenteEditandoIndex = signal<number | null>(null);
+  antecedenteForm = this.fb.group({
+    antecedente_id: ['', Validators.required],
+    doctor_id: [''],
+    fecha_inicio: [''],
+    tratamiento: [''],
+    observacion: [''],
+  });
+  // Para el selector de doctor del formulario de antecedente (aqui no hay
+  // una consulta de la que tomarlo automaticamente, a diferencia de
+  // citas.component.ts).
+  doctoresParaAntecedente = signal<Doctor[]>([]);
 
   constructor(
     private fb: FormBuilder,
@@ -150,12 +192,19 @@ export class PacientesComponent implements OnInit {
     private citasSrv: CitasService,
     private sucursalesSrv: SucursalesService,
     private geocodificacionSrv: GeocodificacionService,
+    private categoriasAntecedentesSrv: CategoriasAntecedentesService,
+    private antecedentesPatologicosSrv: AntecedentesPatologicosService,
+    private pacienteAntecedentesSrv: PacienteAntecedentesService,
+    private doctoresSrv: DoctoresService,
     public auth: AuthService
   ) {}
 
   ngOnInit(): void {
     this.cargar();
+    this.categoriasAntecedentesSrv.listar().subscribe((data) => this.categoriasCatalogo.set(data));
+    this.antecedentesPatologicosSrv.listar().subscribe((data) => this.antecedentesCatalogo.set(data));
     this.sucursalesSrv.listar().subscribe((data) => this.sucursales.set(data.filter((s) => s.activo)));
+    this.doctoresSrv.listar().subscribe((data) => this.doctoresParaAntecedente.set(data));
   }
   cargar(): void { this.srv.listar().subscribe((data) => this.pacientes.set(data)); }
 
@@ -169,9 +218,14 @@ export class PacientesComponent implements OnInit {
     this.tokenBusquedaIdentificacion++;
     this.editando.set(null);
     this.pacienteExistente.set(null);
-    this.form.reset({ activo: true, contacto_emergencia: { nombre: '', telefono: '', parentesco: '' } });
+    this.tabFormulario.set('generales');
+    this.form.reset({ activo: true });
     this.direccionesArray.clear();
     this.direccionesArray.push(this.crearDireccionGroup());
+    this.familiares.set([]);
+    this.cerrarFormFamiliar();
+    this.antecedentes.set([]);
+    this.cerrarFormAntecedente();
     this.habilitarCamposIdentidad();
     this.panelAbierto.set(true);
   }
@@ -180,18 +234,18 @@ export class PacientesComponent implements OnInit {
     this.tokenBusquedaIdentificacion++;
     this.editando.set(p);
     this.pacienteExistente.set(null);
+    this.tabFormulario.set('generales');
     this.form.reset({
       ...p,
       direcciones: undefined,
       fecha_nacimiento: p.fecha_nacimiento?.substring(0, 10) ?? '',
-      contacto_emergencia: {
-        nombre: p.contacto_emergencia?.nombre ?? '',
-        telefono: p.contacto_emergencia?.telefono ?? '',
-        parentesco: p.contacto_emergencia?.parentesco ?? '',
-      },
     });
     this.direccionesArray.clear();
     (p.direcciones?.length ? p.direcciones : [undefined]).forEach((d) => this.direccionesArray.push(this.crearDireccionGroup(d)));
+    this.familiares.set(p.familiares ?? []);
+    this.cerrarFormFamiliar();
+    this.antecedentes.set(p.antecedentes ?? []);
+    this.cerrarFormAntecedente();
     this.habilitarCamposIdentidad();
     this.panelAbierto.set(true);
   }
@@ -228,6 +282,144 @@ export class PacientesComponent implements OnInit {
   // Solo una direccion puede ser la principal -- desmarca todas las demas.
   marcarPrincipal(i: number): void {
     this.direccionesArray.controls.forEach((c, idx) => c.get('es_principal')?.setValue(idx === i));
+  }
+
+  // ---------- Familiares (lista en memoria + card de agregar/editar) ----------
+
+  abrirNuevoFamiliar(): void {
+    this.familiarEditandoIndex.set(null);
+    this.familiarForm.reset({ nombre: '', telefono: '', parentesco: '' });
+    this.mostrarFormFamiliar.set(true);
+  }
+
+  editarFamiliar(i: number): void {
+    this.familiarEditandoIndex.set(i);
+    this.familiarForm.reset(this.familiares()[i]);
+    this.mostrarFormFamiliar.set(true);
+  }
+
+  guardarFamiliar(): void {
+    if (this.familiarForm.invalid) return;
+    const valor = this.familiarForm.getRawValue() as FamiliarPaciente;
+    const indice = this.familiarEditandoIndex();
+    if (indice === null) {
+      this.familiares.update((arr) => [...arr, valor]);
+    } else {
+      this.familiares.update((arr) => arr.map((f, idx) => (idx === indice ? valor : f)));
+    }
+    this.cerrarFormFamiliar();
+  }
+
+  cerrarFormFamiliar(): void {
+    this.mostrarFormFamiliar.set(false);
+    this.familiarEditandoIndex.set(null);
+    this.familiarForm.reset({ nombre: '', telefono: '', parentesco: '' });
+  }
+
+  eliminarFamiliar(i: number): void {
+    this.familiares.update((arr) => arr.filter((_, idx) => idx !== i));
+  }
+
+  // ---------- Antecedentes patologicos: catalogo agrupado + CRUD ----------
+
+  // Antecedentes del catalogo agrupados por categoria (en el orden ya
+  // definido por el catalogo), para el <optgroup> del selector. Excluye
+  // los que el paciente ya tiene registrados, para no ofrecer duplicados
+  // (la tabla tiene un unique(paciente_id, antecedente_id)).
+  catalogoAgrupado = computed(() => {
+    const indiceEditando = this.antecedenteEditandoIndex();
+    const idEditando = indiceEditando !== null ? this.antecedentes()[indiceEditando]?.antecedente_id : null;
+    const yaRegistrados = new Set(this.antecedentes().map((a) => a.antecedente_id).filter((id) => id !== idEditando));
+    const disponibles = this.antecedentesCatalogo().filter((a) => a.activo && !yaRegistrados.has(a.id));
+    const grupos = new Map<string, AntecedentePatologico[]>();
+    for (const a of disponibles) {
+      const nombreCategoria = a.categoria_nombre || 'Otros';
+      if (!grupos.has(nombreCategoria)) grupos.set(nombreCategoria, []);
+      grupos.get(nombreCategoria)!.push(a);
+    }
+    return [...grupos.entries()].map(([categoria, items]) => ({ categoria, items }));
+  });
+
+  abrirNuevoAntecedente(): void {
+    // Requiere un paciente ya guardado -- un antecedente se crea con una
+    // llamada real al backend (no se puede diferir hasta el "Guardar" del
+    // paciente como direcciones/familiares, porque necesita autoria).
+    if (!this.editando()) return;
+    this.antecedenteEditandoIndex.set(null);
+    this.antecedenteForm.reset({ antecedente_id: '', doctor_id: '', fecha_inicio: '', tratamiento: '', observacion: '' });
+    this.mostrarFormAntecedente.set(true);
+  }
+
+  editarAntecedente(i: number): void {
+    this.antecedenteEditandoIndex.set(i);
+    const a = this.antecedentes()[i];
+    this.antecedenteForm.reset({
+      antecedente_id: a.antecedente_id,
+      doctor_id: a.doctor_id ?? '',
+      fecha_inicio: a.fecha_inicio?.substring(0, 10) ?? '',
+      tratamiento: a.tratamiento ?? '',
+      observacion: a.observacion ?? '',
+    });
+    this.mostrarFormAntecedente.set(true);
+  }
+
+  // A diferencia de familiares/direcciones, cada antecedente tiene su
+  // propio autor (creado_por) y CRUD independiente (no se puede reemplazar
+  // como conjunto sin perder esa autoria) -- ver
+  // pacienteAntecedentes.controller.js. Por eso requiere un paciente ya
+  // guardado (con id real): el boton de agregar se deshabilita mientras
+  // se este creando un paciente nuevo (ver abrirNuevoAntecedente()).
+  guardarAntecedente(): void {
+    if (this.antecedenteForm.invalid) return;
+    const pacienteId = this.editando()?.id;
+    if (!pacienteId) return;
+
+    const valor = this.antecedenteForm.getRawValue();
+    const data = {
+      antecedente_id: valor.antecedente_id,
+      doctor_id: valor.doctor_id || null,
+      fecha_inicio: valor.fecha_inicio || null,
+      tratamiento: valor.tratamiento || null,
+      observacion: valor.observacion || null,
+    };
+    const indice = this.antecedenteEditandoIndex();
+    const req = indice === null
+      ? this.pacienteAntecedentesSrv.crear(pacienteId, data)
+      : this.pacienteAntecedentesSrv.actualizar(this.antecedentes()[indice].id!, data);
+
+    req.subscribe({
+      next: (guardado) => {
+        if (indice === null) {
+          this.antecedentes.update((arr) => [...arr, guardado]);
+        } else {
+          this.antecedentes.update((arr) => arr.map((a, idx) => (idx === indice ? guardado : a)));
+        }
+        this.cerrarFormAntecedente();
+      },
+      error: (err) => alert(err?.error?.mensaje || 'No se pudo guardar el antecedente'),
+    });
+  }
+
+  cerrarFormAntecedente(): void {
+    this.mostrarFormAntecedente.set(false);
+    this.antecedenteEditandoIndex.set(null);
+    this.antecedenteForm.reset({ antecedente_id: '', doctor_id: '', fecha_inicio: '', tratamiento: '', observacion: '' });
+  }
+
+  eliminarAntecedente(i: number): void {
+    const a = this.antecedentes()[i];
+    if (!a.id) return;
+    this.pacienteAntecedentesSrv.eliminar(a.id).subscribe({
+      next: () => this.antecedentes.update((arr) => arr.filter((_, idx) => idx !== i)),
+      error: (err) => alert(err?.error?.mensaje || 'No se pudo eliminar el antecedente'),
+    });
+  }
+
+  // Solo quien creo el antecedente puede editarlo/eliminarlo (null =
+  // autor desconocido, sin restriccion) -- mismo criterio que
+  // puedeModificarReceta en citas.component.ts.
+  puedeModificarAntecedente(a: PacienteAntecedente): boolean {
+    return !a.creado_por || a.creado_por === this.auth.usuario()?.id;
   }
 
   @ViewChild(MapaSelectorComponent) mapaSelector?: MapaSelectorComponent;
@@ -403,23 +595,26 @@ export class PacientesComponent implements OnInit {
             acepta_whatsapp: res.paciente.acepta_whatsapp ?? false,
             email: res.paciente.email ?? '',
             alergias: res.paciente.alergias ?? '',
-            contacto_emergencia: {
-              nombre: res.paciente.contacto_emergencia?.nombre ?? '',
-              telefono: res.paciente.contacto_emergencia?.telefono ?? '',
-              parentesco: res.paciente.contacto_emergencia?.parentesco ?? '',
-            },
           });
           this.direccionesArray.clear();
           (res.paciente.direcciones?.length ? res.paciente.direcciones : [undefined]).forEach((d) => this.direccionesArray.push(this.crearDireccionGroup(d)));
+          this.familiares.set(res.paciente.familiares ?? []);
+          this.cerrarFormFamiliar();
+          this.antecedentes.set(res.paciente.antecedentes ?? []);
+          this.cerrarFormAntecedente();
           this.deshabilitarCamposIdentidad();
         } else {
           this.pacienteExistente.set(null);
+          this.familiares.set([]);
+          this.antecedentes.set([]);
           this.habilitarCamposIdentidad();
         }
       },
       error: () => {
         if (token !== this.tokenBusquedaIdentificacion) return;
         this.pacienteExistente.set(null);
+        this.familiares.set([]);
+        this.antecedentes.set([]);
         this.habilitarCamposIdentidad();
       },
     });
@@ -435,7 +630,9 @@ export class PacientesComponent implements OnInit {
 
   guardar(): void {
     if (this.form.invalid) return;
-    const data = this.form.getRawValue();
+    const data: any = this.form.getRawValue();
+    data.familiares = this.familiares();
+    data.antecedentes = this.antecedentes();
     const actual = this.editando();
     const req = actual ? this.srv.actualizar(actual.id, data) : this.srv.crear(data);
     req.subscribe({
@@ -454,6 +651,7 @@ export class PacientesComponent implements OnInit {
 
   verHistorial(p: Paciente): void {
     this.pacienteHistorial.set(p);
+    this.antecedenteHistorialSeleccionado.set(null);
     this.historial.set([]);
     this.historialSeleccionado.set(null);
     this.limpiarFiltrosHistorial();

@@ -1,0 +1,19 @@
+.tabla-catalogo {
+  max-height: 320px;
+  overflow-y: auto;
+}
+.tabla-catalogo thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  vertical-align: top;
+}
+.tabla-catalogo .th-label {
+  margin-bottom: 6px;
+}
+.tabla-catalogo .th-filtro {
+  text-transform: none;
+  font-weight: 400;
+  letter-spacing: normal;
+  white-space: normal;
+}

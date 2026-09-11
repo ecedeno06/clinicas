@@ -9,7 +9,10 @@ import { SucursalesService } from '../../core/services/sucursales.service';
 import { CampanasService } from '../../core/services/campanas.service';
 import { EspecialidadesService } from '../../core/services/especialidades.service';
 import { AuthService } from '../../core/services/auth.service';
-import { Campana, CampanaDoctor, Cita, Disponibilidad, Doctor, Especialidad, EstadoCita, EstadoLaboratorio, FranjaHoraria, HistoriaClinica, OrdenLaboratorio, Paciente, Receta, SignosVitales, Sucursal } from '../../core/models/models';
+import { CategoriasAntecedentesService } from '../../core/services/categoriasAntecedentes.service';
+import { AntecedentesPatologicosService } from '../../core/services/antecedentesPatologicos.service';
+import { PacienteAntecedentesService } from '../../core/services/pacienteAntecedentes.service';
+import { Campana, CampanaDoctor, Cita, Disponibilidad, Doctor, Especialidad, EstadoCita, EstadoLaboratorio, FranjaHoraria, HistoriaClinica, OrdenLaboratorio, Paciente, PacienteAntecedente, Receta, SignosVitales, Sucursal, CategoriaAntecedente, AntecedentePatologico } from '../../core/models/models';
 import { clasificarImc } from '../../core/utils/imc.util';
 import { clasificarPresion } from '../../core/utils/presion.util';
 import { clasificarGlucosa } from '../../core/utils/glucosa.util';
@@ -54,6 +57,32 @@ export class CitasComponent implements OnInit {
   cargandoHistoria = signal(false);
   tabHistoria = signal<'consulta' | 'signos' | 'antecedentes' | 'recetas' | 'laboratorios'>('consulta');
   pacienteDeHistoria = signal<Paciente | null>(null);
+  antecedenteSeleccionado = signal<PacienteAntecedente | null>(null);
+
+  // ---------- Agregar antecedente patologico desde la consulta ----------
+  categoriasCatalogo = signal<CategoriaAntecedente[]>([]);
+  antecedentesCatalogo = signal<AntecedentePatologico[]>([]);
+  mostrarFormAntecedenteConsulta = signal(false);
+  antecedenteConsultaForm = this.fb.group({
+    antecedente_id: ['', Validators.required],
+    fecha_inicio: [''],
+    tratamiento: [''],
+    observacion: [''],
+  });
+
+  // Excluye los que el paciente ya tiene registrados (unique(paciente_id,
+  // antecedente_id) en el backend).
+  catalogoAgrupadoConsulta = computed(() => {
+    const yaRegistrados = new Set((this.pacienteDeHistoria()?.antecedentes ?? []).map((a) => a.antecedente_id));
+    const disponibles = this.antecedentesCatalogo().filter((a) => a.activo && !yaRegistrados.has(a.id));
+    const grupos = new Map<string, AntecedentePatologico[]>();
+    for (const a of disponibles) {
+      const nombreCategoria = a.categoria_nombre || 'Otros';
+      if (!grupos.has(nombreCategoria)) grupos.set(nombreCategoria, []);
+      grupos.get(nombreCategoria)!.push(a);
+    }
+    return [...grupos.entries()].map(([categoria, items]) => ({ categoria, items }));
+  });
   signosVitalesDeHistoria = signal<SignosVitales[]>([]);
   // El endpoint devuelve ascendente (para calcular tendencias en Pacientes);
   // aqui se muestra como lista, mas reciente primero.
@@ -211,6 +240,9 @@ export class CitasComponent implements OnInit {
     private sucursalesSrv: SucursalesService,
     private campanasSrv: CampanasService,
     private especialidadesSrv: EspecialidadesService,
+    private categoriasAntecedentesSrv: CategoriasAntecedentesService,
+    private antecedentesPatologicosSrv: AntecedentesPatologicosService,
+    private pacienteAntecedentesSrv: PacienteAntecedentesService,
     private route: ActivatedRoute,
     public auth: AuthService
   ) {}
@@ -219,6 +251,8 @@ export class CitasComponent implements OnInit {
     this.cargar();
     this.pacientesSrv.listar().subscribe((data) => this.pacientes.set(data));
     this.doctoresSrv.listar().subscribe((data) => this.doctores.set(data));
+    this.categoriasAntecedentesSrv.listar().subscribe((data) => this.categoriasCatalogo.set(data));
+    this.antecedentesPatologicosSrv.listar().subscribe((data) => this.antecedentesCatalogo.set(data));
     this.sucursalesSrv.listar().subscribe((data) => this.sucursales.set(data.filter((s) => s.activo)));
     this.especialidadesSrv.listar().subscribe((data) => this.especialidades.set(data.filter((e) => e.activo)));
     this.campanasSrv.listar().subscribe((data) => {
@@ -427,6 +461,57 @@ export class CitasComponent implements OnInit {
     return !r.creado_por || r.creado_por === this.auth.usuario()?.id;
   }
 
+  // Solo quien creo el antecedente puede eliminarlo (null = autor
+  // desconocido, sin restriccion) -- mismo criterio que puedeModificarReceta.
+  puedeModificarAntecedente(a: PacienteAntecedente): boolean {
+    return !a.creado_por || a.creado_por === this.auth.usuario()?.id;
+  }
+
+  abrirFormAntecedenteConsulta(): void {
+    this.antecedenteConsultaForm.reset({ antecedente_id: '', fecha_inicio: '', tratamiento: '', observacion: '' });
+    this.mostrarFormAntecedenteConsulta.set(true);
+  }
+
+  cerrarFormAntecedenteConsulta(): void {
+    this.mostrarFormAntecedenteConsulta.set(false);
+  }
+
+  guardarAntecedenteConsulta(): void {
+    if (this.antecedenteConsultaForm.invalid) return;
+    const pacienteId = this.pacienteDeHistoria()?.id;
+    if (!pacienteId) return;
+
+    const valor = this.antecedenteConsultaForm.getRawValue();
+    const data = {
+      antecedente_id: valor.antecedente_id,
+      fecha_inicio: valor.fecha_inicio || null,
+      tratamiento: valor.tratamiento || null,
+      observacion: valor.observacion || null,
+      // El doctor que diagnostica es el que atiende esta consulta -- se
+      // toma de la cita, no se pide de nuevo en el formulario.
+      doctor_id: this.citaHistoria()?.doctor_id ?? null,
+    };
+    this.pacienteAntecedentesSrv.crear(pacienteId, data).subscribe({
+      next: () => {
+        this.cerrarFormAntecedenteConsulta();
+        this.pacientesSrv.obtener(pacienteId).subscribe((p) => this.pacienteDeHistoria.set(p));
+      },
+      error: (err) => alert(err?.error?.mensaje || 'No se pudo agregar el antecedente'),
+    });
+  }
+
+  eliminarAntecedenteConsulta(a: PacienteAntecedente): void {
+    if (!a.id) return;
+    const pacienteId = this.pacienteDeHistoria()?.id;
+    this.pacienteAntecedentesSrv.eliminar(a.id).subscribe({
+      next: () => {
+        this.antecedenteSeleccionado.set(null);
+        if (pacienteId) this.pacientesSrv.obtener(pacienteId).subscribe((p) => this.pacienteDeHistoria.set(p));
+      },
+      error: (err) => alert(err?.error?.mensaje || 'No se pudo eliminar el antecedente'),
+    });
+  }
+
   // Solo tiene sentido ofrecer "compartir ubicacion" si hay a donde
   // mandarlo (telefono del paciente, marcado explicitamente como que
   // recibe WhatsApp) y que mandar (enlace de la sucursal).
@@ -566,6 +651,8 @@ export class CitasComponent implements OnInit {
     });
 
     this.pacienteDeHistoria.set(null);
+    this.antecedenteSeleccionado.set(null);
+    this.mostrarFormAntecedenteConsulta.set(false);
     this.pacientesSrv.obtener(c.paciente_id).subscribe({
       next: (data) => this.pacienteDeHistoria.set(data),
       error: () => this.pacienteDeHistoria.set(null),

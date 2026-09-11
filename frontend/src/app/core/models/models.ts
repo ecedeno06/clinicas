@@ -111,11 +111,42 @@ export interface UsuarioDeEmpresa extends UsuarioGlobal {
 }
 
 export type Sexo = 'M' | 'F' | 'Otro';
+export type EstadoCivil = 'soltero' | 'casado' | 'unido' | 'viudo';
+export type EstadoLaboral = 'trabaja' | 'jubilado' | 'pensionado' | 'no_aplica';
+export type TipoTrabajo = 'privada' | 'gobierno' | 'independiente';
 
-export interface ContactoEmergencia {
-  nombre?: string;
-  telefono?: string;
-  parentesco?: string;
+// Familiar del paciente (reemplaza el antiguo campo unico "contacto de
+// emergencia"). La lista se maneja en memoria en el formulario y se
+// manda completa al guardar el paciente -- ver reemplazarFamiliares en
+// pacientes.controller.js.
+export interface FamiliarPaciente {
+  id?: string;
+  nombre: string;
+  telefono?: string | null;
+  parentesco?: string | null;
+}
+
+// Antecedente patologico que presenta el paciente, tomado del catalogo
+// global (AntecedentePatologico). categoria_nombre/antecedente_nombre
+// vienen por join solo para mostrar -- no se editan aqui directamente,
+// se editan en el catalogo (pantalla de super admin).
+export interface PacienteAntecedente {
+  id?: string;
+  antecedente_id: string;
+  antecedente_nombre?: string;
+  categoria_nombre?: string;
+  fecha_inicio?: string | null;
+  tratamiento?: string | null;
+  observacion?: string | null;
+  // Quien lo creo -- solo esa persona puede editarlo/eliminarlo (null =
+  // autor desconocido, sin restriccion). Mismo criterio que Receta.creado_por.
+  creado_por?: string | null;
+  creado_por_nombre?: string | null;
+  // El doctor que diagnostico el antecedente -- distinto de creado_por
+  // (quien lo registro en el sistema puede ser una recepcionista, u otro
+  // usuario). Mismo criterio que Receta.doctor_id.
+  doctor_id?: string | null;
+  doctor_nombre?: string | null;
 }
 
 // Un paciente puede tener varias direcciones (casa, trabajo, etc.), una
@@ -142,11 +173,18 @@ export interface Paciente {
   identificacion?: string;
   fecha_nacimiento?: string | null;
   sexo?: Sexo | null;
+  estado_civil?: EstadoCivil | null;
+  estado_laboral?: EstadoLaboral | null;
+  // Solo aplican si estado_laboral es 'trabaja' (el backend los limpia si
+  // deja de serlo).
+  tipo_trabajo?: TipoTrabajo | null;
+  lugar_trabajo?: string | null;
   telefono?: string;
   acepta_whatsapp?: boolean;
   email?: string;
   direcciones?: DireccionPaciente[];
-  contacto_emergencia?: ContactoEmergencia | null;
+  familiares?: FamiliarPaciente[];
+  antecedentes?: PacienteAntecedente[];
   alergias?: string;
   foto?: string | null;
   activo: boolean;
@@ -160,6 +198,25 @@ export interface Especialidad {
   descripcion?: string;
   activo: boolean;
   created_at?: string;
+}
+
+// Catalogo global de antecedentes patologicos (categorias + detalle),
+// compartido por todas las clinicas -- solo lectura salvo para un super
+// admin. Ver backend/database/migrations/036_catalogo_antecedentes.sql.
+export interface CategoriaAntecedente {
+  id: string;
+  nombre: string;
+  orden: number;
+  activo: boolean;
+}
+
+export interface AntecedentePatologico {
+  id: string;
+  categoria_id: string;
+  categoria_nombre?: string;
+  nombre: string;
+  orden: number;
+  activo: boolean;
 }
 
 // Un doctor puede tener varias especialidades, cada una con su propio

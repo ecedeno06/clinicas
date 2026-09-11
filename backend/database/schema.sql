@@ -97,6 +97,33 @@ create table if not exists especialidades (
 );
 
 -- ---------------------------------------------------------
+-- Catalogo global de antecedentes patologicos (categorias + detalle),
+-- compartido por todas las clinicas -- no lleva empresa_id. Solo lectura
+-- para cualquier usuario autenticado; crear/editar/eliminar requiere ser
+-- super administrador. El seed real (14 categorias, 76 condiciones) vive
+-- en la migracion 036, no aqui.
+-- ---------------------------------------------------------
+create table if not exists categorias_antecedentes (
+    id         uuid primary key default gen_random_uuid(),
+    nombre     text not null unique,
+    orden      integer not null default 0,
+    activo     boolean not null default true,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now()
+);
+
+create table if not exists antecedentes_patologicos (
+    id           uuid primary key default gen_random_uuid(),
+    categoria_id uuid not null references categorias_antecedentes(id),
+    nombre       text not null,
+    orden        integer not null default 0,
+    activo       boolean not null default true,
+    created_at   timestamptz not null default now(),
+    updated_at   timestamptz not null default now(),
+    unique(categoria_id, nombre)
+);
+
+-- ---------------------------------------------------------
 -- Tabla: pacientes. Es GLOBAL (mismo patron que usuarios): una
 -- misma persona puede ser atendida en varias clinicas de la red
 -- sin duplicar su registro (ver pacientes_empresas). La identificacion
@@ -112,13 +139,17 @@ create table if not exists pacientes (
     identificacion      text unique,          -- cedula / pasaporte
     fecha_nacimiento    date,
     sexo                text check (sexo in ('M', 'F', 'Otro')),
+    estado_civil        text check (estado_civil in ('soltero', 'casado', 'unido', 'viudo')),
+    -- tipo_trabajo/lugar_trabajo solo aplican si estado_laboral = 'trabaja'
+    -- (el backend los limpia si deja de ser el caso).
+    estado_laboral      text check (estado_laboral in ('trabaja', 'jubilado', 'pensionado', 'no_aplica')),
+    tipo_trabajo        text check (tipo_trabajo in ('privada', 'gobierno', 'independiente')),
+    lugar_trabajo       text,
     telefono            text,
     -- Indica si "telefono" recibe WhatsApp (se usa para decidir si mostrar
     -- la opcion de "compartir ubicacion por WhatsApp" en Citas).
     acepta_whatsapp     boolean not null default false,
     email               text,
-    -- Contacto de emergencia: { nombre, telefono, parentesco }
-    contacto_emergencia jsonb,
     alergias            text,
     -- Foto del paciente en base64 (data URI), igual que usuarios.avatar
     foto                text,
@@ -148,6 +179,19 @@ create table if not exists direcciones_paciente (
     es_principal       boolean not null default false,
     created_at         timestamptz not null default now(),
     updated_at         timestamptz not null default now()
+);
+
+-- Lista de familiares del paciente (reemplazo del antiguo campo unico
+-- "contacto de emergencia"). Se reemplaza como conjunto en cada guardado
+-- del paciente -- ver reemplazarFamiliares en pacientes.controller.js.
+create table if not exists familiares_paciente (
+    id          uuid primary key default gen_random_uuid(),
+    paciente_id uuid not null references pacientes(id) on delete cascade,
+    nombre      text not null,
+    telefono    text,
+    parentesco  text,
+    created_at  timestamptz not null default now(),
+    updated_at  timestamptz not null default now()
 );
 
 -- ---------------------------------------------------------
@@ -187,6 +231,28 @@ create table if not exists doctores (
     activo              boolean not null default true,
     created_at          timestamptz not null default now(),
     updated_at          timestamptz not null default now()
+);
+
+-- Antecedentes patologicos que presenta el paciente (del catalogo global
+-- antecedentes_patologicos) -- misma logica que familiares_paciente: se
+-- reemplaza como conjunto en cada guardado del paciente. La categoria se
+-- obtiene por join a traves de antecedente_id, no se duplica aqui.
+create table if not exists paciente_antecedente (
+    id             uuid primary key default gen_random_uuid(),
+    paciente_id    uuid not null references pacientes(id) on delete cascade,
+    antecedente_id uuid not null references antecedentes_patologicos(id),
+    fecha_inicio   date,
+    tratamiento    text,
+    observacion    text,
+    -- El doctor que diagnostico el antecedente (distinto de creado_por:
+    -- puede registrarlo una recepcionista u otro usuario).
+    doctor_id      uuid references doctores(id),
+    -- Solo quien lo creo puede editarlo/eliminarlo (null = autor
+    -- desconocido, sin restriccion) -- mismo criterio que recetas.creado_por.
+    creado_por     uuid references usuarios(id),
+    created_at     timestamptz not null default now(),
+    updated_at     timestamptz not null default now(),
+    unique(paciente_id, antecedente_id)
 );
 
 -- Especialidades de un doctor (N:M): la junta medica certifica por
@@ -520,6 +586,10 @@ create index if not exists idx_usuarios_empresas_rol_empresa on usuarios_empresa
 create index if not exists idx_pacientes_empresas_paciente on pacientes_empresas(paciente_id);
 create index if not exists idx_pacientes_empresas_empresa on pacientes_empresas(empresa_id);
 create index if not exists idx_direcciones_paciente_paciente on direcciones_paciente(paciente_id);
+create index if not exists idx_familiares_paciente_paciente on familiares_paciente(paciente_id);
+create index if not exists idx_antecedentes_patologicos_categoria on antecedentes_patologicos(categoria_id);
+create index if not exists idx_paciente_antecedente_paciente on paciente_antecedente(paciente_id);
+create index if not exists idx_paciente_antecedente_antecedente on paciente_antecedente(antecedente_id);
 -- Como maximo una direccion principal por paciente.
 create unique index if not exists uq_direcciones_paciente_principal on direcciones_paciente(paciente_id) where es_principal;
 create index if not exists idx_sucursales_empresa on sucursales(empresa_id);

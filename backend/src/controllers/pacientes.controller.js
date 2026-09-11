@@ -1,5 +1,14 @@
 const { pool } = require('../config/db');
 
+// tipo_trabajo/lugar_trabajo solo tienen sentido si estado_laboral es
+// 'trabaja' -- si no, se limpian para no dejar datos laborales viejos
+// colgando (ej. un paciente que se jubilo ya no deberia seguir mostrando
+// su antiguo lugar de trabajo).
+function normalizarDatosLaborales(estado_laboral, tipo_trabajo, lugar_trabajo) {
+  if (estado_laboral !== 'trabaja') return { tipoTrabajo: null, lugarTrabajo: null };
+  return { tipoTrabajo: tipo_trabajo || null, lugarTrabajo: lugar_trabajo || null };
+}
+
 // Un paciente puede tener varias direcciones (tabla puente
 // direcciones_paciente), una marcada como principal -- esa es la que usan
 // Google Maps/Waze/WhatsApp al doctor en Citas/historial. Se agregan como
@@ -16,11 +25,51 @@ const SELECT_DIRECCIONES = `
   ), '[]') as direcciones
 `;
 
+// Lista de familiares del paciente (reemplaza el antiguo campo unico
+// "contacto de emergencia"). Se maneja igual que direcciones: el
+// frontend la manda completa en el mismo payload de crear/actualizar
+// paciente, y se reemplaza como conjunto en cada guardado -- ver
+// reemplazarFamiliares.
+const SELECT_FAMILIARES = `
+  coalesce((
+    select json_agg(json_build_object(
+      'id', fp.id, 'nombre', fp.nombre, 'telefono', fp.telefono, 'parentesco', fp.parentesco
+    ) order by fp.created_at)
+    from familiares_paciente fp
+    where fp.paciente_id = p.id
+  ), '[]') as familiares
+`;
+
+// Antecedentes patologicos del paciente (del catalogo global
+// antecedentes_patologicos, migracion 036). categoria_nombre/
+// antecedente_nombre se traen por join solo para mostrar -- la fuente de
+// verdad de a que categoria pertenece un antecedente es el catalogo, no
+// se duplica aqui. A diferencia de direcciones/familiares, cada fila
+// tiene su propio autor (creado_por) y su propio CRUD independiente --
+// ver pacienteAntecedentes.controller.js. Aqui solo se usa para MOSTRAR.
+const SELECT_ANTECEDENTES = `
+  coalesce((
+    select json_agg(json_build_object(
+      'id', pa.id, 'antecedente_id', pa.antecedente_id,
+      'antecedente_nombre', ap.nombre, 'categoria_nombre', c.nombre,
+      'fecha_inicio', pa.fecha_inicio, 'tratamiento', pa.tratamiento, 'observacion', pa.observacion,
+      'creado_por', pa.creado_por, 'creado_por_nombre', u.nombre,
+      'doctor_id', pa.doctor_id, 'doctor_nombre', d.nombre
+    ) order by c.orden, ap.orden, ap.nombre)
+    from paciente_antecedente pa
+    join antecedentes_patologicos ap on ap.id = pa.antecedente_id
+    join categorias_antecedentes c on c.id = ap.categoria_id
+    left join usuarios u on u.id = pa.creado_por
+    left join doctores d on d.id = pa.doctor_id
+    where pa.paciente_id = p.id
+  ), '[]') as antecedentes
+`;
+
 // GET /api/pacientes
 async function listar(req, res, next) {
   try {
     const { rows } = await pool.query(
-      `select p.*, pe.activo, ${SELECT_DIRECCIONES}
+      `select p.*, pe.activo, ${SELECT_DIRECCIONES}, ${SELECT_FAMILIARES}, ${SELECT_ANTECEDENTES}
        from pacientes p
        join pacientes_empresas pe on pe.paciente_id = p.id
        where pe.empresa_id = $1
@@ -34,7 +83,7 @@ async function listar(req, res, next) {
 async function obtener(req, res, next) {
   try {
     const { rows } = await pool.query(
-      `select p.*, pe.activo, ${SELECT_DIRECCIONES}
+      `select p.*, pe.activo, ${SELECT_DIRECCIONES}, ${SELECT_FAMILIARES}, ${SELECT_ANTECEDENTES}
        from pacientes p
        join pacientes_empresas pe on pe.paciente_id = p.id
        where p.id = $1 and pe.empresa_id = $2`,
@@ -67,6 +116,20 @@ async function reemplazarDirecciones(ejecutor, pacienteId, direcciones) {
   }
 }
 
+// La lista de familiares se manda completa en cada guardado del paciente
+// (igual que direcciones) -- se reemplaza como conjunto, no se editan
+// filas una a una.
+async function reemplazarFamiliares(ejecutor, pacienteId, familiares) {
+  await ejecutor.query('delete from familiares_paciente where paciente_id = $1', [pacienteId]);
+  for (const f of familiares) {
+    if (!f.nombre) continue;
+    await ejecutor.query(
+      'insert into familiares_paciente (paciente_id, nombre, telefono, parentesco) values ($1,$2,$3,$4)',
+      [pacienteId, f.nombre, f.telefono || null, f.parentesco || null]
+    );
+  }
+}
+
 // GET /api/pacientes/buscar?identificacion=X
 // Busca un paciente en TODA la red (no solo en esta clinica), para saber
 // si ya existe antes de crear uno nuevo -- mismo patron que
@@ -92,11 +155,14 @@ async function crear(req, res, next) {
   try {
     const {
       nombre, identificacion, fecha_nacimiento, sexo, telefono, acepta_whatsapp, email,
-      direcciones, contacto_emergencia, alergias, activo, foto,
+      estado_civil, estado_laboral, tipo_trabajo, lugar_trabajo,
+      direcciones, familiares, alergias, activo, foto,
     } = req.body;
 
     const errorDirecciones = validarDirecciones(direcciones);
     if (errorDirecciones) return res.status(400).json({ mensaje: errorDirecciones });
+
+    const { tipoTrabajo, lugarTrabajo } = normalizarDatosLaborales(estado_laboral, tipo_trabajo, lugar_trabajo);
 
     await client.query('begin');
 
@@ -121,16 +187,20 @@ async function crear(req, res, next) {
         return res.status(400).json({ mensaje: 'nombre es requerido para un paciente nuevo' });
       }
       const ins = await client.query(
-        `insert into pacientes (nombre, identificacion, fecha_nacimiento, sexo, telefono, acepta_whatsapp, email, contacto_emergencia, alergias, foto)
-         values ($1,$2,$3,$4,$5, coalesce($6, false),$7,$8,$9,$10) returning *`,
+        `insert into pacientes (nombre, identificacion, fecha_nacimiento, sexo, telefono, acepta_whatsapp, email, alergias, foto, estado_civil, estado_laboral, tipo_trabajo, lugar_trabajo)
+         values ($1,$2,$3,$4,$5, coalesce($6, false),$7,$8,$9,$10,$11,$12,$13) returning *`,
         [
           nombre, identificacion || null, fecha_nacimiento || null, sexo, telefono, acepta_whatsapp, email,
-          contacto_emergencia ? JSON.stringify(contacto_emergencia) : null, alergias, foto || null,
+          alergias, foto || null,
+          estado_civil || null, estado_laboral || null, tipoTrabajo, lugarTrabajo,
         ]
       );
       paciente = ins.rows[0];
       if (Array.isArray(direcciones) && direcciones.length) {
         await reemplazarDirecciones(client, paciente.id, direcciones);
+      }
+      if (Array.isArray(familiares) && familiares.length) {
+        await reemplazarFamiliares(client, paciente.id, familiares);
       }
     }
 
@@ -142,7 +212,7 @@ async function crear(req, res, next) {
     await client.query('commit');
 
     const { rows } = await pool.query(
-      `select p.*, pe.activo, ${SELECT_DIRECCIONES}
+      `select p.*, pe.activo, ${SELECT_DIRECCIONES}, ${SELECT_FAMILIARES}, ${SELECT_ANTECEDENTES}
        from pacientes p join pacientes_empresas pe on pe.paciente_id = p.id and pe.empresa_id = $2
        where p.id = $1`,
       [paciente.id, req.empresaId]
@@ -166,11 +236,14 @@ async function actualizar(req, res, next) {
   try {
     const {
       nombre, identificacion, fecha_nacimiento, sexo, telefono, acepta_whatsapp, email,
-      direcciones, contacto_emergencia, alergias, activo, foto,
+      estado_civil, estado_laboral, tipo_trabajo, lugar_trabajo,
+      direcciones, familiares, alergias, activo, foto,
     } = req.body;
 
     const errorDirecciones = validarDirecciones(direcciones);
     if (errorDirecciones) return res.status(400).json({ mensaje: errorDirecciones });
+
+    const { tipoTrabajo, lugarTrabajo } = normalizarDatosLaborales(estado_laboral, tipo_trabajo, lugar_trabajo);
 
     const vinculo = await client.query(
       'select 1 from pacientes_empresas where paciente_id = $1 and empresa_id = $2',
@@ -189,19 +262,27 @@ async function actualizar(req, res, next) {
          telefono = coalesce($5, telefono),
          acepta_whatsapp = coalesce($6, acepta_whatsapp),
          email = coalesce($7, email),
-         contacto_emergencia = coalesce($8, contacto_emergencia),
-         alergias = coalesce($9, alergias),
-         foto = coalesce($10, foto)
-       where id = $11 returning *`,
+         alergias = coalesce($8, alergias),
+         foto = coalesce($9, foto),
+         estado_civil = coalesce($10, estado_civil),
+         estado_laboral = coalesce($11, estado_laboral),
+         tipo_trabajo = $12,
+         lugar_trabajo = $13
+       where id = $14 returning *`,
       [
         nombre, identificacion, fecha_nacimiento || null, sexo, telefono, acepta_whatsapp, email,
-        contacto_emergencia ? JSON.stringify(contacto_emergencia) : null, alergias, foto,
+        alergias, foto,
+        estado_civil || null, estado_laboral || null, tipoTrabajo, lugarTrabajo,
         req.params.id,
       ]
     );
 
     if (direcciones !== undefined) {
       await reemplazarDirecciones(client, req.params.id, direcciones || []);
+    }
+
+    if (familiares !== undefined) {
+      await reemplazarFamiliares(client, req.params.id, familiares || []);
     }
 
     if (activo !== undefined) {
@@ -214,7 +295,7 @@ async function actualizar(req, res, next) {
     await client.query('commit');
 
     const { rows: final } = await pool.query(
-      `select p.*, pe.activo, ${SELECT_DIRECCIONES}
+      `select p.*, pe.activo, ${SELECT_DIRECCIONES}, ${SELECT_FAMILIARES}, ${SELECT_ANTECEDENTES}
        from pacientes p join pacientes_empresas pe on pe.paciente_id = p.id and pe.empresa_id = $2
        where p.id = $1`,
       [req.params.id, req.empresaId]
