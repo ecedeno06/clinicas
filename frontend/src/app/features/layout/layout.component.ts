@@ -24,6 +24,8 @@ export class LayoutComponent implements OnInit, OnDestroy {
   menuAbierto = signal(false);
   panelPasswordAbierto = signal(false);
   panelSeguridadAbierto = signal(false);
+  verPasswordNueva = signal(false);
+  verPasswordConfirmar = signal(false);
   // Un admin marco esta cuenta con debe_cambiar_password (al crearla o al
   // resetearle la contrasena) -- se fuerza el formulario, sin poder
   // cancelarlo, hasta que el usuario ponga una contrasena propia.
@@ -125,6 +127,8 @@ export class LayoutComponent implements OnInit, OnDestroy {
   abrirCambioPassword(): void {
     this.menuAbierto.set(false);
     this.passwordForm.reset();
+    this.verPasswordNueva.set(false);
+    this.verPasswordConfirmar.set(false);
     this.panelPasswordAbierto.set(true);
   }
 

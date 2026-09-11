@@ -901,6 +901,35 @@ table.data-table {
   color: var(--slate-500);
 }
 
+/* Boton de mostrar/ocultar contrasena, superpuesto dentro del input
+   (Cambiar contrasena en el menu de usuario). */
+.password-input-wrap {
+  position: relative;
+}
+.password-input-wrap .input {
+  padding-right: 38px;
+}
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius);
+  background: none;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  cursor: pointer;
+  color: var(--slate-500);
+}
+.password-toggle:hover {
+  background: var(--slate-100);
+}
+
 /* Nombre del paciente parpadeando en rojo luminoso mientras la cita de
    urgencia siga sin atender (una vez "atendida" deja de parpadear). */
 .nombre-urgencia {
