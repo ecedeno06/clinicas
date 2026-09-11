@@ -55,6 +55,10 @@ create table if not exists usuarios (
     -- enrolarse explicitamente desde la pantalla de seguridad.
     two_factor_enabled boolean not null default false,
     two_factor_secret  text,
+    -- Frase-reto independiente de la contrasena, definida al activar el
+    -- 2FA (hasheada con bcrypt, nunca reversible) -- se pide antes de
+    -- enviar el correo de recuperacion de 2FA. Se limpia al desactivar.
+    two_factor_challenge_hash text,
     -- Fuerza cambio de contrasena en el siguiente login: se activa al
     -- crear el usuario o al resetearle la contrasena desde Usuarios (el
     -- admin conoce esa contrasena, es temporal); se limpia sola cuando el

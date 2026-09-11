@@ -1,0 +1,11 @@
+-- Frase-reto independiente de la contrasena, definida al ACTIVAR el 2FA
+-- (campo en blanco cada vez, nunca se muestra la anterior). Se pide como
+-- reto de un solo intento antes de enviar el correo de recuperacion de
+-- 2FA (POST /auth/2fa/recovery) -- protege contra alguien que solo tiene
+-- acceso al correo del usuario, pero no a este segundo secreto. Hasheada
+-- con bcrypt igual que password_hash (nunca reversible): ni un
+-- compromiso de CRYPTO_SECRET_KEY (usada para two_factor_secret) la
+-- expone. Se limpia (null) cada vez que el 2FA se desactiva, por
+-- cualquier via, para forzar una frase nueva la proxima vez que se
+-- active.
+alter table usuarios add column if not exists two_factor_challenge_hash text;

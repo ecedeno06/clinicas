@@ -223,19 +223,27 @@ async function setup2FA(req, res, next) {
   }
 }
 
-// POST /api/auth/2fa/enable  { secret, code }  (autenticado)
+// POST /api/auth/2fa/enable  { secret, code, frase_reto }  (autenticado)
+// frase_reto es un secreto independiente de la contrasena (nunca se
+// autocompleta con uno anterior -- siempre se pide en blanco): se exige
+// para poder pedir la recuperacion de 2FA por correo (ver
+// solicitarRecuperacion2FA), asi alguien con acceso solo al correo del
+// usuario no puede desactivarle el 2FA sin conocer tambien esta frase.
 async function enable2FA(req, res, next) {
   try {
-    const { secret, code } = req.body;
+    const { secret, code, frase_reto } = req.body;
     if (!secret || !code) return res.status(400).json({ mensaje: 'secret y code son requeridos' });
+    const fraseLimpia = String(frase_reto || '').trim().toLowerCase();
+    if (fraseLimpia.length < 4) return res.status(400).json({ mensaje: 'La frase-reto debe tener al menos 4 caracteres' });
 
     const esValido = authenticator.check(String(code).trim(), secret);
     if (!esValido) return res.status(400).json({ mensaje: 'Codigo invalido' });
 
     const secretCifrado = encriptar(secret);
+    const fraseHash = await bcrypt.hash(fraseLimpia, 10);
     await pool.query(
-      'update usuarios set two_factor_secret = $1, two_factor_enabled = true where id = $2',
-      [secretCifrado, req.usuario.id]
+      'update usuarios set two_factor_secret = $1, two_factor_enabled = true, two_factor_challenge_hash = $2 where id = $3',
+      [secretCifrado, fraseHash, req.usuario.id]
     );
 
     res.json({ mensaje: '2FA activado correctamente' });
@@ -260,8 +268,10 @@ async function disable2FA(req, res, next) {
     const esValido = authenticator.check(String(code).trim(), secret);
     if (!esValido) return res.status(400).json({ mensaje: 'Codigo invalido' });
 
+    // Se limpia tambien la frase-reto: la proxima vez que se active el
+    // 2FA (aca o en otro equipo) se debe definir una nueva, en blanco.
     await pool.query(
-      'update usuarios set two_factor_secret = null, two_factor_enabled = false where id = $1',
+      'update usuarios set two_factor_secret = null, two_factor_enabled = false, two_factor_challenge_hash = null where id = $1',
       [req.usuario.id]
     );
 
@@ -442,22 +452,34 @@ function generarTokenRecuperacion2FA() {
   return 'r2f_' + crypto.randomBytes(32).toString('hex');
 }
 
-// POST /api/auth/2fa/recovery  { usuarioId }  (publico, con rate-limit en la
-// ruta) -- se llama desde la pantalla que pide el codigo de la app
-// autenticadora ("perdi acceso a mi 2FA"), NO desde el login inicial. El
-// usuarioId ya viene validado por contrasena (lo devolvio POST /auth/login
-// al detectar 2FA activo), asi que no hace falta pedir el email de nuevo.
-// No revela si el 2FA sigue activo o no -- respuesta generica siempre.
+// POST /api/auth/2fa/recovery  { usuarioId, frase_reto }  (publico, con
+// rate-limit en la ruta) -- se llama desde la pantalla que pide el codigo
+// de la app autenticadora ("perdi acceso a mi 2FA"), NO desde el login
+// inicial. El usuarioId ya viene validado por contrasena (lo devolvio
+// POST /auth/login al detectar 2FA activo), asi que no hace falta pedir
+// el email de nuevo.
+//
+// frase_reto es un segundo secreto (definido al activar el 2FA, ver
+// enable2FA) que hay que acertar ANTES de que se envie el correo -- de un
+// solo intento, sin reintentos (si falla, el frontend vuelve al login sin
+// llamar de nuevo a este endpoint). Cuentas que activaron el 2FA antes de
+// que existiera este campo no tienen two_factor_challenge_hash: para
+// ellas se salta el reto y se comporta como antes, para no bloquearlas.
 async function solicitarRecuperacion2FA(req, res, next) {
   try {
     const usuarioId = String(req.body?.usuarioId || '').trim();
     if (!usuarioId) return res.status(400).json({ mensaje: 'usuarioId es requerido' });
 
     const { rows } = await pool.query(
-      'select id, nombre, email from usuarios where id = $1 and activo = true and two_factor_enabled = true',
+      'select id, nombre, email, two_factor_challenge_hash from usuarios where id = $1 and activo = true and two_factor_enabled = true',
       [usuarioId]
     );
     const usuario = rows[0];
+
+    if (usuario && usuario.two_factor_challenge_hash) {
+      const fraseOk = await bcrypt.compare(String(req.body?.frase_reto || '').trim().toLowerCase(), usuario.two_factor_challenge_hash);
+      if (!fraseOk) return res.status(400).json({ mensaje: 'Frase incorrecta.' });
+    }
 
     if (usuario) {
       const token = generarTokenRecuperacion2FA();
@@ -495,7 +517,9 @@ async function confirmarRecuperacion2FA(req, res, next) {
     const registro = rows[0];
     if (!registro) return res.status(400).json({ mensaje: 'El enlace es invalido o ya expiro. Solicita uno nuevo.' });
 
-    await pool.query('update usuarios set two_factor_secret = null, two_factor_enabled = false where id = $1', [registro.usuario_id]);
+    // Se limpia tambien la frase-reto: la proxima vez que se active el
+    // 2FA se debe definir una nueva, en blanco (ver enable2FA).
+    await pool.query('update usuarios set two_factor_secret = null, two_factor_enabled = false, two_factor_challenge_hash = null where id = $1', [registro.usuario_id]);
     await pool.query('update dos_factor_recovery_tokens set usado = true where id = $1', [registro.id]);
     // Mismo criterio que reset-password: cierra las sesiones activas, por
     // si alguien mas tenia acceso.
@@ -507,6 +531,40 @@ async function confirmarRecuperacion2FA(req, res, next) {
     );
 
     res.json({ mensaje: 'Verificacion en dos pasos desactivada. Ya puedes iniciar sesion solo con tu contrasena.' });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// POST /api/auth/2fa/recovery/notificar-admin  { usuarioId }  (publico,
+// con rate-limit en la ruta) -- boton de escape para el caso legitimo de
+// que el usuario tambien olvido su frase-reto: avisa a los super admins
+// por correo para que puedan desactivarle el 2FA a mano desde Usuarios.
+// No revela nada sobre si el usuario existe -- respuesta generica siempre.
+async function notificarIntentoFallido2FA(req, res, next) {
+  try {
+    const usuarioId = String(req.body?.usuarioId || '').trim();
+    if (!usuarioId) return res.status(400).json({ mensaje: 'usuarioId es requerido' });
+
+    const { rows } = await pool.query('select nombre, email from usuarios where id = $1', [usuarioId]);
+    const usuario = rows[0];
+
+    if (usuario) {
+      const { rows: admins } = await pool.query(
+        'select email from usuarios where es_super_admin = true and activo = true'
+      );
+      const fecha = new Date().toLocaleString('es-PA');
+      for (const admin of admins) {
+        enviarCorreo({
+          destinatario: admin.email,
+          asunto: 'Solicitud de ayuda: recuperacion de 2FA fallida',
+          texto: `El usuario ${usuario.nombre} (${usuario.email}) intento recuperar el acceso a su 2FA el ${fecha}, pero no acerto su frase-reto.\n\nSi perdio legitimamente su dispositivo, puedes desactivarle el 2FA manualmente desde Usuarios.`,
+          html: `<p>El usuario <strong>${usuario.nombre}</strong> (${usuario.email}) intento recuperar el acceso a su 2FA el ${fecha}, pero no acerto su frase-reto.</p><p>Si perdio legitimamente su dispositivo, puedes desactivarle el 2FA manualmente desde Usuarios.</p>`,
+        }).catch((err) => console.error('Error enviando correo de aviso de 2FA a un admin:', err.message));
+      }
+    }
+
+    res.json({ mensaje: 'Se notifico al equipo de soporte.' });
   } catch (err) {
     next(err);
   }
@@ -721,6 +779,7 @@ module.exports = {
   restablecerPassword,
   solicitarRecuperacion2FA,
   confirmarRecuperacion2FA,
+  notificarIntentoFallido2FA,
   obtenerPista,
   sessionConfig,
   seleccionarEmpresa,

@@ -25,6 +25,16 @@ export class SeguridadComponent implements OnInit {
   qrTemporal = signal<string | null>(null);
 
   codeForm = this.fb.group({ code: ['', [Validators.required, Validators.pattern(/^\d{6}$/)]] });
+  // Un solo FormGroup para el paso de enrolamiento (codigo + frase-reto):
+  // dos FormGroup hermanos bajo el mismo <form> daban problemas de
+  // deteccion de validez en el template. frase_reto es un segundo secreto,
+  // independiente de la contrasena, exigido para activar el 2FA -- siempre
+  // en blanco, nunca se autocompleta con una anterior (ver
+  // auth.service.ts#enable2FA).
+  enrolarForm = this.fb.group({
+    code: ['', [Validators.required, Validators.pattern(/^\d{6}$/)]],
+    frase_reto: ['', [Validators.required, Validators.minLength(4)]],
+  });
 
   constructor(private fb: FormBuilder, private auth: AuthService) {}
 
@@ -47,7 +57,7 @@ export class SeguridadComponent implements OnInit {
         this.cargando.set(false);
         this.secretoTemporal.set(res.secret);
         this.qrTemporal.set(res.qrCode);
-        this.codeForm.reset();
+        this.enrolarForm.reset();
         this.paso.set('enrolando');
       },
       error: (err) => {
@@ -58,10 +68,11 @@ export class SeguridadComponent implements OnInit {
   }
 
   confirmarEnrolamiento(): void {
-    if (this.codeForm.invalid || !this.secretoTemporal()) return;
+    if (this.enrolarForm.invalid || !this.secretoTemporal()) return;
     this.error.set(null);
     this.cargando.set(true);
-    this.auth.enable2FA(this.secretoTemporal()!, this.codeForm.getRawValue().code!).subscribe({
+    const { code, frase_reto } = this.enrolarForm.getRawValue();
+    this.auth.enable2FA(this.secretoTemporal()!, code!, frase_reto!).subscribe({
       next: () => {
         this.cargando.set(false);
         this.cancelarEnrolamiento();
@@ -78,6 +89,7 @@ export class SeguridadComponent implements OnInit {
     this.paso.set('inicial');
     this.secretoTemporal.set(null);
     this.qrTemporal.set(null);
+    this.enrolarForm.reset();
     this.error.set(null);
   }
 

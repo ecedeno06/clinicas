@@ -38,10 +38,15 @@ export class LoginComponent {
   // "Perdi acceso a mi 2FA" -- desde la pantalla que pide el codigo de la
   // app autenticadora. usuarioId ya viene validado por contrasena (lo puso
   // el login al detectar 2FA activo), asi que no hace falta pedir el email.
-  // mensajeRecuperacion2FA siempre es el mensaje generico del backend.
+  // mensajeRecuperacion2FA siempre es el mensaje generico del backend en
+  // exito; en error (frase-reto incorrecta) se ofrece notificar a un
+  // administrador en vez de reintentar (un solo intento, sin retry).
   mostrarRecuperacion2FA = signal(false);
   cargandoRecuperacion2FA = signal(false);
   mensajeRecuperacion2FA = signal<string | null>(null);
+  fallaRecuperacion2FA = signal(false);
+  cargandoNotificarAdmin = signal(false);
+  fraseRetoRecuperacionForm = this.fb.group({ frase_reto: [''] });
 
   form = this.fb.group({
     email: ['', [Validators.required, Validators.email]],
@@ -102,30 +107,56 @@ export class LoginComponent {
     this.error.set(null);
     this.mostrarRecuperacion2FA.set(false);
     this.mensajeRecuperacion2FA.set(null);
+    this.fallaRecuperacion2FA.set(false);
+    this.fraseRetoRecuperacionForm.reset();
   }
 
   abrirRecuperacion2FA(): void {
     this.mostrarRecuperacion2FA.set(true);
     this.mensajeRecuperacion2FA.set(null);
+    this.fallaRecuperacion2FA.set(false);
+    this.fraseRetoRecuperacionForm.reset();
   }
 
   cerrarRecuperacion2FA(): void {
     this.mostrarRecuperacion2FA.set(false);
     this.mensajeRecuperacion2FA.set(null);
+    this.fallaRecuperacion2FA.set(false);
   }
 
+  // Un solo intento: si falla, no se vuelve a llamar a este metodo -- la
+  // pantalla ofrece "Notificar a un administrador" o "Volver", ambos
+  // terminan en cancelar2FA().
   enviarRecuperacion2FA(): void {
     if (!this.usuarioId2FA()) return;
     this.cargandoRecuperacion2FA.set(true);
     this.mensajeRecuperacion2FA.set(null);
-    this.auth.solicitarRecuperacion2FA(this.usuarioId2FA()!).subscribe({
+    this.fallaRecuperacion2FA.set(false);
+    const frase = this.fraseRetoRecuperacionForm.getRawValue().frase_reto || '';
+    this.auth.solicitarRecuperacion2FA(this.usuarioId2FA()!, frase).subscribe({
       next: (res) => {
         this.cargandoRecuperacion2FA.set(false);
         this.mensajeRecuperacion2FA.set(res.mensaje);
       },
       error: (err) => {
         this.cargandoRecuperacion2FA.set(false);
-        this.mensajeRecuperacion2FA.set(err?.error?.mensaje || 'No se pudo procesar la solicitud. Intenta de nuevo.');
+        this.fallaRecuperacion2FA.set(true);
+        this.mensajeRecuperacion2FA.set(err?.error?.mensaje || 'No se pudo procesar la solicitud.');
+      },
+    });
+  }
+
+  notificarAdmin2FA(): void {
+    if (!this.usuarioId2FA()) return;
+    this.cargandoNotificarAdmin.set(true);
+    this.auth.notificarAdmin2FA(this.usuarioId2FA()!).subscribe({
+      next: () => {
+        this.cargandoNotificarAdmin.set(false);
+        this.cancelar2FA();
+      },
+      error: () => {
+        this.cargandoNotificarAdmin.set(false);
+        this.cancelar2FA();
       },
     });
   }

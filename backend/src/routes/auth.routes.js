@@ -11,6 +11,7 @@ const {
   restablecerPassword,
   solicitarRecuperacion2FA,
   confirmarRecuperacion2FA,
+  notificarIntentoFallido2FA,
   obtenerPista,
   sessionConfig,
   seleccionarEmpresa,
@@ -23,6 +24,7 @@ const { requireAuth } = require('../middleware/auth');
 const rateLimitPista = require('../middleware/rateLimitPista');
 const rateLimitOlvidoPassword = require('../middleware/rateLimitOlvidoPassword');
 const rateLimitRecuperacion2FA = require('../middleware/rateLimitRecuperacion2FA');
+const rateLimitNotificarAdmin2FA = require('../middleware/rateLimitNotificarAdmin2FA');
 
 router.post('/login', login);
 router.post('/2fa/verify-login', verificar2FA);
@@ -31,6 +33,7 @@ router.post('/forgot-password', rateLimitOlvidoPassword, olvidoPassword);
 router.post('/reset-password', restablecerPassword);
 router.post('/2fa/recovery', rateLimitRecuperacion2FA, solicitarRecuperacion2FA);
 router.post('/2fa/recovery/confirm', confirmarRecuperacion2FA);
+router.post('/2fa/recovery/notificar-admin', rateLimitNotificarAdmin2FA, notificarIntentoFallido2FA);
 router.get('/pista', rateLimitPista, obtenerPista);
 router.get('/session-config', sessionConfig);
 router.post('/seleccionar-empresa', requireAuth, seleccionarEmpresa);

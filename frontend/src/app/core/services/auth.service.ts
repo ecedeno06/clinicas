@@ -239,10 +239,13 @@ export class AuthService {
 
   // POST /auth/2fa/recovery -- publico. Se llama desde la pantalla que pide
   // el codigo de la app autenticadora ("perdi acceso a mi 2FA"), usando el
-  // usuarioId que ya devolvio el login (contrasena ya validada). Respuesta
-  // siempre generica, igual que olvidarPassword().
-  solicitarRecuperacion2FA(usuarioId: string): Observable<{ mensaje: string }> {
-    return this.http.post<{ mensaje: string }>(`${environment.apiUrl}/auth/2fa/recovery`, { usuarioId });
+  // usuarioId que ya devolvio el login (contrasena ya validada). fraseReto
+  // es el segundo secreto definido al activar el 2FA -- un solo intento,
+  // si falla el backend responde error sin enviar correo. Si la cuenta no
+  // tiene frase configurada (activada antes de este cambio), se ignora y
+  // se comporta como antes.
+  solicitarRecuperacion2FA(usuarioId: string, fraseReto: string): Observable<{ mensaje: string }> {
+    return this.http.post<{ mensaje: string }>(`${environment.apiUrl}/auth/2fa/recovery`, { usuarioId, frase_reto: fraseReto });
   }
 
   // POST /auth/2fa/recovery/confirm -- publico, usa el token del enlace
@@ -252,12 +255,23 @@ export class AuthService {
     return this.http.post<{ mensaje: string }>(`${environment.apiUrl}/auth/2fa/recovery/confirm`, { token });
   }
 
+  // POST /auth/2fa/recovery/notificar-admin -- publico. Boton de escape
+  // tras fallar la frase-reto: avisa a los super admins por correo para
+  // que puedan desactivar el 2FA manualmente si el caso es legitimo.
+  notificarAdmin2FA(usuarioId: string): Observable<{ mensaje: string }> {
+    return this.http.post<{ mensaje: string }>(`${environment.apiUrl}/auth/2fa/recovery/notificar-admin`, { usuarioId });
+  }
+
   setup2FA(): Observable<{ secret: string; qrCode: string }> {
     return this.http.post<{ secret: string; qrCode: string }>(`${environment.apiUrl}/auth/2fa/setup`, {});
   }
 
-  enable2FA(secret: string, code: string): Observable<{ mensaje: string }> {
-    return this.http.post<{ mensaje: string }>(`${environment.apiUrl}/auth/2fa/enable`, { secret, code });
+  // frase_reto: segundo secreto, independiente de la contrasena, exigido
+  // para poder pedir la recuperacion de 2FA por correo (ver
+  // solicitarRecuperacion2FA). Siempre se pide en blanco -- nunca se
+  // reutiliza una frase anterior.
+  enable2FA(secret: string, code: string, fraseReto: string): Observable<{ mensaje: string }> {
+    return this.http.post<{ mensaje: string }>(`${environment.apiUrl}/auth/2fa/enable`, { secret, code, frase_reto: fraseReto });
   }
 
   disable2FA(code: string): Observable<{ mensaje: string }> {

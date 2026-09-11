@@ -43,13 +43,22 @@
     </div>
   </div>
 
-  <form [formGroup]="codeForm" (ngSubmit)="confirmarEnrolamiento()">
+  <form [formGroup]="enrolarForm" (ngSubmit)="confirmarEnrolamiento()">
+    <div class="form-group mt-16">
+      <label>Frase-reto</label>
+      <input class="input" type="text" formControlName="frase_reto" autocomplete="off" placeholder="Un secreto que solo tu sepas" />
+      <div class="text-muted text-sm mt-8">
+        Si mas adelante pierdes el equipo con la app autenticadora, tendras que escribir esta frase (una sola vez, sin reintentos) antes de poder desactivar el 2FA por correo. No se puede recuperar despues -- si la olvidas, tendras que pedirle a un administrador que te desactive el 2FA manualmente.
+      </div>
+    </div>
+
     <div class="form-group mt-16">
       <label>Codigo de 6 digitos</label>
       <input class="input" type="text" inputmode="numeric" maxlength="6" formControlName="code" placeholder="000000" />
     </div>
+
     <div class="form-actions">
-      <button type="submit" class="btn btn-primary" [disabled]="codeForm.invalid || cargando()">
+      <button type="submit" class="btn btn-primary" [disabled]="enrolarForm.invalid || cargando()">
         {{ cargando() ? 'Confirmando...' : 'Confirmar y activar' }}
       </button>
       <button type="button" class="btn btn-outline" (click)="cancelarEnrolamiento()">Cancelar</button>

@@ -5,17 +5,32 @@
     @if (usuarioId2FA()) {
       @if (mostrarRecuperacion2FA()) {
         <h1>Perdiste acceso a tu autenticador</h1>
-        <p class="text-muted text-sm">Te enviaremos un enlace a tu correo para desactivar la verificacion en dos pasos. Podras entrar solo con tu contrasena y activarla de nuevo despues en otro equipo.</p>
 
-        <button type="button" class="btn btn-primary w-full mt-16" [disabled]="cargandoRecuperacion2FA()" (click)="enviarRecuperacion2FA()">
-          {{ cargandoRecuperacion2FA() ? 'Enviando...' : 'Enviar enlace' }}
-        </button>
+        @if (!mensajeRecuperacion2FA()) {
+          <p class="text-muted text-sm">Escribe la frase-reto que definiste al activar el 2FA. Es un solo intento: si no coincide, no se enviara el enlace.</p>
 
-        @if (mensajeRecuperacion2FA()) {
+          <form [formGroup]="fraseRetoRecuperacionForm" (ngSubmit)="enviarRecuperacion2FA()" class="mt-16">
+            <div class="form-group">
+              <label>Frase-reto</label>
+              <input class="input" type="text" formControlName="frase_reto" autocomplete="off" autofocus />
+            </div>
+            <button type="submit" class="btn btn-primary w-full mt-16" [disabled]="cargandoRecuperacion2FA()">
+              {{ cargandoRecuperacion2FA() ? 'Enviando...' : 'Enviar enlace' }}
+            </button>
+          </form>
+
+          <button type="button" class="btn btn-outline w-full mt-16" (click)="cerrarRecuperacion2FA()">Volver</button>
+        } @else {
           <div class="auth-hint mt-16">{{ mensajeRecuperacion2FA() }}</div>
-        }
 
-        <button type="button" class="btn btn-outline w-full mt-16" (click)="cerrarRecuperacion2FA()">Volver</button>
+          @if (fallaRecuperacion2FA()) {
+            <button type="button" class="btn btn-outline w-full mt-16" [disabled]="cargandoNotificarAdmin()" (click)="notificarAdmin2FA()">
+              {{ cargandoNotificarAdmin() ? 'Enviando...' : 'Notificar a un administrador' }}
+            </button>
+          }
+
+          <button type="button" class="btn btn-outline w-full mt-16" (click)="cancelar2FA()">Volver a iniciar sesion</button>
+        }
       } @else {
         <h1>Verificacion en dos pasos</h1>
         <p class="text-muted text-sm">Ingresa el codigo de 6 digitos de tu app autenticadora.</p>
