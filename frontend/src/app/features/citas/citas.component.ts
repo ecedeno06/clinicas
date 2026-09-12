@@ -972,60 +972,40 @@ export class CitasComponent implements OnInit {
     generarPdf(doc);
   }
 
-  // Replica en el PDF el mismo checklist que se ve en pantalla al crear la
-  // orden (.checklist-examenes-scroll): TODO el catalogo, agrupado por
-  // categoria, con una casilla marcada para los examenes que forman parte
-  // de esta orden -- igual que el formulario de papel de APLAFA.
   imprimirOrdenLaboratorio(o: OrdenLaboratorio): void {
     const empresa = this.auth.empresaActiva();
-    const citaCtx = this.citaLaboratorio() || this.citaHistoria();
-    const doctorNombre = o.doctor_nombre || citaCtx?.doctor_nombre || '';
-    const sucursalNombre = citaCtx?.sucursal_nombre || '';
+    const citaCtx = this.citaLaboratorio();
+    const doctorNombre = o.doctor_nombre || citaCtx?.doctor_nombre || this.citaHistoria()?.doctor_nombre || '';
     const pacienteNombre = citaCtx?.paciente_nombre || this.pacienteDeHistoria()?.nombre || '';
     const fecha = o.fecha_cita || citaCtx?.fecha || o.created_at;
 
-    const marcados = new Map(o.examenes.filter((e) => e.examen_id).map((e) => [e.examen_id, e]));
-
-    const content: any[] = [
-      ...(encabezadoClinica(empresa?.empresa_logo, empresa?.empresa_nombre, 'Orden de laboratorio') as any[]),
-      { text: doctorNombre, margin: [0, 0, 0, 2] },
-      ...(sucursalNombre ? [{ text: `Sucursal: ${sucursalNombre}`, margin: [0, 0, 0, 2] }] : []),
-      { text: `Paciente: ${pacienteNombre}`, margin: [0, 0, 0, 2] },
-      { text: `Fecha: ${fecha ? formatoFechaCorta(fecha) : ''}`, color: '#64748b', margin: [0, 0, 0, 10] },
+    const body: any[] = [
+      ['Examen', 'Valor de referencia', 'Resultado', 'Unidad'].map((t) => ({ text: t, bold: true })),
     ];
-
-    const textoItem = (nombre: string, marcado: boolean, resultado?: string | null, unidad?: string | null) => {
-      let texto = (marcado ? '[X] ' : '[ ] ') + nombre;
-      if (marcado && resultado) texto += ` — ${resultado}${unidad ? ' ' + unidad : ''}`;
-      return { text: texto, fontSize: 8, margin: [0, 1, 0, 1] as [number, number, number, number] };
-    };
-
-    for (const grupo of this.catalogoAgrupadoExamenes()) {
-      content.push({ text: grupo.categoria, bold: true, fontSize: 10, color: '#0f766e', margin: [0, 8, 0, 3] });
-      const filas: any[][] = [];
-      let fila: any[] = [];
-      for (const ex of grupo.items) {
-        const marcado = marcados.get(ex.id);
-        fila.push(textoItem(ex.nombre, !!marcado, marcado?.resultado, marcado?.unidad));
-        if (fila.length === 2) { filas.push(fila); fila = []; }
-      }
-      if (fila.length) { fila.push({ text: '' }); filas.push(fila); }
-      content.push({ table: { widths: ['*', '*'], body: filas }, layout: 'noBorders' });
-    }
-
-    const personalizados = o.examenes.filter((e) => !e.examen_id);
-    if (personalizados.length) {
-      content.push({ text: 'Otros examenes', bold: true, fontSize: 10, color: '#0f766e', margin: [0, 8, 0, 3] });
-      for (const e of personalizados) {
-        content.push(textoItem(e.nombre_examen, true, e.resultado, e.unidad));
+    for (const [categoria, examenes] of this.agruparExamenesPorCategoria(o.examenes)) {
+      body.push([{ text: categoria, colSpan: 4, bold: true, fillColor: '#f1f5f9', margin: [0, 3, 0, 3] }, {}, {}, {}]);
+      for (const e of examenes) {
+        body.push([e.nombre_examen, e.valor_referencia || '-', e.resultado || '-', e.unidad || '-']);
       }
     }
-
-    if (o.observaciones) content.push({ text: `Observaciones: ${o.observaciones}`, margin: [0, 10, 0, 0] });
 
     const doc: TDocumentDefinitions = {
       pageMargins: [30, 30, 30, 30],
-      content,
+      content: [
+        ...(encabezadoClinica(empresa?.empresa_logo, empresa?.empresa_nombre, 'Orden de laboratorio') as any[]),
+        { text: doctorNombre, margin: [0, 0, 0, 2] },
+        { text: `Paciente: ${pacienteNombre}`, margin: [0, 0, 0, 2] },
+        { text: `Fecha: ${fecha ? formatoFechaCorta(fecha) : ''}`, color: '#64748b', margin: [0, 0, 0, 10] },
+        {
+          table: {
+            headerRows: 1,
+            widths: ['*', 'auto', 'auto', 'auto'],
+            body,
+          },
+          layout: 'lightHorizontalLines',
+        },
+        ...(o.observaciones ? [{ text: `Observaciones: ${o.observaciones}`, margin: [0, 10, 0, 0] as [number, number, number, number] }] : []),
+      ],
       defaultStyle: { fontSize: 9 },
     };
 
