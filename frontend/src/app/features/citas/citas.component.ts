@@ -1047,12 +1047,16 @@ export class CitasComponent implements OnInit {
     const empresa = this.auth.empresaActiva()?.empresa_nombre;
     const pacienteNombre = c?.paciente_nombre || p?.nombre || '';
     const doctorNombre = o.doctor_nombre || c?.doctor_nombre || this.citaHistoria()?.doctor_nombre || '';
+    const sucursalNombre = c?.sucursal_nombre || this.citaHistoria()?.sucursal_nombre || '';
     const fecha = o.fecha_cita || c?.fecha || o.created_at;
+    const idCorto = o.id.slice(0, 8).toUpperCase();
 
     const lineas = [
       `Hola ${pacienteNombre}, esta es tu orden de laboratorio de ${empresa}:`,
       '',
+      `Orden: #${idCorto}`,
       `Doctor: ${doctorNombre}`,
+      ...(sucursalNombre ? [`Sucursal: ${sucursalNombre}`] : []),
       `Fecha: ${fecha ? formatoFechaCorta(fecha) : ''}`,
       '',
     ];
