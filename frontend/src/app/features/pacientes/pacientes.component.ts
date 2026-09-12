@@ -12,6 +12,7 @@ import { AntecedentesPatologicosService } from '../../core/services/antecedentes
 import { PacienteAntecedentesService } from '../../core/services/pacienteAntecedentes.service';
 import { DireccionPaciente, Doctor, EstadoCita, FamiliarPaciente, HistoriaClinica, OrdenLaboratorio, Paciente, PacienteAntecedente, Receta, SignosVitales, Sucursal, CategoriaAntecedente, AntecedentePatologico } from '../../core/models/models';
 import { formatoFechaCorta } from '../../core/utils/pdf.util';
+import { hoyISO } from '../../core/utils/fecha.util';
 import { formatoAmPm } from '../../core/utils/hora12.util';
 import { clasificarImc } from '../../core/utils/imc.util';
 import { clasificarPresion } from '../../core/utils/presion.util';
@@ -20,12 +21,13 @@ import { SelectorFotoComponent } from '../../core/components/selector-foto/selec
 import { EscanerDocumentoComponent, DatosDocumentoDetectados } from '../../core/components/escaner-documento/escaner-documento.component';
 import { MapaSelectorComponent, UbicacionSeleccionada, extraerLatLng } from '../../core/components/mapa-selector/mapa-selector.component';
 import { TelefonoInputComponent } from '../../core/components/telefono-input/telefono-input.component';
+import { BuscadorAntecedenteComponent } from '../../core/components/buscador-antecedente/buscador-antecedente.component';
 import { direccionPrincipal } from '../../core/utils/direccion.util';
 
 @Component({
   selector: 'app-pacientes',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule, SelectorFotoComponent, EscanerDocumentoComponent, MapaSelectorComponent, TelefonoInputComponent],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, SelectorFotoComponent, EscanerDocumentoComponent, MapaSelectorComponent, TelefonoInputComponent, BuscadorAntecedenteComponent],
   templateUrl: './pacientes.component.html',
   styleUrl: './pacientes.component.css',
 })
@@ -346,7 +348,7 @@ export class PacientesComponent implements OnInit {
     // paciente como direcciones/familiares, porque necesita autoria).
     if (!this.editando()) return;
     this.antecedenteEditandoIndex.set(null);
-    this.antecedenteForm.reset({ antecedente_id: '', doctor_id: '', fecha_inicio: '', tratamiento: '', observacion: '' });
+    this.antecedenteForm.reset({ antecedente_id: '', doctor_id: '', fecha_inicio: hoyISO(), tratamiento: '', observacion: '' });
     this.mostrarFormAntecedente.set(true);
   }
 

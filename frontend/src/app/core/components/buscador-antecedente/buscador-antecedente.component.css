@@ -1,0 +1,42 @@
+.buscador-antecedente {
+  position: relative;
+}
+.buscador-antecedente-lista {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  margin-top: 4px;
+  background: var(--white);
+  border: 1px solid var(--slate-100);
+  border-radius: var(--radius);
+  max-height: 240px;
+  overflow-y: auto;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+}
+.buscador-antecedente-categoria {
+  position: sticky;
+  top: 0;
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--teal-600);
+  text-shadow: 0 0 6px rgba(20, 184, 166, 0.55), 0 0 12px rgba(20, 184, 166, 0.3);
+  background: var(--slate-50);
+}
+.buscador-antecedente-item {
+  padding: 9px 12px;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+.buscador-antecedente-item:hover {
+  background: var(--slate-50);
+}
+.buscador-antecedente-vacio {
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--slate-500);
+}

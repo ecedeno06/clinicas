@@ -1,0 +1,27 @@
+<div class="buscador-antecedente">
+  <input
+    class="input"
+    type="text"
+    [ngModel]="texto"
+    (ngModelChange)="onInput($event)"
+    (focus)="onFocus()"
+    (blur)="onBlur()"
+    [disabled]="disabled"
+    autocomplete="off"
+    placeholder="Escribe para buscar..." />
+  @if (abierto && resultados.length) {
+    <div class="buscador-antecedente-lista">
+      @for (grupo of resultados; track grupo.categoria) {
+        <div class="buscador-antecedente-categoria">{{ grupo.categoria }}</div>
+        @for (item of grupo.items; track item.id) {
+          <div class="buscador-antecedente-item" (mousedown)="seleccionar(item)">{{ item.nombre }}</div>
+        }
+      }
+    </div>
+  }
+  @if (abierto && texto && !resultados.length) {
+    <div class="buscador-antecedente-lista">
+      <div class="buscador-antecedente-vacio">Sin resultados.</div>
+    </div>
+  }
+</div>
