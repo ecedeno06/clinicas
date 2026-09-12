@@ -979,21 +979,10 @@ export class CitasComponent implements OnInit {
     const pacienteNombre = citaCtx?.paciente_nombre || this.pacienteDeHistoria()?.nombre || '';
     const fecha = o.fecha_cita || citaCtx?.fecha || o.created_at;
 
-    // Agrupa por categoria del catalogo (misma agrupacion que el checklist
-    // al crear la orden) -- los examenes "otro examen" (sin examen_id o ya
-    // fuera del catalogo) caen en un grupo aparte al final.
-    const categoriaPorExamenId = new Map(this.examenesLabCatalogo().map((e) => [e.id, e.categoria_nombre || 'Otros']));
-    const grupos = new Map<string, ExamenLaboratorio[]>();
-    for (const e of o.examenes) {
-      const categoria = (e.examen_id && categoriaPorExamenId.get(e.examen_id)) || 'Otros examenes';
-      if (!grupos.has(categoria)) grupos.set(categoria, []);
-      grupos.get(categoria)!.push(e);
-    }
-
     const body: any[] = [
       ['Examen', 'Valor de referencia', 'Resultado', 'Unidad'].map((t) => ({ text: t, bold: true })),
     ];
-    for (const [categoria, examenes] of grupos) {
+    for (const [categoria, examenes] of this.agruparExamenesPorCategoria(o.examenes)) {
       body.push([{ text: categoria, colSpan: 4, bold: true, fillColor: '#f1f5f9', margin: [0, 3, 0, 3] }, {}, {}, {}]);
       for (const e of examenes) {
         body.push([e.nombre_examen, e.valor_referencia || '-', e.resultado || '-', e.unidad || '-']);
@@ -1021,6 +1010,63 @@ export class CitasComponent implements OnInit {
     };
 
     generarPdf(doc);
+  }
+
+  // Agrupa los examenes de una orden por categoria del catalogo (mismo
+  // criterio que el checklist al crearla y que el PDF impreso) -- los
+  // examenes fuera del catalogo (sin examen_id) caen en un grupo aparte.
+  private agruparExamenesPorCategoria(examenes: ExamenLaboratorio[]): [string, ExamenLaboratorio[]][] {
+    const categoriaPorExamenId = new Map(this.examenesLabCatalogo().map((e) => [e.id, e.categoria_nombre || 'Otros']));
+    const grupos = new Map<string, ExamenLaboratorio[]>();
+    for (const e of examenes) {
+      const categoria = (e.examen_id && categoriaPorExamenId.get(e.examen_id)) || 'Otros examenes';
+      if (!grupos.has(categoria)) grupos.set(categoria, []);
+      grupos.get(categoria)!.push(e);
+    }
+    return [...grupos.entries()];
+  }
+
+  // Solo tiene sentido ofrecer "enviar por WhatsApp" si hay a donde
+  // mandarlo -- mismo criterio que puedeCompartirUbicacion(), pero el
+  // telefono/paciente puede venir de la cita (drawer de Laboratorio) o del
+  // paciente de la consulta (tab Laboratorios del historial).
+  puedeEnviarWhatsappLaboratorio(): boolean {
+    const c = this.citaLaboratorio();
+    const p = this.pacienteDeHistoria();
+    const telefono = c?.paciente_telefono || p?.telefono;
+    const aceptaWhatsapp = c?.paciente_acepta_whatsapp ?? p?.acepta_whatsapp;
+    return !!telefono && !!aceptaWhatsapp;
+  }
+
+  // wa.me abre WhatsApp Web/app con el mensaje precargado -- no requiere
+  // API ni cuenta de WhatsApp Business (mismo mecanismo que whatsappUrl()).
+  whatsappOrdenLaboratorioUrl(o: OrdenLaboratorio): string {
+    const c = this.citaLaboratorio();
+    const p = this.pacienteDeHistoria();
+    const telefono = (c?.paciente_telefono || p?.telefono || '').replace(/\D/g, '');
+    const empresa = this.auth.empresaActiva()?.empresa_nombre;
+    const pacienteNombre = c?.paciente_nombre || p?.nombre || '';
+    const doctorNombre = o.doctor_nombre || c?.doctor_nombre || this.citaHistoria()?.doctor_nombre || '';
+    const fecha = o.fecha_cita || c?.fecha || o.created_at;
+
+    const lineas = [
+      `Hola ${pacienteNombre}, esta es tu orden de laboratorio de ${empresa}:`,
+      '',
+      `Doctor: ${doctorNombre}`,
+      `Fecha: ${fecha ? formatoFechaCorta(fecha) : ''}`,
+      '',
+    ];
+    for (const [categoria, examenes] of this.agruparExamenesPorCategoria(o.examenes)) {
+      lineas.push(`*${categoria}*`);
+      for (const e of examenes) {
+        const resultado = e.resultado ? `: ${e.resultado}${e.unidad ? ' ' + e.unidad : ''}` : '';
+        lineas.push(`- ${e.nombre_examen}${resultado}`);
+      }
+      lineas.push('');
+    }
+    if (o.observaciones) lineas.push(`Observaciones: ${o.observaciones}`);
+
+    return `https://wa.me/${telefono}?text=${encodeURIComponent(lineas.join('\n'))}`;
   }
 
   crearExamenGroup(e?: Partial<{ examen_id: string | null; nombre_examen: string; valor_referencia: string; resultado: string; unidad: string }>) {
