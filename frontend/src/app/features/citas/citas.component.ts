@@ -978,6 +978,7 @@ export class CitasComponent implements OnInit {
     const doctorNombre = o.doctor_nombre || citaCtx?.doctor_nombre || this.citaHistoria()?.doctor_nombre || '';
     const pacienteNombre = citaCtx?.paciente_nombre || this.pacienteDeHistoria()?.nombre || '';
     const fecha = o.fecha_cita || citaCtx?.fecha || o.created_at;
+    const idCorto = o.id.slice(0, 8).toUpperCase();
 
     const body: any[] = [
       ['Examen', 'Valor de referencia', 'Resultado', 'Unidad'].map((t) => ({ text: t, bold: true })),
@@ -993,6 +994,7 @@ export class CitasComponent implements OnInit {
       pageMargins: [30, 30, 30, 30],
       content: [
         ...(encabezadoClinica(empresa?.empresa_logo, empresa?.empresa_nombre, 'Orden de laboratorio') as any[]),
+        { text: `Orden: #${idCorto}`, margin: [0, 0, 0, 2] },
         { text: doctorNombre, margin: [0, 0, 0, 2] },
         { text: `Paciente: ${pacienteNombre}`, margin: [0, 0, 0, 2] },
         { text: `Fecha: ${fecha ? formatoFechaCorta(fecha) : ''}`, color: '#64748b', margin: [0, 0, 0, 10] },
