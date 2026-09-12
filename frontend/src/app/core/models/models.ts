@@ -378,12 +378,17 @@ export interface Receta {
   doctor_nombre?: string;
 }
 
-// Catalogo global de examenes de laboratorio (categorias + detalle),
-// compartido por todas las clinicas -- solo lectura salvo para un super
-// admin. Ver backend/database/migrations/040_catalogo_examenes_laboratorio.sql.
+// Catalogo hibrido de examenes de laboratorio (categorias + detalle):
+// empresa_id nulo = global, compartido por todas las clinicas (solo
+// editable por un super admin); empresa_id no nulo = agregado por esa
+// clinica, visible y editable solo por ella (ademas del global). Ver
+// backend/database/migrations/040_catalogo_examenes_laboratorio.sql y
+// 042_examenes_laboratorio_por_clinica.sql.
 export interface CategoriaExamenLaboratorio {
   id: string;
   nombre: string;
+  empresa_id?: string | null;
+  empresa_nombre?: string | null;
   orden: number;
   activo: boolean;
 }
@@ -393,6 +398,8 @@ export interface ExamenLaboratorioCatalogo {
   categoria_id: string;
   categoria_nombre?: string;
   nombre: string;
+  empresa_id?: string | null;
+  empresa_nombre?: string | null;
   valor_referencia?: string | null;
   unidad?: string | null;
   orden: number;

@@ -1,14 +1,17 @@
 const router = require('express').Router();
 const ctrl = require('../controllers/categoriasExamenesLaboratorio.controller');
-const { requireAuth, requireSuperAdmin } = require('../middleware/auth');
+const { requireAuth, requireEmpresa, requireRol } = require('../middleware/auth');
 
-// Catalogo global: lectura para cualquier usuario logueado (de cualquier
-// clinica), escritura solo para super admin.
-router.use(requireAuth);
+// Lectura: cualquier usuario logueado ve el catalogo global + el propio
+// de su clinica activa. Escritura: requiere rol admin en la clinica
+// activa (un super admin siempre lo tiene, ver auth.controller.js
+// seleccionarEmpresa) -- el controller valida ademas si la fila es
+// global o de otra clinica.
+router.use(requireAuth, requireEmpresa);
 
 router.get('/', ctrl.listar);
-router.post('/', requireSuperAdmin, ctrl.crear);
-router.put('/:id', requireSuperAdmin, ctrl.actualizar);
-router.delete('/:id', requireSuperAdmin, ctrl.eliminar);
+router.post('/', requireRol('admin'), ctrl.crear);
+router.put('/:id', requireRol('admin'), ctrl.actualizar);
+router.delete('/:id', requireRol('admin'), ctrl.eliminar);
 
 module.exports = router;

@@ -41,7 +41,7 @@ export const routes: Routes = [
       { path: 'reportes/citas', component: ReporteCitasComponent },
       { path: 'empresas', component: EmpresasComponent, canActivate: [superAdminGuard] },
       { path: 'catalogo-antecedentes', component: CatalogoAntecedentesComponent, canActivate: [superAdminGuard] },
-      { path: 'catalogo-examenes-laboratorio', component: CatalogoExamenesLaboratorioComponent, canActivate: [superAdminGuard] },
+      { path: 'catalogo-examenes-laboratorio', component: CatalogoExamenesLaboratorioComponent },
     ],
   },
   { path: '**', redirectTo: '' },

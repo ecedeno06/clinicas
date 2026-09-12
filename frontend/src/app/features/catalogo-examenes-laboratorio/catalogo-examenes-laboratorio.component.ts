@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { CategoriasExamenesLaboratorioService } from '../../core/services/categoriasExamenesLaboratorio.service';
 import { ExamenesLaboratorioCatalogoService } from '../../core/services/examenesLaboratorioCatalogo.service';
+import { AuthService } from '../../core/services/auth.service';
 import { CategoriaExamenLaboratorio, ExamenLaboratorioCatalogo } from '../../core/models/models';
 
 @Component({
@@ -137,11 +138,27 @@ export class CatalogoExamenesLaboratorioComponent implements OnInit {
     activo: [true],
   });
 
+  // Solo un super admin puede marcar lo que crea como catalogo GLOBAL;
+  // cualquier otro usuario con permiso de edicion siempre crea para su
+  // propia clinica (el backend tambien lo fuerza, esto es solo la UI).
+  crearComoGlobal = signal(false);
+
   constructor(
     private fb: FormBuilder,
     private categoriasSrv: CategoriasExamenesLaboratorioService,
-    private examenesSrv: ExamenesLaboratorioCatalogoService
+    private examenesSrv: ExamenesLaboratorioCatalogoService,
+    public auth: AuthService
   ) {}
+
+  // Una fila global solo la gestiona un super admin; una fila propia de
+  // la clinica activa la gestiona cualquier admin de esa clinica (o un
+  // super admin); una fila de otra clinica no deberia ni llegar en el
+  // listado, pero por si acaso tambien se oculta aqui.
+  puedeGestionar(fila: { empresa_id?: string | null }): boolean {
+    if (!this.auth.puedeEliminar()) return false;
+    if (!fila.empresa_id) return this.auth.esSuperAdmin();
+    return fila.empresa_id === this.auth.empresaActiva()?.empresa_id;
+  }
 
   ngOnInit(): void {
     this.cargarCategorias();
@@ -160,6 +177,7 @@ export class CatalogoExamenesLaboratorioComponent implements OnInit {
 
   abrirNuevaCategoria(): void {
     this.editandoCategoria.set(null);
+    this.crearComoGlobal.set(false);
     this.categoriaForm.reset({ nombre: '', orden: 0, activo: true });
     this.panelCategoriaAbierto.set(true);
   }
@@ -176,8 +194,9 @@ export class CatalogoExamenesLaboratorioComponent implements OnInit {
 
   guardarCategoria(): void {
     if (this.categoriaForm.invalid) return;
-    const data = this.categoriaForm.getRawValue();
     const actual = this.editandoCategoria();
+    const data: any = this.categoriaForm.getRawValue();
+    if (!actual) data.global = this.crearComoGlobal();
     const req = actual ? this.categoriasSrv.actualizar(actual.id, data) : this.categoriasSrv.crear(data);
     req.subscribe({
       next: () => { this.cerrarPanelCategoria(); this.cargarCategorias(); },
@@ -197,6 +216,7 @@ export class CatalogoExamenesLaboratorioComponent implements OnInit {
 
   abrirNuevoExamen(): void {
     this.editandoExamen.set(null);
+    this.crearComoGlobal.set(false);
     this.examenForm.reset({ categoria_id: this.filtroCategoriaId() || '', nombre: '', valor_referencia: '', unidad: '', orden: 0, activo: true });
     this.panelExamenAbierto.set(true);
   }
@@ -213,8 +233,9 @@ export class CatalogoExamenesLaboratorioComponent implements OnInit {
 
   guardarExamen(): void {
     if (this.examenForm.invalid) return;
-    const data = this.examenForm.getRawValue();
     const actual = this.editandoExamen();
+    const data: any = this.examenForm.getRawValue();
+    if (!actual) data.global = this.crearComoGlobal();
     const req = actual ? this.examenesSrv.actualizar(actual.id, data) : this.examenesSrv.crear(data);
     req.subscribe({
       next: () => { this.cerrarPanelExamen(); this.cargarExamenes(); },

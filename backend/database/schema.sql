@@ -124,32 +124,46 @@ create table if not exists antecedentes_patologicos (
 );
 
 -- ---------------------------------------------------------
--- Catalogo global de examenes de laboratorio (categorias + detalle),
--- mismo patron que categorias_antecedentes/antecedentes_patologicos.
--- El seed real (14 categorias, ~100 examenes) vive en la migracion 040.
+-- Catalogo de examenes de laboratorio (categorias + detalle). Hibrido:
+-- empresa_id nulo = catalogo GLOBAL compartido por todas las clinicas
+-- (solo lo administra un super admin); empresa_id no nulo = agregado por
+-- esa clinica especificamente, visible solo para ella (ademas del
+-- global) y administrable solo por ella. El seed global real (14
+-- categorias, ~100 examenes) vive en la migracion 040; empresa_id se
+-- agrego despues en la migracion 042.
 -- ---------------------------------------------------------
 create table if not exists categorias_examenes_laboratorio (
     id         uuid primary key default gen_random_uuid(),
-    nombre     text not null unique,
+    nombre     text not null,
+    empresa_id uuid references empresas(id),
     orden      integer not null default 0,
     activo     boolean not null default true,
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now()
 );
+-- Nombre unico dentro de su ambito: entre las categorias globales, o
+-- dentro de las propias de una misma clinica (dos clinicas distintas si
+-- pueden repetir nombre).
+create unique index if not exists uq_categorias_examenes_lab_global_nombre on categorias_examenes_laboratorio (nombre) where empresa_id is null;
+create unique index if not exists uq_categorias_examenes_lab_empresa_nombre on categorias_examenes_laboratorio (empresa_id, nombre) where empresa_id is not null;
+create index if not exists idx_categorias_examenes_lab_empresa on categorias_examenes_laboratorio(empresa_id);
 
 create table if not exists examenes_laboratorio_catalogo (
     id               uuid primary key default gen_random_uuid(),
     categoria_id     uuid not null references categorias_examenes_laboratorio(id),
     nombre           text not null,
+    empresa_id       uuid references empresas(id),
     valor_referencia text,
     unidad           text,
     orden            integer not null default 0,
     activo           boolean not null default true,
     created_at       timestamptz not null default now(),
-    updated_at       timestamptz not null default now(),
-    unique(categoria_id, nombre)
+    updated_at       timestamptz not null default now()
 );
+create unique index if not exists uq_examenes_laboratorio_catalogo_global on examenes_laboratorio_catalogo (categoria_id, nombre) where empresa_id is null;
+create unique index if not exists uq_examenes_laboratorio_catalogo_empresa on examenes_laboratorio_catalogo (categoria_id, empresa_id, nombre) where empresa_id is not null;
 create index if not exists idx_examenes_laboratorio_catalogo_categoria on examenes_laboratorio_catalogo(categoria_id);
+create index if not exists idx_examenes_laboratorio_catalogo_empresa on examenes_laboratorio_catalogo(empresa_id);
 
 -- ---------------------------------------------------------
 -- Tabla: pacientes. Es GLOBAL (mismo patron que usuarios): una
