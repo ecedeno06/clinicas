@@ -483,14 +483,27 @@ export class PacientesComponent implements OnInit {
   // poder incluirla en el mensaje.
   pacienteWhatsappAbierto = signal<string | null>(null);
   sucursalWhatsapp = signal('');
+  // La tabla de pacientes scrollea (.table-wrap { overflow: auto }), lo que
+  // recorta cualquier dropdown "position: absolute" que se salga de esa
+  // caja -- por eso este menu se posiciona "fixed" segun el boton que lo
+  // abrio, en vez de depender del contenedor de la tabla.
+  whatsappMenuPos = signal<{ top: number; left: number } | null>(null);
 
-  abrirSelectorWhatsapp(p: Paciente): void {
+  abrirSelectorWhatsapp(p: Paciente, event: MouseEvent): void {
+    const boton = event.currentTarget as HTMLElement;
+    const rect = boton.getBoundingClientRect();
+    const anchoMenu = 220;
+    this.whatsappMenuPos.set({
+      top: rect.bottom + 6,
+      left: Math.max(8, Math.min(rect.right - anchoMenu, window.innerWidth - anchoMenu - 8)),
+    });
     this.pacienteWhatsappAbierto.set(p.id);
     this.sucursalWhatsapp.set(this.sucursales()[0]?.id ?? '');
   }
 
   cerrarSelectorWhatsapp(): void {
     this.pacienteWhatsappAbierto.set(null);
+    this.whatsappMenuPos.set(null);
   }
 
   enviarWhatsapp(p: Paciente): void {
