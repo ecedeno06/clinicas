@@ -14,7 +14,7 @@ import { AntecedentesPatologicosService } from '../../core/services/antecedentes
 import { PacienteAntecedentesService } from '../../core/services/pacienteAntecedentes.service';
 import { CategoriasExamenesLaboratorioService } from '../../core/services/categoriasExamenesLaboratorio.service';
 import { ExamenesLaboratorioCatalogoService } from '../../core/services/examenesLaboratorioCatalogo.service';
-import { Campana, CampanaDoctor, Cita, Disponibilidad, Doctor, Especialidad, EstadoCita, EstadoLaboratorio, FranjaHoraria, HistoriaClinica, OrdenLaboratorio, Paciente, PacienteAntecedente, Receta, SignosVitales, Sucursal, CategoriaAntecedente, AntecedentePatologico, CategoriaExamenLaboratorio, ExamenLaboratorioCatalogo } from '../../core/models/models';
+import { Campana, CampanaDoctor, Cita, Disponibilidad, Doctor, Especialidad, EstadoCita, EstadoLaboratorio, ExamenLaboratorio, FranjaHoraria, HistoriaClinica, OrdenLaboratorio, Paciente, PacienteAntecedente, Receta, SignosVitales, Sucursal, CategoriaAntecedente, AntecedentePatologico, CategoriaExamenLaboratorio, ExamenLaboratorioCatalogo } from '../../core/models/models';
 import { clasificarImc } from '../../core/utils/imc.util';
 import { clasificarPresion } from '../../core/utils/presion.util';
 import { clasificarGlucosa } from '../../core/utils/glucosa.util';
@@ -979,12 +979,26 @@ export class CitasComponent implements OnInit {
     const pacienteNombre = citaCtx?.paciente_nombre || this.pacienteDeHistoria()?.nombre || '';
     const fecha = o.fecha_cita || citaCtx?.fecha || o.created_at;
 
-    const filas = o.examenes.map((e) => [
-      e.nombre_examen,
-      e.valor_referencia || '-',
-      e.resultado || '-',
-      e.unidad || '-',
-    ]);
+    // Agrupa por categoria del catalogo (misma agrupacion que el checklist
+    // al crear la orden) -- los examenes "otro examen" (sin examen_id o ya
+    // fuera del catalogo) caen en un grupo aparte al final.
+    const categoriaPorExamenId = new Map(this.examenesLabCatalogo().map((e) => [e.id, e.categoria_nombre || 'Otros']));
+    const grupos = new Map<string, ExamenLaboratorio[]>();
+    for (const e of o.examenes) {
+      const categoria = (e.examen_id && categoriaPorExamenId.get(e.examen_id)) || 'Otros examenes';
+      if (!grupos.has(categoria)) grupos.set(categoria, []);
+      grupos.get(categoria)!.push(e);
+    }
+
+    const body: any[] = [
+      ['Examen', 'Valor de referencia', 'Resultado', 'Unidad'].map((t) => ({ text: t, bold: true })),
+    ];
+    for (const [categoria, examenes] of grupos) {
+      body.push([{ text: categoria, colSpan: 4, bold: true, fillColor: '#f1f5f9', margin: [0, 3, 0, 3] }, {}, {}, {}]);
+      for (const e of examenes) {
+        body.push([e.nombre_examen, e.valor_referencia || '-', e.resultado || '-', e.unidad || '-']);
+      }
+    }
 
     const doc: TDocumentDefinitions = {
       pageMargins: [30, 30, 30, 30],
@@ -997,10 +1011,7 @@ export class CitasComponent implements OnInit {
           table: {
             headerRows: 1,
             widths: ['*', 'auto', 'auto', 'auto'],
-            body: [
-              ['Examen', 'Valor de referencia', 'Resultado', 'Unidad'].map((t) => ({ text: t, bold: true })),
-              ...filas,
-            ],
+            body,
           },
           layout: 'lightHorizontalLines',
         },
