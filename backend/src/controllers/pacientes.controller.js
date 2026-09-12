@@ -55,7 +55,7 @@ const SELECT_ANTECEDENTES = `
       'fecha_inicio', pa.fecha_inicio, 'tratamiento', pa.tratamiento, 'observacion', pa.observacion,
       'creado_por', pa.creado_por, 'creado_por_nombre', u.nombre,
       'doctor_id', pa.doctor_id, 'doctor_nombre', d.nombre
-    ) order by c.orden, ap.orden, ap.nombre)
+    ) order by c.nombre, ap.nombre)
     from paciente_antecedente pa
     join antecedentes_patologicos ap on ap.id = pa.antecedente_id
     join categorias_antecedentes c on c.id = ap.categoria_id

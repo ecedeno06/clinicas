@@ -6,7 +6,7 @@ const { pool } = require('../config/db');
 
 async function listar(req, res, next) {
   try {
-    const { rows } = await pool.query('select * from categorias_antecedentes order by orden asc, nombre asc');
+    const { rows } = await pool.query('select * from categorias_antecedentes order by nombre asc');
     res.json(rows);
   } catch (err) { next(err); }
 }

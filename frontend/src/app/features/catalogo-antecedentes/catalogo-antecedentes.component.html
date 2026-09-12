@@ -20,10 +20,6 @@
             <input class="input th-filtro" type="text" placeholder="Filtrar..." [ngModel]="filtroCategoriaNombre()" (ngModelChange)="filtroCategoriaNombre.set($event)" />
           </th>
           <th>
-            <div class="th-label sortable" (click)="ordenarCategoriasPor('orden')">Orden {{ ordenCategoriaCampo() === 'orden' ? (ordenCategoriaDireccion() === 'asc' ? '▲' : '▼') : '' }}</div>
-            <input class="input th-filtro" type="text" placeholder="Filtrar..." [ngModel]="filtroCategoriaOrden()" (ngModelChange)="filtroCategoriaOrden.set($event)" />
-          </th>
-          <th>
             <div class="th-label sortable" (click)="ordenarCategoriasPor('activo')">Estado {{ ordenCategoriaCampo() === 'activo' ? (ordenCategoriaDireccion() === 'asc' ? '▲' : '▼') : '' }}</div>
             <select class="input th-filtro" [ngModel]="filtroCategoriaEstado()" (ngModelChange)="filtroCategoriaEstado.set($event)">
               <option value="">Todas</option>
@@ -40,7 +36,6 @@
         @for (c of categoriasFiltradas(); track c.id) {
           <tr class="row-clickable" [class.row-selected]="filtroCategoriaId() === c.id" title="Ver antecedentes de esta categoria" (click)="seleccionarCategoriaParaFiltrar(c)">
             <td>{{ c.nombre }}</td>
-            <td>{{ c.orden }}</td>
             <td><span class="badge" [class.badge-green]="c.activo" [class.badge-slate]="!c.activo">{{ c.activo ? 'Activa' : 'Inactiva' }}</span></td>
             <td class="table-actions">
               <button type="button" class="btn-icon" title="Editar" aria-label="Editar" (click)="$event.stopPropagation(); abrirEditarCategoria(c)">
@@ -52,7 +47,7 @@
             </td>
           </tr>
         } @empty {
-          <tr><td colspan="4"><div class="empty-state">No hay categorias registradas.</div></td></tr>
+          <tr><td colspan="3"><div class="empty-state">No hay categorias registradas.</div></td></tr>
         }
       </tbody>
     </table>
@@ -81,10 +76,6 @@
             <input class="input th-filtro" type="text" placeholder="Filtrar..." [ngModel]="filtroAntecedenteNombre()" (ngModelChange)="filtroAntecedenteNombre.set($event)" />
           </th>
           <th>
-            <div class="th-label sortable" (click)="ordenarAntecedentesPor('orden')">Orden {{ ordenAntecedenteCampo() === 'orden' ? (ordenAntecedenteDireccion() === 'asc' ? '▲' : '▼') : '' }}</div>
-            <input class="input th-filtro" type="text" placeholder="Filtrar..." [ngModel]="filtroAntecedenteOrden()" (ngModelChange)="filtroAntecedenteOrden.set($event)" />
-          </th>
-          <th>
             <div class="th-label sortable" (click)="ordenarAntecedentesPor('activo')">Estado {{ ordenAntecedenteCampo() === 'activo' ? (ordenAntecedenteDireccion() === 'asc' ? '▲' : '▼') : '' }}</div>
             <select class="input th-filtro" [ngModel]="filtroAntecedenteEstado()" (ngModelChange)="filtroAntecedenteEstado.set($event)">
               <option value="">Todos</option>
@@ -102,7 +93,6 @@
           <tr>
             <td>{{ a.categoria_nombre }}</td>
             <td>{{ a.nombre }}</td>
-            <td>{{ a.orden }}</td>
             <td><span class="badge" [class.badge-green]="a.activo" [class.badge-slate]="!a.activo">{{ a.activo ? 'Activo' : 'Inactivo' }}</span></td>
             <td class="table-actions">
               <button type="button" class="btn-icon" title="Editar" aria-label="Editar" (click)="abrirEditarAntecedente(a)">
@@ -114,7 +104,7 @@
             </td>
           </tr>
         } @empty {
-          <tr><td colspan="5"><div class="empty-state">No hay antecedentes registrados.</div></td></tr>
+          <tr><td colspan="4"><div class="empty-state">No hay antecedentes registrados.</div></td></tr>
         }
       </tbody>
     </table>
@@ -132,10 +122,6 @@
         <div class="form-group">
           <label>Nombre *</label>
           <input class="input" formControlName="nombre" autocomplete="off" />
-        </div>
-        <div class="form-group mt-16">
-          <label>Orden</label>
-          <input class="input" type="number" formControlName="orden" />
         </div>
         <div class="form-group mt-16">
           <label class="flex items-center gap-8"><input type="checkbox" formControlName="activo" /> Categoria activa</label>
@@ -167,10 +153,6 @@
         <div class="form-group mt-16">
           <label>Nombre *</label>
           <input class="input" formControlName="nombre" autocomplete="off" />
-        </div>
-        <div class="form-group mt-16">
-          <label>Orden</label>
-          <input class="input" type="number" formControlName="orden" />
         </div>
         <div class="form-group mt-16">
           <label class="flex items-center gap-8"><input type="checkbox" formControlName="activo" /> Antecedente activo</label>

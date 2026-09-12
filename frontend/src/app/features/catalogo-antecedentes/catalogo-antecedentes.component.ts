@@ -19,6 +19,10 @@ export class CatalogoAntecedentesComponent implements OnInit {
 // ---------- Categorias ----------
   panelCategoriaAbierto = signal(false);
   editandoCategoria = signal<CategoriaAntecedente | null>(null);
+  // El campo "orden" ya no se muestra ni se edita en esta pantalla -- las
+  // listas se muestran siempre alfabeticamente (el backend ya ordena por
+  // nombre); se conserva en el formulario con su valor por defecto (0)
+  // solo para no romper la forma del payload que espera la API.
   categoriaForm = this.fb.group({
     nombre: ['', Validators.required],
     orden: [0],
@@ -26,16 +30,14 @@ export class CatalogoAntecedentesComponent implements OnInit {
   });
 
   filtroCategoriaNombre = signal('');
-  filtroCategoriaOrden = signal('');
   filtroCategoriaEstado = signal(''); // '', 'activa', 'inactiva'
-  ordenCategoriaCampo = signal<'nombre' | 'orden' | 'activo'>('orden');
+  ordenCategoriaCampo = signal<'nombre' | 'activo'>('nombre');
   ordenCategoriaDireccion = signal<'asc' | 'desc'>('asc');
 
-  hayFiltrosCategorias = computed(() => !!(this.filtroCategoriaNombre() || this.filtroCategoriaOrden() || this.filtroCategoriaEstado()));
+  hayFiltrosCategorias = computed(() => !!(this.filtroCategoriaNombre() || this.filtroCategoriaEstado()));
 
   limpiarFiltrosCategorias(): void {
     this.filtroCategoriaNombre.set('');
-    this.filtroCategoriaOrden.set('');
     this.filtroCategoriaEstado.set('');
   }
 
@@ -45,7 +47,7 @@ export class CatalogoAntecedentesComponent implements OnInit {
     this.filtroCategoriaId.set(this.filtroCategoriaId() === c.id ? '' : c.id);
   }
 
-  ordenarCategoriasPor(campo: 'nombre' | 'orden' | 'activo'): void {
+  ordenarCategoriasPor(campo: 'nombre' | 'activo'): void {
     if (this.ordenCategoriaCampo() === campo) {
       this.ordenCategoriaDireccion.set(this.ordenCategoriaDireccion() === 'asc' ? 'desc' : 'asc');
     } else {
@@ -56,7 +58,6 @@ export class CatalogoAntecedentesComponent implements OnInit {
 
   categoriasFiltradas = computed(() => {
     const nombre = this.filtroCategoriaNombre().trim().toLowerCase();
-    const orden = this.filtroCategoriaOrden().trim();
     const estado = this.filtroCategoriaEstado();
     const campo = this.ordenCategoriaCampo();
     const dir = this.ordenCategoriaDireccion() === 'asc' ? 1 : -1;
@@ -64,7 +65,6 @@ export class CatalogoAntecedentesComponent implements OnInit {
     return this.categorias()
       .filter((c) => {
         if (nombre && !c.nombre.toLowerCase().includes(nombre)) return false;
-        if (orden && !String(c.orden).includes(orden)) return false;
         if (estado === 'activa' && !c.activo) return false;
         if (estado === 'inactiva' && c.activo) return false;
         return true;
@@ -80,23 +80,21 @@ export class CatalogoAntecedentesComponent implements OnInit {
   // ---------- Antecedentes ----------
   filtroCategoriaId = signal('');
   filtroAntecedenteNombre = signal('');
-  filtroAntecedenteOrden = signal('');
   filtroAntecedenteEstado = signal(''); // '', 'activo', 'inactivo'
-  ordenAntecedenteCampo = signal<'categoria_nombre' | 'nombre' | 'orden' | 'activo'>('orden');
+  ordenAntecedenteCampo = signal<'categoria_nombre' | 'nombre' | 'activo'>('nombre');
   ordenAntecedenteDireccion = signal<'asc' | 'desc'>('asc');
 
   hayFiltrosAntecedentes = computed(() => !!(
-    this.filtroCategoriaId() || this.filtroAntecedenteNombre() || this.filtroAntecedenteOrden() || this.filtroAntecedenteEstado()
+    this.filtroCategoriaId() || this.filtroAntecedenteNombre() || this.filtroAntecedenteEstado()
   ));
 
   limpiarFiltrosAntecedentes(): void {
     this.filtroCategoriaId.set('');
     this.filtroAntecedenteNombre.set('');
-    this.filtroAntecedenteOrden.set('');
     this.filtroAntecedenteEstado.set('');
   }
 
-  ordenarAntecedentesPor(campo: 'categoria_nombre' | 'nombre' | 'orden' | 'activo'): void {
+  ordenarAntecedentesPor(campo: 'categoria_nombre' | 'nombre' | 'activo'): void {
     if (this.ordenAntecedenteCampo() === campo) {
       this.ordenAntecedenteDireccion.set(this.ordenAntecedenteDireccion() === 'asc' ? 'desc' : 'asc');
     } else {
@@ -108,7 +106,6 @@ export class CatalogoAntecedentesComponent implements OnInit {
   antecedentesFiltrados = computed(() => {
     const catId = this.filtroCategoriaId();
     const nombre = this.filtroAntecedenteNombre().trim().toLowerCase();
-    const orden = this.filtroAntecedenteOrden().trim();
     const estado = this.filtroAntecedenteEstado();
     const campo = this.ordenAntecedenteCampo();
     const dir = this.ordenAntecedenteDireccion() === 'asc' ? 1 : -1;
@@ -117,7 +114,6 @@ export class CatalogoAntecedentesComponent implements OnInit {
       .filter((a) => {
         if (catId && a.categoria_id !== catId) return false;
         if (nombre && !a.nombre.toLowerCase().includes(nombre)) return false;
-        if (orden && !String(a.orden).includes(orden)) return false;
         if (estado === 'activo' && !a.activo) return false;
         if (estado === 'inactivo' && a.activo) return false;
         return true;

@@ -18,7 +18,7 @@ async function listar(req, res, next) {
        from examenes_laboratorio_catalogo e
        join categorias_examenes_laboratorio c on c.id = e.categoria_id
        ${where}
-       order by c.orden asc, e.orden asc, e.nombre asc`,
+       order by c.nombre asc, e.nombre asc`,
       params
     );
     res.json(rows);

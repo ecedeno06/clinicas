@@ -18,7 +18,7 @@ async function listar(req, res, next) {
        from antecedentes_patologicos ap
        join categorias_antecedentes c on c.id = ap.categoria_id
        ${where}
-       order by c.orden asc, ap.orden asc, ap.nombre asc`,
+       order by c.nombre asc, ap.nombre asc`,
       params
     );
     res.json(rows);
