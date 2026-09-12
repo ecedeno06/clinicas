@@ -1057,7 +1057,10 @@ export class CitasComponent implements OnInit {
       '',
     ];
     for (const [categoria, examenes] of this.agruparExamenesPorCategoria(o.examenes)) {
-      lineas.push(`*${categoria}*`);
+      // Sin negrita (*texto*): con varias categorias en un mismo mensaje
+      // WhatsApp a veces no cierra bien cada negrita y deja asteriscos
+      // sueltos en medio de las palabras.
+      lineas.push(categoria.toUpperCase());
       for (const e of examenes) {
         const resultado = e.resultado ? `: ${e.resultado}${e.unidad ? ' ' + e.unidad : ''}` : '';
         lineas.push(`- ${e.nombre_examen}${resultado}`);
