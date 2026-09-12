@@ -36,7 +36,7 @@ function restarOcupados(bloque, ocupados) {
 }
 
 async function verificarDoctorDeLaEmpresa(doctorId, empresaId) {
-  const { rows } = await pool.query('select id from doctores where id = $1 and empresa_id = $2', [doctorId, empresaId]);
+  const { rows } = await pool.query('select 1 from doctores_empresas where doctor_id = $1 and empresa_id = $2', [doctorId, empresaId]);
   return !!rows[0];
 }
 
@@ -127,8 +127,8 @@ async function actualizar(req, res, next) {
     const { dia_semana, hora_inicio, hora_fin, activo, sucursal_id } = req.body;
 
     const actual = await pool.query(
-      `select dh.* from doctor_horarios dh join doctores d on d.id = dh.doctor_id
-       where dh.id = $1 and d.empresa_id = $2`,
+      `select dh.* from doctor_horarios dh join doctores_empresas de on de.doctor_id = dh.doctor_id
+       where dh.id = $1 and de.empresa_id = $2`,
       [req.params.id, req.empresaId]
     );
     if (!actual.rows[0]) return res.status(404).json({ mensaje: 'Horario no encontrado' });
@@ -185,8 +185,8 @@ async function eliminar(req, res, next) {
 
     const horario = await client.query(
       `select h.* from doctor_horarios h
-       join doctores d on d.id = h.doctor_id
-       where h.id = $1 and d.empresa_id = $2
+       join doctores_empresas de on de.doctor_id = h.doctor_id
+       where h.id = $1 and de.empresa_id = $2
        for update`,
       [req.params.id, req.empresaId]
     );

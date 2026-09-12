@@ -16,6 +16,10 @@ export class DoctoresService {
   actualizar(id: string, data: any): Observable<Doctor> { return this.http.put<Doctor>(`${this.base}/${id}`, data); }
   eliminar(id: string): Observable<void> { return this.http.delete<void>(`${this.base}/${id}`); }
 
+  buscarPorIdentificacion(identificacion: string): Observable<{ existe: boolean; doctor?: Doctor }> {
+    return this.http.get<{ existe: boolean; doctor?: Doctor }>(`${this.base}/buscar`, { params: { identificacion } });
+  }
+
   listarHorarios(doctorId: string): Observable<DoctorHorario[]> { return this.http.get<DoctorHorario[]>(`${this.base}/${doctorId}/horarios`); }
   crearHorario(doctorId: string, data: { dia_semana: number; hora_inicio: string; hora_fin: string; sucursal_id?: string }): Observable<DoctorHorario> {
     return this.http.post<DoctorHorario>(`${this.base}/${doctorId}/horarios`, data);

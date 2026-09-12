@@ -19,6 +19,13 @@ import { TelefonoInputComponent } from '../../core/components/telefono-input/tel
 export class DoctoresComponent implements OnInit {
   doctores = signal<Doctor[]>([]);
   especialidades = signal<Especialidad[]>([]);
+  // La especialidad que ejerce un doctor es un hecho global de la
+  // persona (no de la clinica que lo consulta) -- solo se le pueden
+  // asignar especialidades del catalogo GLOBAL, nunca privadas de una
+  // clinica (el backend tambien lo valida). Permite responder "que
+  // doctores tienen la especialidad X en toda la red" sin fragmentar
+  // por clinica.
+  especialidadesGlobales = computed(() => this.especialidades().filter((e) => !e.empresa_id));
   panelAbierto = signal(false);
   editando = signal<Doctor | null>(null);
 
@@ -53,12 +60,22 @@ export class DoctoresComponent implements OnInit {
 
   form = this.fb.group({
     nombre: ['', Validators.required],
+    identificacion: [''],
     telefono: [''],
     acepta_whatsapp: [false],
     email: [''],
     activo: [true],
     especialidades: this.fb.array([this.crearEspecialidadGroup()]),
   });
+
+  // Doctor es global (mismo patron que Pacientes): al escribir la
+  // identificacion se busca en TODA la red antes de crear uno nuevo.
+  doctorExistente = signal<Doctor | null>(null);
+  private readonly camposIdentidad = ['nombre', 'telefono', 'email'];
+  // Se incrementa cada vez que se abre el panel para que una respuesta
+  // tardia de buscarPorIdentificacion() no contamine un formulario que
+  // ya se reseteo -- ver onIdentificacionBlur().
+  private tokenBusquedaIdentificacion = 0;
 
   constructor(
     private fb: FormBuilder,
@@ -104,19 +121,70 @@ export class DoctoresComponent implements OnInit {
   }
 
   abrirNuevo(): void {
+    this.tokenBusquedaIdentificacion++;
     this.editando.set(null);
+    this.doctorExistente.set(null);
     this.form.reset({ activo: true });
+    this.habilitarCamposIdentidad();
     this.especialidadesArray.clear();
     this.especialidadesArray.push(this.crearEspecialidadGroup());
     this.panelAbierto.set(true);
   }
 
   abrirEditar(d: Doctor): void {
+    this.tokenBusquedaIdentificacion++;
     this.editando.set(d);
-    this.form.reset({ nombre: d.nombre, telefono: d.telefono, acepta_whatsapp: d.acepta_whatsapp, email: d.email, activo: d.activo });
+    this.doctorExistente.set(null);
+    this.form.reset({ nombre: d.nombre, identificacion: d.identificacion, telefono: d.telefono, acepta_whatsapp: d.acepta_whatsapp, email: d.email, activo: d.activo });
+    this.habilitarCamposIdentidad();
     this.especialidadesArray.clear();
     (d.especialidades.length ? d.especialidades : [undefined]).forEach((e) => this.especialidadesArray.push(this.crearEspecialidadGroup(e)));
     this.panelAbierto.set(true);
+  }
+
+  // Solo aplica al registrar un doctor nuevo: busca en TODA la red (no
+  // solo esta clinica) si la identificacion ya pertenece a alguien. Si
+  // es asi, reutiliza sus datos globales (nombre, contacto) en vez de
+  // dejar que se vuelvan a capturar distinto por error.
+  onIdentificacionBlur(): void {
+    if (this.editando()) return;
+    const identificacion = (this.form.get('identificacion')?.value || '').trim();
+    if (!identificacion) {
+      this.doctorExistente.set(null);
+      this.habilitarCamposIdentidad();
+      return;
+    }
+    const token = ++this.tokenBusquedaIdentificacion;
+    this.srv.buscarPorIdentificacion(identificacion).subscribe({
+      next: (res) => {
+        if (token !== this.tokenBusquedaIdentificacion) return;
+        if (res.existe && res.doctor) {
+          this.doctorExistente.set(res.doctor);
+          this.form.patchValue({
+            nombre: res.doctor.nombre,
+            telefono: res.doctor.telefono ?? '',
+            email: res.doctor.email ?? '',
+          });
+          this.deshabilitarCamposIdentidad();
+        } else {
+          this.doctorExistente.set(null);
+          this.habilitarCamposIdentidad();
+        }
+      },
+      error: () => {
+        if (token !== this.tokenBusquedaIdentificacion) return;
+        this.doctorExistente.set(null);
+        this.habilitarCamposIdentidad();
+      },
+    });
+  }
+
+  private deshabilitarCamposIdentidad(): void {
+    this.camposIdentidad.forEach((c) => this.form.get(c)?.disable());
+  }
+
+  private habilitarCamposIdentidad(): void {
+    this.camposIdentidad.forEach((c) => this.form.get(c)?.enable());
   }
 
   cerrarPanel(): void { this.panelAbierto.set(false); }

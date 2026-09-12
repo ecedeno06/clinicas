@@ -83,18 +83,28 @@ create table if not exists usuarios_empresas_rol (
 );
 
 -- ---------------------------------------------------------
--- Tabla: especialidades (catalogo de especialidades medicas
--- que ofrece cada clinica: Pediatria, Cardiologia, etc.)
+-- Tabla: especialidades. Catalogo HIBRIDO (mismo patron que
+-- categorias_examenes_laboratorio): empresa_id nulo = especialidad
+-- global compartida por toda la red (solo super admin la administra;
+-- es la unica que se puede asignar a un doctor, ver
+-- doctor_especialidades mas abajo); empresa_id no nulo = especialidad
+-- propia de esa clinica, solo utilizable por ella para elegir
+-- especialidad al agendar (Citas/Campanas).
 -- ---------------------------------------------------------
 create table if not exists especialidades (
     id              uuid primary key default gen_random_uuid(),
-    empresa_id      uuid not null references empresas(id),
+    empresa_id      uuid references empresas(id),
     nombre          text not null,
     descripcion     text,
     activo          boolean not null default true,
     created_at      timestamptz not null default now(),
     updated_at      timestamptz not null default now()
 );
+create index if not exists idx_especialidades_empresa on especialidades(empresa_id);
+-- El unique(empresa_id, nombre) mas abajo (uq_especialidades_empresa_nombre)
+-- no evita nombres globales repetidos entre si (NULL <> NULL en una
+-- unique constraint) -- este indice parcial cubre ese caso.
+create unique index if not exists uq_especialidades_global_nombre on especialidades (nombre) where empresa_id is null;
 
 -- ---------------------------------------------------------
 -- Catalogo global de antecedentes patologicos (categorias + detalle),
@@ -253,27 +263,49 @@ create table if not exists pacientes_empresas (
 );
 
 -- ---------------------------------------------------------
--- Tabla: doctores (catalogo de doctores/especialistas de la
--- clinica). usuario_id es opcional: se puede crear el doctor
--- antes de darle acceso al sistema, o nunca dárselo si solo se
--- usa para agendar sus citas. Un doctor puede tener varias
--- especialidades (ver doctor_especialidades mas abajo) -- por
--- eso especialidad_id/numero_colegiado NO viven aqui.
+-- Tabla: doctores. Es GLOBAL (mismo patron que pacientes/usuarios): un
+-- mismo medico puede atender en varias clinicas de la red sin duplicar
+-- su registro (ver doctores_empresas). "identificacion" (cedula) es la
+-- llave para buscarlo en toda la red al agregarlo a una clinica nueva,
+-- igual que pacientes.identificacion -- es unica cuando no es null,
+-- pero puede quedar sin capturar. usuario_id es opcional: se puede
+-- crear el doctor antes de darle acceso al sistema, o nunca dárselo si
+-- solo se usa para agendar sus citas. Un doctor puede tener varias
+-- especialidades (ver doctor_especialidades mas abajo) -- por eso
+-- especialidad_id/numero_colegiado NO viven aqui.
 -- ---------------------------------------------------------
 create table if not exists doctores (
     id                  uuid primary key default gen_random_uuid(),
-    empresa_id          uuid not null references empresas(id),
     usuario_id          uuid references usuarios(id) on delete set null,
     nombre              text not null,
+    identificacion      text,
     telefono            text,
     -- Indica si "telefono" recibe WhatsApp, mismo patron que
     -- pacientes.acepta_whatsapp.
     acepta_whatsapp     boolean not null default false,
     email               text,
-    activo              boolean not null default true,
     created_at          timestamptz not null default now(),
     updated_at          timestamptz not null default now()
 );
+create unique index if not exists uq_doctores_identificacion on doctores (identificacion) where identificacion is not null;
+
+-- ---------------------------------------------------------
+-- Tabla: doctores_empresas (relacion N:M doctor <-> clinica, paralela a
+-- pacientes_empresas/usuarios_empresas_rol). "activo" es un atributo de
+-- la relacion: un doctor puede estar activo en una clinica e inactivo
+-- (dado de baja) en otra.
+-- ---------------------------------------------------------
+create table if not exists doctores_empresas (
+    id         uuid primary key default gen_random_uuid(),
+    doctor_id  uuid not null references doctores(id) on delete cascade,
+    empresa_id uuid not null references empresas(id) on delete cascade,
+    activo     boolean not null default true,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now(),
+    unique (doctor_id, empresa_id)
+);
+create index if not exists idx_doctores_empresas_empresa on doctores_empresas(empresa_id);
+create index if not exists idx_doctores_empresas_doctor on doctores_empresas(doctor_id);
 
 -- Antecedentes patologicos que presenta el paciente (del catalogo global
 -- antecedentes_patologicos) -- misma logica que familiares_paciente: se
@@ -636,7 +668,6 @@ create index if not exists idx_paciente_antecedente_antecedente on paciente_ante
 -- Como maximo una direccion principal por paciente.
 create unique index if not exists uq_direcciones_paciente_principal on direcciones_paciente(paciente_id) where es_principal;
 create index if not exists idx_sucursales_empresa on sucursales(empresa_id);
-create index if not exists idx_doctores_empresa on doctores(empresa_id);
 create index if not exists idx_doctor_especialidades_doctor on doctor_especialidades(doctor_id);
 create index if not exists idx_doctor_especialidades_especialidad on doctor_especialidades(especialidad_id);
 create index if not exists idx_doctor_horarios_doctor on doctor_horarios(doctor_id);

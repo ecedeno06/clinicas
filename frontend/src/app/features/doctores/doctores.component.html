@@ -60,9 +60,20 @@
         <button class="close" (click)="cerrarPanel()">&times;</button>
       </div>
       <form [formGroup]="form" (ngSubmit)="guardar()">
+        @if (!editando() && doctorExistente(); as de) {
+          <p class="text-muted text-sm">
+            Ya existe un doctor con esta identificacion en la red
+            (<strong>{{ de.nombre }}</strong>) — se asociara a esta clinica
+            con sus datos actuales.
+          </p>
+        }
         <div class="form-group">
           <label>Nombre *</label>
           <input class="input" formControlName="nombre" placeholder="Dr. Juan Perez" />
+        </div>
+        <div class="form-group mt-16">
+          <label>Identificacion (cedula)</label>
+          <input class="input" formControlName="identificacion" autocomplete="off" (blur)="onIdentificacionBlur()" />
         </div>
         <div formArrayName="especialidades">
           @for (e of especialidadesArray.controls; track $index; let i = $index) {
@@ -77,7 +88,7 @@
                 <label>Especialidad *</label>
                 <select class="input" formControlName="especialidad_id">
                   <option value="" disabled>Selecciona una especialidad</option>
-                  @for (esp of especialidades(); track esp.id) { <option [value]="esp.id">{{ esp.nombre }}</option> }
+                  @for (esp of especialidadesGlobales(); track esp.id) { <option [value]="esp.id">{{ esp.nombre }}</option> }
                 </select>
               </div>
               <div class="form-group mt-16">

@@ -139,8 +139,13 @@ async function obtener(req, res, next) {
 // Confirma que el doctor no tenga otra cita (no cancelada) que se cruce
 // con el horario indicado, en esa misma fecha. excluirCitaId se usa al
 // editar una cita para no chocar contra si misma.
-async function hayChoqueDeHorario({ empresaId, doctorId, fecha, horaInicio, horaFin, excluirCitaId }) {
-  const valores = [doctorId, fecha, horaInicio, horaFin, empresaId];
+// El doctor es una entidad global (puede atender en varias clinicas de
+// la red): el choque se revisa sin importar la clinica, para que no
+// quede doblemente agendado a la misma hora en dos clinicas distintas
+// -- mismo criterio que ya usa disponibilidad() en
+// doctorHorarios.controller.js.
+async function hayChoqueDeHorario({ doctorId, fecha, horaInicio, horaFin, excluirCitaId }) {
+  const valores = [doctorId, fecha, horaInicio, horaFin];
   let exclusion = '';
   if (excluirCitaId) {
     valores.push(excluirCitaId);
@@ -148,7 +153,7 @@ async function hayChoqueDeHorario({ empresaId, doctorId, fecha, horaInicio, hora
   }
   const { rows } = await pool.query(
     `select 1 from citas
-     where doctor_id = $1 and fecha = $2 and empresa_id = $5
+     where doctor_id = $1 and fecha = $2
        and estado <> 'cancelada'
        and hora_inicio < $4 and hora_fin > $3
        ${exclusion}
@@ -199,15 +204,29 @@ async function crear(req, res, next) {
     const paciente = await pool.query('select 1 from pacientes_empresas where paciente_id = $1 and empresa_id = $2', [paciente_id, req.empresaId]);
     if (!paciente.rows[0]) return res.status(400).json({ mensaje: 'El paciente indicado no pertenece a esta clinica' });
 
-    const doctor = await pool.query('select id from doctores where id = $1 and empresa_id = $2', [doctor_id, req.empresaId]);
+    const doctor = await pool.query('select 1 from doctores_empresas where doctor_id = $1 and empresa_id = $2', [doctor_id, req.empresaId]);
     if (!doctor.rows[0]) return res.status(400).json({ mensaje: 'El doctor indicado no pertenece a esta clinica' });
+
+    // La especialidad elegida al agendar debe ser una que el doctor
+    // realmente ejerza (el frontend ya filtra el selector por esto, pero
+    // se valida tambien en el servidor -- ver doctor_especialidades,
+    // ahora un listado global del doctor sin importar la clinica).
+    if (especialidad_id) {
+      const tieneEspecialidad = await pool.query(
+        'select 1 from doctor_especialidades where doctor_id = $1 and especialidad_id = $2',
+        [doctor_id, especialidad_id]
+      );
+      if (!tieneEspecialidad.rows[0]) {
+        return res.status(400).json({ mensaje: 'El doctor indicado no tiene esa especialidad.' });
+      }
+    }
 
     // Una urgencia puede asignar cualquier doctor sin que sus compromisos
     // de horario lo bloqueen -- solo se salta lo que depende del horario
     // DEL DOCTOR (otra cita suya, un compromiso de campana confirmado);
     // el choque contra otra cita del PACIENTE se sigue validando siempre.
     if (!es_urgencia) {
-      const choqueDoctor = await hayChoqueDeHorario({ empresaId: req.empresaId, doctorId: doctor_id, fecha, horaInicio: hora_inicio, horaFin: hora_fin });
+      const choqueDoctor = await hayChoqueDeHorario({ doctorId: doctor_id, fecha, horaInicio: hora_inicio, horaFin: hora_fin });
       if (choqueDoctor) {
         return res.status(409).json({ mensaje: 'El doctor ya tiene una cita agendada que se cruza con ese horario.' });
       }
@@ -318,7 +337,7 @@ async function actualizar(req, res, next) {
     if (fecha || hora_inicio || hora_fin) {
       if (!urgenciaEfectiva) {
         const choqueDoctor = await hayChoqueDeHorario({
-          empresaId: req.empresaId, doctorId: cita.doctor_id, fecha: nuevaFecha,
+          doctorId: cita.doctor_id, fecha: nuevaFecha,
           horaInicio: nuevaHoraInicio, horaFin: nuevaHoraFin, excluirCitaId: cita.id,
         });
         if (choqueDoctor) {

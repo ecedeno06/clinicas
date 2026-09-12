@@ -223,7 +223,12 @@ async function invitarDoctor(req, res, next) {
     const campana = await pool.query('select 1 from campanas where id = $1 and empresa_id = $2', [req.params.id, req.empresaId]);
     if (!campana.rows[0]) return res.status(404).json({ mensaje: 'Campana no encontrada' });
 
-    const doctor = await pool.query('select id, nombre from doctores where id = $1 and empresa_id = $2', [doctor_id, req.empresaId]);
+    const doctor = await pool.query(
+      `select d.id, d.nombre from doctores d
+       join doctores_empresas de on de.doctor_id = d.id
+       where d.id = $1 and de.empresa_id = $2`,
+      [doctor_id, req.empresaId]
+    );
     if (!doctor.rows[0]) return res.status(400).json({ mensaje: 'El doctor indicado no pertenece a esta clinica' });
 
     const { rows } = await pool.query(

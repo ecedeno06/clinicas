@@ -191,9 +191,15 @@ export interface Paciente {
   created_at?: string;
 }
 
+// Catalogo hibrido (mismo patron que CategoriaExamenLaboratorio):
+// empresa_id nulo = global, compartido por toda la red (solo un doctor
+// puede tener asignadas especialidades globales, ver Doctor); empresa_id
+// no nulo = propia de esa clinica (solo utilizable por ella en
+// Citas/Campanas).
 export interface Especialidad {
   id: string;
-  empresa_id?: string;
+  empresa_id?: string | null;
+  empresa_nombre?: string | null;
   nombre: string;
   descripcion?: string;
   activo: boolean;
@@ -227,10 +233,14 @@ export interface DoctorEspecialidad {
   numero_colegiado?: string | null;
 }
 
+// Doctor es GLOBAL (mismo patron que Paciente): un mismo medico puede
+// atender en varias clinicas de la red sin duplicar su registro.
+// identificacion (cedula) es la llave para buscarlo en toda la red al
+// agregarlo a una clinica nueva -- ver Paciente.identificacion.
 export interface Doctor {
   id: string;
-  empresa_id?: string;
   usuario_id?: string | null;
+  identificacion?: string | null;
   especialidades: DoctorEspecialidad[];
   // Nombres de especialidades ya unidos ("Cardiologia, Pediatria"), para
   // mostrar en listados/mensajes sin necesitar el arreglo estructurado.

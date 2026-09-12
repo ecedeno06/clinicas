@@ -44,6 +44,11 @@ export class EspecialidadesComponent implements OnInit {
     activo: [true],
   });
 
+  // Solo un super admin puede marcar lo que crea como catalogo GLOBAL;
+  // cualquier otro usuario con permiso de edicion siempre crea para su
+  // propia clinica (el backend tambien lo fuerza, esto es solo la UI).
+  crearComoGlobal = signal(false);
+
   constructor(private fb: FormBuilder, private srv: EspecialidadesService, public auth: AuthService) {}
 
   ngOnInit(): void { this.cargar(); }
@@ -51,20 +56,46 @@ export class EspecialidadesComponent implements OnInit {
 
   esAdmin(): boolean { return this.auth.esSuperAdmin() || this.auth.usuario()?.rol === 'admin'; }
 
-  abrirNuevo(): void { this.editando.set(null); this.form.reset({ activo: true }); this.panelAbierto.set(true); }
-  abrirEditar(e: Especialidad): void { this.editando.set(e); this.form.reset({ ...e }); this.panelAbierto.set(true); }
+  // Una fila global solo la gestiona un super admin; una fila propia de
+  // la clinica activa la gestiona cualquier admin de esa clinica (o un
+  // super admin); una fila de otra clinica no deberia ni llegar en el
+  // listado, pero por si acaso tambien se oculta aqui.
+  puedeGestionar(fila: Especialidad): boolean {
+    if (!this.esAdmin()) return false;
+    if (!fila.empresa_id) return this.auth.esSuperAdmin();
+    return fila.empresa_id === this.auth.empresaActiva()?.empresa_id;
+  }
+
+  abrirNuevo(): void {
+    this.editando.set(null);
+    this.crearComoGlobal.set(false);
+    this.form.reset({ activo: true });
+    this.panelAbierto.set(true);
+  }
+  abrirEditar(e: Especialidad): void {
+    this.editando.set(e);
+    this.form.reset({ ...e });
+    this.panelAbierto.set(true);
+  }
   cerrarPanel(): void { this.panelAbierto.set(false); }
 
   guardar(): void {
     if (this.form.invalid) return;
-    const data = this.form.getRawValue();
     const actual = this.editando();
+    const data: any = this.form.getRawValue();
+    if (!actual) data.global = this.crearComoGlobal();
     const req = actual ? this.srv.actualizar(actual.id, data) : this.srv.crear(data);
-    req.subscribe(() => { this.cerrarPanel(); this.cargar(); });
+    req.subscribe({
+      next: () => { this.cerrarPanel(); this.cargar(); },
+      error: (err) => alert(err?.error?.mensaje || 'No se pudo guardar la especialidad'),
+    });
   }
 
   eliminar(e: Especialidad): void {
     if (!confirm(`Eliminar la especialidad "${e.nombre}"?`)) return;
-    this.srv.eliminar(e.id).subscribe(() => this.cargar());
+    this.srv.eliminar(e.id).subscribe({
+      next: () => this.cargar(),
+      error: (err) => alert(err?.error?.mensaje || 'No se pudo eliminar la especialidad'),
+    });
   }
 }
