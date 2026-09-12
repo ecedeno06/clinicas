@@ -205,7 +205,7 @@
           </div>
         </div>
         <div class="form-group mt-16">
-          <label class="flex items-center gap-8"><input type="checkbox" formControlName="es_urgencia" [attr.disabled]="editando() && editando()!.estado !== 'pendiente' ? true : null" /> Es una urgencia</label>
+          <label class="flex items-center gap-8"><input type="checkbox" formControlName="es_urgencia" (change)="onToggleUrgencia()" [attr.disabled]="editando() && editando()!.estado !== 'pendiente' ? true : null" /> Es una urgencia</label>
           <div class="text-muted text-sm mt-8">
             Permite asignar cualquier doctor sin que su horario configurado lo bloquee. No omite choques reales de horario (el doctor no puede quedar en dos citas a la vez).
             @if (editando() && editando()!.estado !== 'pendiente') {

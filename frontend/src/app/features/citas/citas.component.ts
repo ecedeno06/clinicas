@@ -456,6 +456,17 @@ export class CitasComponent implements OnInit {
     else this.form.patchValue({ hora_fin: hora24 });
   }
 
+  // Al marcar "Es una urgencia" se rellena la hora con la del sistema
+  // (una urgencia es siempre "ahora mismo") -- el usuario igual puede
+  // corregirla a mano despues. No hace nada al desmarcar.
+  onToggleUrgencia(): void {
+    if (!this.form.get('es_urgencia')?.value) return;
+    const ahora = new Date();
+    const fin = new Date(ahora.getTime() + 30 * 60000);
+    const aTexto = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    this.form.patchValue({ hora_inicio: aTexto(ahora), hora_fin: aTexto(fin) });
+  }
+
   cargar(): void { this.srv.listar().subscribe((data) => this.citas.set(data)); }
 
   puedeVerHistoria(): boolean {

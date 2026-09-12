@@ -10,6 +10,7 @@ export class EspecialidadesService {
   constructor(private http: HttpClient) {}
 
   listar(): Observable<Especialidad[]> { return this.http.get<Especialidad[]>(this.base); }
+  listarCatalogoGlobal(): Observable<Especialidad[]> { return this.http.get<Especialidad[]>(`${this.base}/globales`); }
   obtener(id: string): Observable<Especialidad> { return this.http.get<Especialidad>(`${this.base}/${id}`); }
   crear(data: any): Observable<Especialidad> { return this.http.post<Especialidad>(this.base, data); }
   actualizar(id: string, data: any): Observable<Especialidad> { return this.http.put<Especialidad>(`${this.base}/${id}`, data); }
