@@ -378,10 +378,32 @@ export interface Receta {
   doctor_nombre?: string;
 }
 
+// Catalogo global de examenes de laboratorio (categorias + detalle),
+// compartido por todas las clinicas -- solo lectura salvo para un super
+// admin. Ver backend/database/migrations/040_catalogo_examenes_laboratorio.sql.
+export interface CategoriaExamenLaboratorio {
+  id: string;
+  nombre: string;
+  orden: number;
+  activo: boolean;
+}
+
+export interface ExamenLaboratorioCatalogo {
+  id: string;
+  categoria_id: string;
+  categoria_nombre?: string;
+  nombre: string;
+  valor_referencia?: string | null;
+  unidad?: string | null;
+  orden: number;
+  activo: boolean;
+}
+
 export type EstadoLaboratorio = 'pendiente' | 'completada' | 'cancelada';
 
 export interface ExamenLaboratorio {
   id?: string;
+  examen_id?: string | null;
   nombre_examen: string;
   valor_referencia?: string | null;
   resultado?: string | null;

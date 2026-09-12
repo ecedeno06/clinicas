@@ -81,9 +81,9 @@ async function crear(req, res, next) {
     for (let i = 0; i < examenes.length; i++) {
       const e = examenes[i];
       await client.query(
-        `insert into orden_laboratorio_examenes (orden_id, nombre_examen, valor_referencia, resultado, unidad, orden)
-         values ($1,$2,$3,$4,$5,$6)`,
-        [orden.id, e.nombre_examen, e.valor_referencia, e.resultado, e.unidad, i]
+        `insert into orden_laboratorio_examenes (orden_id, examen_id, nombre_examen, valor_referencia, resultado, unidad, orden)
+         values ($1,$2,$3,$4,$5,$6,$7)`,
+        [orden.id, e.examen_id || null, e.nombre_examen, e.valor_referencia, e.resultado, e.unidad, i]
       );
     }
     await client.query('commit');
@@ -132,9 +132,9 @@ async function actualizar(req, res, next) {
     for (let i = 0; i < examenes.length; i++) {
       const e = examenes[i];
       await client.query(
-        `insert into orden_laboratorio_examenes (orden_id, nombre_examen, valor_referencia, resultado, unidad, orden)
-         values ($1,$2,$3,$4,$5,$6)`,
-        [orden.id, e.nombre_examen, e.valor_referencia, e.resultado, e.unidad, i]
+        `insert into orden_laboratorio_examenes (orden_id, examen_id, nombre_examen, valor_referencia, resultado, unidad, orden)
+         values ($1,$2,$3,$4,$5,$6,$7)`,
+        [orden.id, e.examen_id || null, e.nombre_examen, e.valor_referencia, e.resultado, e.unidad, i]
       );
     }
     await client.query('commit');

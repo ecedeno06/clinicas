@@ -8,6 +8,8 @@ router.use('/usuarios', require('./usuarios.routes'));
 router.use('/especialidades', require('./especialidades.routes'));
 router.use('/antecedentes-categorias', require('./categoriasAntecedentes.routes'));
 router.use('/antecedentes-patologicos', require('./antecedentesPatologicos.routes'));
+router.use('/examenes-laboratorio-categorias', require('./categoriasExamenesLaboratorio.routes'));
+router.use('/examenes-laboratorio-catalogo', require('./examenesLaboratorioCatalogo.routes'));
 router.use('/pacientes', require('./pacientes.routes'));
 router.use('/doctores', require('./doctores.routes'));
 router.use('/citas', require('./citas.routes'));

@@ -13,6 +13,7 @@ import { CitasComponent } from './features/citas/citas.component';
 import { UsuariosComponent } from './features/usuarios/usuarios.component';
 import { EmpresasComponent } from './features/empresas/empresas.component';
 import { CatalogoAntecedentesComponent } from './features/catalogo-antecedentes/catalogo-antecedentes.component';
+import { CatalogoExamenesLaboratorioComponent } from './features/catalogo-examenes-laboratorio/catalogo-examenes-laboratorio.component';
 import { SucursalesComponent } from './features/sucursales/sucursales.component';
 import { CampanasComponent } from './features/campanas/campanas.component';
 import { ReporteCampanasComponent } from './features/reportes/reporte-campanas/reporte-campanas.component';
@@ -40,6 +41,7 @@ export const routes: Routes = [
       { path: 'reportes/citas', component: ReporteCitasComponent },
       { path: 'empresas', component: EmpresasComponent, canActivate: [superAdminGuard] },
       { path: 'catalogo-antecedentes', component: CatalogoAntecedentesComponent, canActivate: [superAdminGuard] },
+      { path: 'catalogo-examenes-laboratorio', component: CatalogoExamenesLaboratorioComponent, canActivate: [superAdminGuard] },
     ],
   },
   { path: '**', redirectTo: '' },

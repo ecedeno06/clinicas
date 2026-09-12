@@ -124,6 +124,34 @@ create table if not exists antecedentes_patologicos (
 );
 
 -- ---------------------------------------------------------
+-- Catalogo global de examenes de laboratorio (categorias + detalle),
+-- mismo patron que categorias_antecedentes/antecedentes_patologicos.
+-- El seed real (14 categorias, ~100 examenes) vive en la migracion 040.
+-- ---------------------------------------------------------
+create table if not exists categorias_examenes_laboratorio (
+    id         uuid primary key default gen_random_uuid(),
+    nombre     text not null unique,
+    orden      integer not null default 0,
+    activo     boolean not null default true,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now()
+);
+
+create table if not exists examenes_laboratorio_catalogo (
+    id               uuid primary key default gen_random_uuid(),
+    categoria_id     uuid not null references categorias_examenes_laboratorio(id),
+    nombre           text not null,
+    valor_referencia text,
+    unidad           text,
+    orden            integer not null default 0,
+    activo           boolean not null default true,
+    created_at       timestamptz not null default now(),
+    updated_at       timestamptz not null default now(),
+    unique(categoria_id, nombre)
+);
+create index if not exists idx_examenes_laboratorio_catalogo_categoria on examenes_laboratorio_catalogo(categoria_id);
+
+-- ---------------------------------------------------------
 -- Tabla: pacientes. Es GLOBAL (mismo patron que usuarios): una
 -- misma persona puede ser atendida en varias clinicas de la red
 -- sin duplicar su registro (ver pacientes_empresas). La identificacion
@@ -509,6 +537,7 @@ create table if not exists ordenes_laboratorio (
 create table if not exists orden_laboratorio_examenes (
     id                  uuid primary key default gen_random_uuid(),
     orden_id            uuid not null references ordenes_laboratorio(id) on delete cascade,
+    examen_id           uuid references examenes_laboratorio_catalogo(id),
     nombre_examen       text not null,
     valor_referencia    text,
     resultado           text,

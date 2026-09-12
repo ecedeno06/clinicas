@@ -12,13 +12,16 @@ import { AuthService } from '../../core/services/auth.service';
 import { CategoriasAntecedentesService } from '../../core/services/categoriasAntecedentes.service';
 import { AntecedentesPatologicosService } from '../../core/services/antecedentesPatologicos.service';
 import { PacienteAntecedentesService } from '../../core/services/pacienteAntecedentes.service';
-import { Campana, CampanaDoctor, Cita, Disponibilidad, Doctor, Especialidad, EstadoCita, EstadoLaboratorio, FranjaHoraria, HistoriaClinica, OrdenLaboratorio, Paciente, PacienteAntecedente, Receta, SignosVitales, Sucursal, CategoriaAntecedente, AntecedentePatologico } from '../../core/models/models';
+import { CategoriasExamenesLaboratorioService } from '../../core/services/categoriasExamenesLaboratorio.service';
+import { ExamenesLaboratorioCatalogoService } from '../../core/services/examenesLaboratorioCatalogo.service';
+import { Campana, CampanaDoctor, Cita, Disponibilidad, Doctor, Especialidad, EstadoCita, EstadoLaboratorio, FranjaHoraria, HistoriaClinica, OrdenLaboratorio, Paciente, PacienteAntecedente, Receta, SignosVitales, Sucursal, CategoriaAntecedente, AntecedentePatologico, CategoriaExamenLaboratorio, ExamenLaboratorioCatalogo } from '../../core/models/models';
 import { clasificarImc } from '../../core/utils/imc.util';
 import { clasificarPresion } from '../../core/utils/presion.util';
 import { clasificarGlucosa } from '../../core/utils/glucosa.util';
 import { combinar12, formatoAmPm, HORAS_12, MINUTOS_60, partes12 } from '../../core/utils/hora12.util';
 import { hoyISO } from '../../core/utils/fecha.util';
 import { SelectorFotoComponent } from '../../core/components/selector-foto/selector-foto.component';
+import { BuscadorAntecedenteComponent } from '../../core/components/buscador-antecedente/buscador-antecedente.component';
 import { extraerLatLng } from '../../core/components/mapa-selector/mapa-selector.component';
 import { direccionPrincipal } from '../../core/utils/direccion.util';
 import { generarPdf, encabezadoClinica, formatoFechaCorta } from '../../core/utils/pdf.util';
@@ -27,7 +30,7 @@ import { TDocumentDefinitions } from 'pdfmake/interfaces';
 @Component({
   selector: 'app-citas',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule, SelectorFotoComponent],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, SelectorFotoComponent, BuscadorAntecedenteComponent],
   templateUrl: './citas.component.html',
   styleUrl: './citas.component.css',
 })
@@ -80,6 +83,20 @@ export class CitasComponent implements OnInit {
       const nombreCategoria = a.categoria_nombre || 'Otros';
       if (!grupos.has(nombreCategoria)) grupos.set(nombreCategoria, []);
       grupos.get(nombreCategoria)!.push(a);
+    }
+    return [...grupos.entries()].map(([categoria, items]) => ({ categoria, items }));
+  });
+
+  // ---------- Catalogo de examenes de laboratorio (checklist en la orden) ----------
+  categoriasExamenesLabCatalogo = signal<CategoriaExamenLaboratorio[]>([]);
+  examenesLabCatalogo = signal<ExamenLaboratorioCatalogo[]>([]);
+  catalogoAgrupadoExamenes = computed(() => {
+    const activos = this.examenesLabCatalogo().filter((e) => e.activo);
+    const grupos = new Map<string, ExamenLaboratorioCatalogo[]>();
+    for (const e of activos) {
+      const nombreCategoria = e.categoria_nombre || 'Otros';
+      if (!grupos.has(nombreCategoria)) grupos.set(nombreCategoria, []);
+      grupos.get(nombreCategoria)!.push(e);
     }
     return [...grupos.entries()].map(([categoria, items]) => ({ categoria, items }));
   });
@@ -243,6 +260,8 @@ export class CitasComponent implements OnInit {
     private categoriasAntecedentesSrv: CategoriasAntecedentesService,
     private antecedentesPatologicosSrv: AntecedentesPatologicosService,
     private pacienteAntecedentesSrv: PacienteAntecedentesService,
+    private categoriasExamenesLabSrv: CategoriasExamenesLaboratorioService,
+    private examenesLabCatalogoSrv: ExamenesLaboratorioCatalogoService,
     private route: ActivatedRoute,
     public auth: AuthService
   ) {}
@@ -253,6 +272,8 @@ export class CitasComponent implements OnInit {
     this.doctoresSrv.listar().subscribe((data) => this.doctores.set(data));
     this.categoriasAntecedentesSrv.listar().subscribe((data) => this.categoriasCatalogo.set(data));
     this.antecedentesPatologicosSrv.listar().subscribe((data) => this.antecedentesCatalogo.set(data));
+    this.categoriasExamenesLabSrv.listar().subscribe((data) => this.categoriasExamenesLabCatalogo.set(data));
+    this.examenesLabCatalogoSrv.listar().subscribe((data) => this.examenesLabCatalogo.set(data));
     this.sucursalesSrv.listar().subscribe((data) => this.sucursales.set(data.filter((s) => s.activo)));
     this.especialidadesSrv.listar().subscribe((data) => this.especialidades.set(data.filter((e) => e.activo)));
     this.campanasSrv.listar().subscribe((data) => {
@@ -468,7 +489,7 @@ export class CitasComponent implements OnInit {
   }
 
   abrirFormAntecedenteConsulta(): void {
-    this.antecedenteConsultaForm.reset({ antecedente_id: '', fecha_inicio: '', tratamiento: '', observacion: '' });
+    this.antecedenteConsultaForm.reset({ antecedente_id: '', fecha_inicio: hoyISO(), tratamiento: '', observacion: '' });
     this.mostrarFormAntecedenteConsulta.set(true);
   }
 
@@ -951,8 +972,49 @@ export class CitasComponent implements OnInit {
     generarPdf(doc);
   }
 
-  crearExamenGroup(e?: Partial<{ nombre_examen: string; valor_referencia: string; resultado: string; unidad: string }>) {
+  imprimirOrdenLaboratorio(o: OrdenLaboratorio): void {
+    const empresa = this.auth.empresaActiva();
+    const citaCtx = this.citaLaboratorio();
+    const doctorNombre = o.doctor_nombre || citaCtx?.doctor_nombre || this.citaHistoria()?.doctor_nombre || '';
+    const pacienteNombre = citaCtx?.paciente_nombre || this.pacienteDeHistoria()?.nombre || '';
+    const fecha = o.fecha_cita || citaCtx?.fecha || o.created_at;
+
+    const filas = o.examenes.map((e) => [
+      e.nombre_examen,
+      e.valor_referencia || '-',
+      e.resultado || '-',
+      e.unidad || '-',
+    ]);
+
+    const doc: TDocumentDefinitions = {
+      pageMargins: [30, 30, 30, 30],
+      content: [
+        ...(encabezadoClinica(empresa?.empresa_logo, empresa?.empresa_nombre, 'Orden de laboratorio') as any[]),
+        { text: doctorNombre, margin: [0, 0, 0, 2] },
+        { text: `Paciente: ${pacienteNombre}`, margin: [0, 0, 0, 2] },
+        { text: `Fecha: ${fecha ? formatoFechaCorta(fecha) : ''}`, color: '#64748b', margin: [0, 0, 0, 10] },
+        {
+          table: {
+            headerRows: 1,
+            widths: ['*', 'auto', 'auto', 'auto'],
+            body: [
+              ['Examen', 'Valor de referencia', 'Resultado', 'Unidad'].map((t) => ({ text: t, bold: true })),
+              ...filas,
+            ],
+          },
+          layout: 'lightHorizontalLines',
+        },
+        ...(o.observaciones ? [{ text: `Observaciones: ${o.observaciones}`, margin: [0, 10, 0, 0] as [number, number, number, number] }] : []),
+      ],
+      defaultStyle: { fontSize: 9 },
+    };
+
+    generarPdf(doc);
+  }
+
+  crearExamenGroup(e?: Partial<{ examen_id: string | null; nombre_examen: string; valor_referencia: string; resultado: string; unidad: string }>) {
     return this.fb.group({
+      examen_id: [e?.examen_id ?? null],
       nombre_examen: [e?.nombre_examen ?? '', Validators.required],
       valor_referencia: [e?.valor_referencia ?? ''],
       resultado: [e?.resultado ?? ''],
@@ -966,10 +1028,33 @@ export class CitasComponent implements OnInit {
 
   agregarExamen(): void {
     this.examenesArray.push(this.crearExamenGroup());
+    this.laboratorioForm.markAsDirty();
   }
 
   quitarExamen(i: number): void {
-    if (this.examenesArray.length > 1) this.examenesArray.removeAt(i);
+    this.examenesArray.removeAt(i);
+    this.laboratorioForm.markAsDirty();
+  }
+
+  // Checklist del catalogo: marca/desmarca un examen agregando o quitando
+  // su fila correspondiente en examenesArray (identificada por examen_id).
+  examenMarcado(examenId: string): boolean {
+    return this.examenesArray.controls.some((c) => c.get('examen_id')?.value === examenId);
+  }
+
+  toggleExamenCatalogo(ex: ExamenLaboratorioCatalogo): void {
+    const idx = this.examenesArray.controls.findIndex((c) => c.get('examen_id')?.value === ex.id);
+    if (idx >= 0) {
+      this.examenesArray.removeAt(idx);
+    } else {
+      this.examenesArray.push(this.crearExamenGroup({
+        examen_id: ex.id,
+        nombre_examen: ex.nombre,
+        valor_referencia: ex.valor_referencia ?? '',
+        unidad: ex.unidad ?? '',
+      }));
+    }
+    this.laboratorioForm.markAsDirty();
   }
 
   abrirLaboratorio(c: Cita): void {
@@ -990,7 +1075,6 @@ export class CitasComponent implements OnInit {
     this.laboratorioEditando.set(null);
     this.laboratorioForm.reset({ estado: 'pendiente', observaciones: '' });
     this.examenesArray.clear();
-    this.examenesArray.push(this.crearExamenGroup());
     this.mostrarFormularioLaboratorio.set(true);
   }
 

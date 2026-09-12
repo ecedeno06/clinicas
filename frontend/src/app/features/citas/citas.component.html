@@ -648,14 +648,7 @@
                 <h3 style="margin:0;">Agregar antecedente</h3>
                 <div class="form-group mt-16">
                   <label>Antecedente *</label>
-                  <select class="input" formControlName="antecedente_id">
-                    <option value="" disabled>Selecciona un antecedente</option>
-                    @for (grupo of catalogoAgrupadoConsulta(); track grupo.categoria) {
-                      <optgroup [label]="grupo.categoria">
-                        @for (item of grupo.items; track item.id) { <option [value]="item.id">{{ item.nombre }}</option> }
-                      </optgroup>
-                    }
-                  </select>
+                  <app-buscador-antecedente formControlName="antecedente_id" [grupos]="catalogoAgrupadoConsulta()"></app-buscador-antecedente>
                 </div>
                 <div class="form-group mt-16">
                   <label>Fecha de inicio</label>
@@ -777,12 +770,15 @@
               <div class="card mt-16">
                 <div class="flex items-center" style="justify-content: space-between;">
                   <div class="text-muted text-sm">{{ o.fecha_cita | date:'dd/MM/yyyy':'UTC' }} &middot; {{ o.doctor_nombre }}</div>
-                  <span class="badge"
-                    [class.badge-slate]="o.estado === 'pendiente'"
-                    [class.badge-green]="o.estado === 'completada'"
-                    [class.badge-red]="o.estado === 'cancelada'">
-                    {{ o.estado }}
-                  </span>
+                  <div class="flex items-center gap-12">
+                    <span class="badge"
+                      [class.badge-slate]="o.estado === 'pendiente'"
+                      [class.badge-green]="o.estado === 'completada'"
+                      [class.badge-red]="o.estado === 'cancelada'">
+                      {{ o.estado }}
+                    </span>
+                    <button type="button" class="btn btn-outline btn-sm" (click)="imprimirOrdenLaboratorio(o)">Imprimir</button>
+                  </div>
                 </div>
                 <div class="table-wrap mt-16">
                   <table class="data-table">
@@ -1038,6 +1034,7 @@
                 </span>
               </div>
               <div class="flex gap-6">
+                <button type="button" class="btn btn-outline btn-sm" (click)="imprimirOrdenLaboratorio(o)">Imprimir</button>
                 <button type="button" class="btn btn-outline btn-sm" (click)="editarOrdenLaboratorio(o)">Editar</button>
                 <button type="button" class="btn btn-danger btn-sm" (click)="eliminarOrdenLaboratorio(o)">Eliminar</button>
               </div>
@@ -1067,14 +1064,29 @@
       } @else {
         <!-- Formulario para registrar o editar una orden puntual -->
         <form [formGroup]="laboratorioForm" (ngSubmit)="guardarOrdenLaboratorio()" class="mt-16">
+          <div class="form-group">
+            <label>Examenes a solicitar *</label>
+            <div class="checklist-examenes-scroll">
+              @for (grupo of catalogoAgrupadoExamenes(); track grupo.categoria) {
+                <div class="checklist-examenes-categoria">{{ grupo.categoria }}</div>
+                <div class="checklist-examenes-grid">
+                  @for (ex of grupo.items; track ex.id) {
+                    <label class="checklist-examen-item">
+                      <input type="checkbox" [checked]="examenMarcado(ex.id)" (change)="toggleExamenCatalogo(ex)" />
+                      {{ ex.nombre }}
+                    </label>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+
           <div formArrayName="examenes">
             @for (e of examenesArray.controls; track $index; let i = $index) {
               <div class="card mt-16" [formGroupName]="i">
                 <div class="flex items-center" style="justify-content: space-between;">
                   <h3 style="margin:0;">Examen {{ i + 1 }}</h3>
-                  @if (examenesArray.length > 1) {
-                    <button type="button" class="btn btn-outline btn-sm" (click)="quitarExamen(i)">Quitar</button>
-                  }
+                  <button type="button" class="btn btn-outline btn-sm" (click)="quitarExamen(i)">Quitar</button>
                 </div>
                 <div class="form-group mt-16">
                   <label>Examen *</label>
@@ -1097,7 +1109,7 @@
               </div>
             }
           </div>
-          <button type="button" class="btn btn-outline mt-16" (click)="agregarExamen()">+ Agregar examen</button>
+          <button type="button" class="btn btn-outline mt-16" (click)="agregarExamen()">+ Agregar otro examen</button>
 
           <div class="form-group mt-16">
             <label>Estado</label>
@@ -1114,7 +1126,7 @@
           </div>
 
           <div class="form-actions">
-            <button type="submit" class="btn btn-primary" [disabled]="laboratorioForm.invalid || laboratorioForm.pristine">{{ laboratorioEditando() ? 'Guardar cambios' : 'Registrar orden' }}</button>
+            <button type="submit" class="btn btn-primary" [disabled]="laboratorioForm.invalid || laboratorioForm.pristine || examenesArray.length === 0">{{ laboratorioEditando() ? 'Guardar cambios' : 'Registrar orden' }}</button>
             <button type="button" class="btn btn-outline" (click)="cancelarFormularioLaboratorio()">Cancelar</button>
           </div>
         </form>
