@@ -27,7 +27,6 @@ interface LoginRequiere2FA {
 export interface SessionConfig {
   inactivityLimitMinutes: number;
   warningBeforeMinutes: number;
-  passwordHintMaxSimilarity: number;
   refreshIntervalMinutes: number;
 }
 

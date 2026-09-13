@@ -8,14 +8,17 @@ import { SessionService } from '../../core/services/session.service';
 import { SelectorFotoComponent } from '../../core/components/selector-foto/selector-foto.component';
 import { InactividadComponent } from '../../core/components/inactividad/inactividad.component';
 import { SeguridadComponent } from '../seguridad/seguridad.component';
-import { passwordsCoincidenValidator } from '../../core/utils/password.util';
+import { PasswordChecklistComponent } from '../../core/components/password-checklist/password-checklist.component';
+import { passwordsCoincidenValidator, construirValidadorPolitica, construirValidadorPista, generarPasswordSegunPolitica } from '../../core/utils/password.util';
+import { PoliticaPasswordService } from '../../core/services/politicaPassword.service';
+import { PoliticaPassword } from '../../core/models/models';
 
 const SIDEBAR_STORAGE_KEY = 'clinica_sidebar_colapsado';
 
 @Component({
   selector: 'app-layout',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterOutlet, RouterLink, RouterLinkActive, SelectorFotoComponent, InactividadComponent, SeguridadComponent],
+  imports: [CommonModule, ReactiveFormsModule, RouterOutlet, RouterLink, RouterLinkActive, SelectorFotoComponent, InactividadComponent, SeguridadComponent, PasswordChecklistComponent],
   templateUrl: './layout.component.html',
   styleUrl: './layout.component.css',
 })
@@ -26,6 +29,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
   panelSeguridadAbierto = signal(false);
   verPasswordNueva = signal(false);
   verPasswordConfirmar = signal(false);
+  passwordGenerada = signal(false);
   // Un admin marco esta cuenta con debe_cambiar_password (al crearla o al
   // resetearle la contrasena) -- se fuerza el formulario, sin poder
   // cancelarlo, hasta que el usuario ponga una contrasena propia.
@@ -42,18 +46,23 @@ export class LayoutComponent implements OnInit, OnDestroy {
   passwordForm = this.fb.group(
     {
       password_actual: ['', Validators.required],
-      password_nueva: ['', [Validators.required, Validators.minLength(6)]],
+      password_nueva: ['', [Validators.required]],
       password_confirmar: ['', Validators.required],
       pista: [''],
     },
     { validators: passwordsCoincidenValidator }
   );
 
+  // Se completa en ngOnInit (GET publico) -- hasta entonces el formulario
+  // solo valida "required"/coincidencia, sin la politica todavia.
+  politica = signal<PoliticaPassword | null>(null);
+
   constructor(
     public auth: AuthService,
     public theme: ThemeService,
     public sessionService: SessionService,
-    private fb: FormBuilder
+    private fb: FormBuilder,
+    private politicaPasswordSrv: PoliticaPasswordService
   ) {}
 
   ngOnInit(): void {
@@ -67,6 +76,17 @@ export class LayoutComponent implements OnInit, OnDestroy {
     // header -- evita confundir en que entorno se esta trabajando
     // (ej. clinica_medica local vs neondb en la nube).
     this.auth.obtenerMe().subscribe({ error: () => {} });
+
+    this.politicaPasswordSrv.obtener().subscribe({
+      next: (p) => {
+        this.politica.set(p);
+        this.passwordForm.get('password_nueva')?.addValidators(construirValidadorPolitica(p));
+        this.passwordForm.addValidators(construirValidadorPista(p));
+        this.passwordForm.get('password_nueva')?.updateValueAndValidity();
+        this.passwordForm.updateValueAndValidity();
+      },
+      error: () => {}, // sin la politica, el formulario sigue funcionando con las reglas base (required/coincidencia)
+    });
   }
 
   ngOnDestroy(): void {
@@ -129,7 +149,21 @@ export class LayoutComponent implements OnInit, OnDestroy {
     this.passwordForm.reset();
     this.verPasswordNueva.set(false);
     this.verPasswordConfirmar.set(false);
+    this.passwordGenerada.set(false);
     this.panelPasswordAbierto.set(true);
+  }
+
+  generarPassword(): void {
+    const pol = this.politica();
+    if (!pol) return;
+    const nueva = generarPasswordSegunPolitica(pol);
+    this.passwordForm.patchValue({ password_nueva: nueva, password_confirmar: nueva });
+    this.passwordForm.get('password_nueva')?.markAsTouched();
+    this.passwordForm.get('password_confirmar')?.markAsTouched();
+    this.verPasswordNueva.set(true);
+    this.verPasswordConfirmar.set(true);
+    this.passwordGenerada.set(true);
+    navigator.clipboard?.writeText(nueva).catch(() => {});
   }
 
   cerrarCambioPassword(): void {

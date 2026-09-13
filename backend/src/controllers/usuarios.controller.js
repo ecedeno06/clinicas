@@ -1,5 +1,6 @@
 const bcrypt = require('bcryptjs');
 const { pool } = require('../config/db');
+const { obtenerPolitica, validarPassword } = require('../utils/politicaPassword');
 
 // GET /api/usuarios  -> STAFF de la clinica activa, con su rol. El rol
 // 'paciente' nunca aparece aqui -- esta pantalla es de gestion de staff,
@@ -79,6 +80,8 @@ async function crear(req, res, next) {
       if (!nombre || !password) {
         return res.status(400).json({ mensaje: 'nombre y password son requeridos para un usuario nuevo' });
       }
+      const erroresPassword = validarPassword(password, await obtenerPolitica());
+      if (erroresPassword.length) return res.status(400).json({ mensaje: erroresPassword.join('. ') });
       const password_hash = await bcrypt.hash(password, 10);
       const { rows } = await pool.query(
         `insert into usuarios (nombre, email, password_hash, telefono, acepta_whatsapp, activo, debe_cambiar_password, es_super_admin)
@@ -120,6 +123,10 @@ async function actualizar(req, res, next) {
     );
     if (!pertenece.rows[0]) return res.status(404).json({ mensaje: 'Usuario no encontrado en esta clinica' });
 
+    if (password) {
+      const erroresPassword = validarPassword(password, await obtenerPolitica());
+      if (erroresPassword.length) return res.status(400).json({ mensaje: erroresPassword.join('. ') });
+    }
     const password_hash = password ? await bcrypt.hash(password, 10) : null;
     // es_super_admin es un permiso global -- solo otro super-admin puede
     // otorgarlo o quitarlo; un admin normal que lo mande se ignora

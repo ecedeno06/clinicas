@@ -496,3 +496,18 @@ export interface SignosVitales {
   fecha_cita?: string;
   hora_cita?: string;
 }
+
+// Tabla singleton (una sola fila): editable solo por super admin desde
+// /politica-password. GET es publico -- el login y "restablecer
+// contrasena" (paginas sin autenticar) tambien la necesitan.
+export interface PoliticaPassword {
+  id?: number;
+  longitud_minima: number;
+  requiere_mayuscula: boolean;
+  requiere_minuscula: boolean;
+  requiere_numero: boolean;
+  requiere_caracter_especial: boolean;
+  pista_longitud_minima: number;
+  pista_similitud_maxima_porcentaje: number;
+  updated_at?: string;
+}

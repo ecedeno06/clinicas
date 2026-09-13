@@ -14,6 +14,7 @@ import { CitasComponent } from './features/citas/citas.component';
 import { UsuariosComponent } from './features/usuarios/usuarios.component';
 import { EmpresasComponent } from './features/empresas/empresas.component';
 import { CatalogoAntecedentesComponent } from './features/catalogo-antecedentes/catalogo-antecedentes.component';
+import { PoliticaPasswordComponent } from './features/politica-password/politica-password.component';
 import { CatalogoExamenesLaboratorioComponent } from './features/catalogo-examenes-laboratorio/catalogo-examenes-laboratorio.component';
 import { SucursalesComponent } from './features/sucursales/sucursales.component';
 import { CampanasComponent } from './features/campanas/campanas.component';
@@ -44,6 +45,7 @@ export const routes: Routes = [
       { path: 'reportes/citas', component: ReporteCitasComponent, canActivate: [staffGuard] },
       { path: 'empresas', component: EmpresasComponent, canActivate: [superAdminGuard] },
       { path: 'catalogo-antecedentes', component: CatalogoAntecedentesComponent, canActivate: [superAdminGuard] },
+      { path: 'politica-password', component: PoliticaPasswordComponent, canActivate: [superAdminGuard] },
       { path: 'catalogo-examenes-laboratorio', component: CatalogoExamenesLaboratorioComponent, canActivate: [staffGuard] },
       { path: 'portal/perfil', component: PerfilPacienteComponent },
       { path: 'portal/citas', component: CitasPacienteComponent },

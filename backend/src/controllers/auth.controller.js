@@ -5,7 +5,7 @@ const { authenticator } = require('otplib');
 const QRCode = require('qrcode');
 const { pool } = require('../config/db');
 const { encriptar, desencriptar } = require('../utils/cifrado2fa');
-const { porcentajeSimilitud } = require('../utils/levenshtein');
+const { obtenerPolitica, validarPassword, validarPista } = require('../utils/politicaPassword');
 const { enviarCorreo } = require('../utils/correo');
 const { nombreInstanciaDb } = require('../utils/instanciaDb');
 
@@ -449,7 +449,9 @@ async function restablecerPassword(req, res, next) {
   try {
     const { token, password_nueva } = req.body || {};
     if (!token || !password_nueva) return res.status(400).json({ mensaje: 'token y password_nueva son requeridos' });
-    if (password_nueva.length < 6) return res.status(400).json({ mensaje: 'La nueva contrasena debe tener al menos 6 caracteres' });
+
+    const erroresPassword = validarPassword(password_nueva, await obtenerPolitica());
+    if (erroresPassword.length) return res.status(400).json({ mensaje: erroresPassword.join('. ') });
 
     const { rows } = await pool.query(
       `select id, usuario_id from password_reset_tokens where token = $1 and usado = false and expira_en > now()`,
@@ -604,7 +606,6 @@ function sessionConfig(req, res) {
   res.json({
     inactivityLimitMinutes: Number(process.env.SESSION_INACTIVITY_LIMIT_MINUTES) || 15,
     warningBeforeMinutes: Number(process.env.SESSION_WARNING_BEFORE_MINUTES) || 2,
-    passwordHintMaxSimilarity: Number(process.env.PASSWORD_HINT_MAX_SIMILARITY) || 70,
     refreshIntervalMinutes: Number(process.env.SESSION_REFRESH_INTERVAL_MINUTES) || 10,
   });
 }
@@ -775,8 +776,11 @@ async function cambiarPassword(req, res, next) {
     if (!password_actual || !password_nueva) {
       return res.status(400).json({ mensaje: 'password_actual y password_nueva son requeridos' });
     }
-    if (password_nueva.length < 6) {
-      return res.status(400).json({ mensaje: 'La nueva contrasena debe tener al menos 6 caracteres' });
+
+    const politica = await obtenerPolitica();
+    const erroresPassword = validarPassword(password_nueva, politica);
+    if (erroresPassword.length) {
+      return res.status(400).json({ mensaje: erroresPassword.join('. ') });
     }
 
     const { rows } = await pool.query('select password_hash from usuarios where id = $1', [req.usuario.id]);
@@ -791,12 +795,9 @@ async function cambiarPassword(req, res, next) {
     if (pista !== undefined) {
       pistaFinal = String(pista).trim() || null;
       if (pistaFinal) {
-        const maxSimilitud = Number(process.env.PASSWORD_HINT_MAX_SIMILARITY) || 70;
-        const similitud = porcentajeSimilitud(password_nueva, pistaFinal);
-        if (similitud > maxSimilitud) {
-          return res.status(400).json({
-            mensaje: `La pista es demasiado obvia (${similitud.toFixed(0)}% de similitud con la contrasena). Debe parecerse menos de un ${maxSimilitud}%.`,
-          });
+        const erroresPista = validarPista(pistaFinal, password_nueva, politica);
+        if (erroresPista.length) {
+          return res.status(400).json({ mensaje: erroresPista.join('. ') });
         }
       }
     }

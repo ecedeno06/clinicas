@@ -2,6 +2,7 @@ const bcrypt = require('bcryptjs');
 const { pool } = require('../config/db');
 const { generarPasswordTemporal } = require('../utils/passwordTemporal');
 const { enviarCorreo } = require('../utils/correo');
+const { obtenerPolitica } = require('../utils/politicaPassword');
 
 // tipo_trabajo/lugar_trabajo solo tienen sentido si estado_laboral es
 // 'trabaja' -- si no, se limpian para no dejar datos laborales viejos
@@ -525,7 +526,11 @@ async function invitar(req, res, next) {
       if (existente.rows[0]) {
         usuarioId = existente.rows[0].id;
       } else {
-        passwordTemporal = generarPasswordTemporal();
+        // No se valida contra la politica de password (es aleatoria y se
+        // fuerza su cambio en el primer login), pero respeta el minimo
+        // configurado en vez de un largo fijo.
+        const politica = await obtenerPolitica();
+        passwordTemporal = generarPasswordTemporal(Math.max(10, politica.longitud_minima));
         const passwordHash = await bcrypt.hash(passwordTemporal, 10);
         const nuevo = await client.query(
           `insert into usuarios (nombre, email, password_hash, activo, debe_cambiar_password)

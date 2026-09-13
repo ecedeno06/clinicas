@@ -3,13 +3,16 @@ import { CommonModule } from '@angular/common';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { UsuariosService } from '../../core/services/usuarios.service';
 import { AuthService } from '../../core/services/auth.service';
-import { Usuario, Rol } from '../../core/models/models';
+import { PoliticaPasswordService } from '../../core/services/politicaPassword.service';
+import { Usuario, Rol, PoliticaPassword } from '../../core/models/models';
 import { TelefonoInputComponent } from '../../core/components/telefono-input/telefono-input.component';
+import { PasswordChecklistComponent } from '../../core/components/password-checklist/password-checklist.component';
+import { construirValidadorPolitica, generarPasswordSegunPolitica } from '../../core/utils/password.util';
 
 @Component({
   selector: 'app-usuarios',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule, TelefonoInputComponent],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, TelefonoInputComponent, PasswordChecklistComponent],
   templateUrl: './usuarios.component.html',
   styleUrl: './usuarios.component.css',
 })
@@ -55,9 +58,28 @@ export class UsuariosComponent implements OnInit {
     es_super_admin: [false],
   });
 
-  constructor(private fb: FormBuilder, private srv: UsuariosService, public auth: AuthService) {}
+  politica = signal<PoliticaPassword | null>(null);
+  verPassword = signal(false);
+  passwordGenerada = signal(false);
 
-  ngOnInit(): void { this.cargar(); }
+  constructor(
+    private fb: FormBuilder,
+    private srv: UsuariosService,
+    public auth: AuthService,
+    private politicaPasswordSrv: PoliticaPasswordService
+  ) {}
+
+  ngOnInit(): void {
+    this.cargar();
+    this.politicaPasswordSrv.obtener().subscribe({
+      next: (p) => {
+        this.politica.set(p);
+        this.form.get('password')?.addValidators(construirValidadorPolitica(p));
+        this.form.get('password')?.updateValueAndValidity();
+      },
+      error: () => {},
+    });
+  }
   cargar(): void { this.srv.listar().subscribe((data) => this.usuarios.set(data)); }
 
   // Se incrementa cada vez que se abre el panel (nuevo o editar) para que
@@ -70,6 +92,8 @@ export class UsuariosComponent implements OnInit {
     this.tokenBusquedaEmail++;
     this.editando.set(null);
     this.usuarioExistente.set(null);
+    this.verPassword.set(false);
+    this.passwordGenerada.set(false);
     this.form.reset({ rol: 'recepcionista', activo: true, es_super_admin: false });
     // nombre/password no son obligatorios aqui: si el email ya existe en el
     // sistema (otra clinica), el backend solo lo asocia a esta clinica (como
@@ -81,6 +105,8 @@ export class UsuariosComponent implements OnInit {
     this.tokenBusquedaEmail++;
     this.editando.set(u);
     this.usuarioExistente.set(null);
+    this.verPassword.set(false);
+    this.passwordGenerada.set(false);
     this.form.reset({ ...u, password: '' });
     this.form.get('password')?.clearValidators();
     this.form.get('password')?.updateValueAndValidity();
@@ -88,6 +114,17 @@ export class UsuariosComponent implements OnInit {
   }
 
   cerrarPanel(): void { this.panelAbierto.set(false); }
+
+  generarPassword(): void {
+    const pol = this.politica();
+    if (!pol) return;
+    const nueva = generarPasswordSegunPolitica(pol);
+    this.form.patchValue({ password: nueva });
+    this.form.get('password')?.markAsTouched();
+    this.verPassword.set(true);
+    this.passwordGenerada.set(true);
+    navigator.clipboard?.writeText(nueva).catch(() => {});
+  }
 
   onEmailBlur(): void {
     if (this.editando()) return;
