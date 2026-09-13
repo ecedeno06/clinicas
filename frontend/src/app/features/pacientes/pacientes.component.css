@@ -1,3 +1,17 @@
+/* Cintillo de las pestanas Receta/Laboratorio del historial clinico
+   cuando el rol actual (ej. recepcionista) no tiene permiso para ver
+   ese dato confidencial -- reemplaza el listado en vez de mostrarlo
+   vacio, que se confundiria con "no hay registros". */
+.cintillo-confidencial {
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  background: var(--tint-amber-bg);
+  color: var(--text-on-tint-amber);
+  font-weight: 600;
+  font-size: 13px;
+  text-align: center;
+}
+
 /* Lista de antecedentes patologicos del paciente (tab Antecedentes,
    drawer de historial clinico): no mas de ~5 filas visibles, el resto
    con scroll -- el detalle de la fila seleccionada se muestra en un

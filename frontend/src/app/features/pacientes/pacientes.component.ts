@@ -103,9 +103,14 @@ export class PacientesComponent implements OnInit {
 
   recetasSeleccionadas = signal<Receta[]>([]);
   cargandoRecetaSeleccionada = signal(false);
+  // Recetas/laboratorio son confidenciales (solo admin/doctor); si el rol
+  // actual no tiene permiso, el backend responde 403 y mostramos un
+  // cintillo en vez del listado vacio (que se veria igual que "no hay").
+  sinPermisoReceta = signal(false);
 
   ordenesLaboratorioSeleccionadas = signal<OrdenLaboratorio[]>([]);
   cargandoLaboratorioSeleccionado = signal(false);
+  sinPermisoLaboratorio = signal(false);
 
   sucursales = signal<Sucursal[]>([]);
 
@@ -675,7 +680,9 @@ export class PacientesComponent implements OnInit {
     this.signosVitalesSeleccionado.set(null);
     this.signosVitalesHistorialLista.set([]);
     this.recetasSeleccionadas.set([]);
+    this.sinPermisoReceta.set(false);
     this.ordenesLaboratorioSeleccionadas.set([]);
+    this.sinPermisoLaboratorio.set(false);
     this.cargandoHistorial.set(true);
     this.srv.historial(p.id).subscribe({
       next: (data) => { this.historial.set(data); this.cargandoHistorial.set(false); },
@@ -735,17 +742,25 @@ export class PacientesComponent implements OnInit {
     });
 
     this.recetasSeleccionadas.set([]);
+    this.sinPermisoReceta.set(false);
     this.cargandoRecetaSeleccionada.set(true);
     this.citasSrv.listarRecetas(h.cita_id).subscribe({
       next: (data) => { this.recetasSeleccionadas.set(data); this.cargandoRecetaSeleccionada.set(false); },
-      error: () => this.cargandoRecetaSeleccionada.set(false),
+      error: (err) => {
+        this.sinPermisoReceta.set(err?.status === 403);
+        this.cargandoRecetaSeleccionada.set(false);
+      },
     });
 
     this.ordenesLaboratorioSeleccionadas.set([]);
+    this.sinPermisoLaboratorio.set(false);
     this.cargandoLaboratorioSeleccionado.set(true);
     this.citasSrv.listarLaboratorio(h.cita_id).subscribe({
       next: (data) => { this.ordenesLaboratorioSeleccionadas.set(data); this.cargandoLaboratorioSeleccionado.set(false); },
-      error: () => this.cargandoLaboratorioSeleccionado.set(false),
+      error: (err) => {
+        this.sinPermisoLaboratorio.set(err?.status === 403);
+        this.cargandoLaboratorioSeleccionado.set(false);
+      },
     });
   }
 

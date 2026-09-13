@@ -579,7 +579,9 @@
                   }
                 }
               } @else if (tabInferior() === 'receta') {
-                @if (cargandoRecetaSeleccionada()) {
+                @if (sinPermisoReceta()) {
+                  <div class="cintillo-confidencial">Confidencial - ver con el doctor / Administrador</div>
+                } @else if (cargandoRecetaSeleccionada()) {
                   <div class="empty-state">Cargando...</div>
                 } @else {
                   @for (r of recetasSeleccionadas(); track r.id) {
@@ -610,7 +612,9 @@
                   }
                 }
               } @else {
-                @if (cargandoLaboratorioSeleccionado()) {
+                @if (sinPermisoLaboratorio()) {
+                  <div class="cintillo-confidencial">Confidencial - ver con el doctor / Administrador</div>
+                } @else if (cargandoLaboratorioSeleccionado()) {
                   <div class="empty-state">Cargando...</div>
                 } @else {
                   @for (o of ordenesLaboratorioSeleccionadas(); track o.id) {
