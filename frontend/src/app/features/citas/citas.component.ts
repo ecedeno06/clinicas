@@ -212,6 +212,10 @@ export class CitasComponent implements OnInit {
     campana_id: [''],
     es_domicilio: [false],
     es_urgencia: [false],
+    // Solo controla si al guardar se abre el chat de WhatsApp con el
+    // mensaje de confirmacion -- no es un campo de la cita en si, se
+    // saca del payload antes de enviarlo al backend (ver guardar()).
+    enviar_whatsapp: [false],
     fecha: [hoyISO(), Validators.required],
     hora_inicio: ['', Validators.required],
     hora_fin: ['', Validators.required],
@@ -551,6 +555,16 @@ export class CitasComponent implements OnInit {
     return !!c.paciente_telefono && !!c.paciente_acepta_whatsapp && !!c.sucursal_google_maps_url;
   }
 
+  // Mismo criterio que puedeCompartirUbicacion(), pero evaluado ANTES de
+  // guardar (todavia no existe una Cita, solo el paciente elegido en el
+  // formulario) -- controla si se muestra el checkbox "Enviar Mensaje
+  // WhatsApp".
+  puedeEnviarWhatsappForm(): boolean {
+    const pacienteId = this.form.get('paciente_id')?.value;
+    const paciente = this.pacientes().find((p) => p.id === pacienteId);
+    return !!paciente?.telefono && !!paciente?.acepta_whatsapp;
+  }
+
   // wa.me abre WhatsApp Web/app con el mensaje precargado para ese numero
   // -- no requiere API ni cuenta de WhatsApp Business.
   whatsappUrl(c: Cita): string {
@@ -589,7 +603,7 @@ export class CitasComponent implements OnInit {
     // reset (doctor_id y fecha cambiarian en dos eventos separados, el
     // primero con el otro campo todavia con el valor viejo) -- se llama una
     // sola vez, ya con el formulario completo, justo debajo.
-    this.form.reset({ sucursal_id: this.sucursales()[0]?.id ?? '', especialidad_id: '', campana_id: '', es_domicilio: false, es_urgencia: false, fecha: hoyISO(), estado: 'pendiente' }, { emitEvent: false });
+    this.form.reset({ sucursal_id: this.sucursales()[0]?.id ?? '', especialidad_id: '', campana_id: '', es_domicilio: false, es_urgencia: false, enviar_whatsapp: false, fecha: hoyISO(), estado: 'pendiente' }, { emitEvent: false });
     this.errorGuardar.set(null);
     this.panelAbierto.set(true);
     this.actualizarDisponibilidad();
@@ -609,6 +623,7 @@ export class CitasComponent implements OnInit {
       campana_id: c.campana_id ?? '',
       es_domicilio: c.es_domicilio ?? false,
       es_urgencia: c.es_urgencia ?? false,
+      enviar_whatsapp: false,
       fecha: c.fecha.substring(0, 10),
       hora_inicio: c.hora_inicio?.substring(0, 5),
       hora_fin: c.hora_fin?.substring(0, 5),
@@ -630,17 +645,20 @@ export class CitasComponent implements OnInit {
     this.errorGuardar.set(null);
     const actual = this.editando();
     const esNueva = !actual;
-    const data = this.form.getRawValue();
+    // enviar_whatsapp es solo una preferencia de esta pantalla, no un
+    // campo de la cita -- se saca del payload antes de mandarlo al backend.
+    const { enviar_whatsapp, ...data } = this.form.getRawValue();
     const req = actual ? this.srv.actualizar(actual.id, data) : this.srv.crear(data);
     req.subscribe({
       next: (citaGuardada) => {
         this.cerrarPanel();
         this.cargar();
-        // Solo al crear (no al editar/reagendar): si se puede compartir la
-        // ubicacion por WhatsApp, se abre solo el chat con el mensaje ya
-        // redactado -- falta un clic humano en "Enviar" (WhatsApp no
-        // permite enviar sin esa confirmacion sin la API de negocio).
-        if (esNueva && this.puedeCompartirUbicacion(citaGuardada)) {
+        // Solo al crear (no al editar/reagendar), y solo si se marco el
+        // checkbox: si ademas se puede compartir la ubicacion por WhatsApp,
+        // se abre el chat con el mensaje ya redactado -- falta un clic
+        // humano en "Enviar" (WhatsApp no permite enviar sin esa
+        // confirmacion sin la API de negocio).
+        if (esNueva && enviar_whatsapp && this.puedeCompartirUbicacion(citaGuardada)) {
           window.open(this.whatsappUrl(citaGuardada), '_blank');
         }
       },

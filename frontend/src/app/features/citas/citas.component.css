@@ -155,3 +155,19 @@
 .checklist-examen-item input[type="checkbox"] {
   flex-shrink: 0;
 }
+
+/* Checkbox "Enviar Mensaje WhatsApp" en Nueva cita: texto e icono en
+   verde luminoso (mismo tono de marca que los botones de WhatsApp del
+   resto de la app) para que resalte justo antes de Guardar. */
+.checkbox-whatsapp-luminoso {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #25D366;
+  font-weight: 700;
+  text-shadow: 0 0 6px rgba(37, 211, 102, 0.6), 0 0 14px rgba(37, 211, 102, 0.35);
+  cursor: pointer;
+}
+.checkbox-whatsapp-luminoso svg {
+  filter: drop-shadow(0 0 4px rgba(37, 211, 102, 0.65));
+}
