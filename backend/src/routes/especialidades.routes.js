@@ -2,7 +2,8 @@ const router = require('express').Router();
 const ctrl = require('../controllers/especialidades.controller');
 const { requireAuth, requireEmpresa, requireRol } = require('../middleware/auth');
 
-router.use(requireAuth, requireEmpresa);
+// Router de gestion clinica (staff): el rol 'paciente' no accede aqui.
+router.use(requireAuth, requireEmpresa, requireRol('admin', 'doctor', 'recepcionista'));
 
 router.get('/', ctrl.listar);
 router.get('/globales', requireRol('admin'), ctrl.listarCatalogoGlobal);

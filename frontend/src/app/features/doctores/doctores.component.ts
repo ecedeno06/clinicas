@@ -163,8 +163,11 @@ export class DoctoresComponent implements OnInit {
           this.form.patchValue({
             nombre: res.doctor.nombre,
             telefono: res.doctor.telefono ?? '',
+            acepta_whatsapp: res.doctor.acepta_whatsapp ?? false,
             email: res.doctor.email ?? '',
           });
+          this.especialidadesArray.clear();
+          (res.doctor.especialidades?.length ? res.doctor.especialidades : [undefined]).forEach((e) => this.especialidadesArray.push(this.crearEspecialidadGroup(e)));
           this.deshabilitarCamposIdentidad();
         } else {
           this.doctorExistente.set(null);
@@ -247,6 +250,28 @@ export class DoctoresComponent implements OnInit {
 
   tieneHorarioActivo(dia: number): boolean {
     return this.horariosPorDia(dia).some((h) => h.activo);
+  }
+
+  // El doctor dueno de este tablero (su propia cuenta) puede gestionar
+  // cualquiera de sus bloques sin importar la clinica.
+  esMiPropioDoctor(): boolean {
+    const doctor = this.horarioDoctor();
+    const usuarioId = this.auth.usuario()?.id;
+    return !!doctor?.usuario_id && doctor.usuario_id === usuarioId;
+  }
+
+  // true si este bloque puntual es de la clinica activa de la sesion --
+  // decide el color (verde/ambar) y, para un admin normal, si puede
+  // deshabilitarlo/eliminarlo (ver puedeGestionarHorario).
+  esDeClinicaActiva(h: DoctorHorario): boolean {
+    return h.sucursal_empresa_id === this.auth.empresaActiva()?.empresa_id;
+  }
+
+  // Mismo criterio que el backend (puedeGestionarHorario en
+  // doctorHorarios.controller.js): el doctor dueno gestiona cualquiera de
+  // sus bloques; un admin normal solo los de su clinica activa.
+  puedeGestionarHorario(h: DoctorHorario): boolean {
+    return this.esMiPropioDoctor() || (this.esAdmin() && this.esDeClinicaActiva(h));
   }
 
   abrirHorario(d: Doctor): void {

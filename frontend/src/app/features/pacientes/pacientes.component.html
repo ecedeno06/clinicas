@@ -73,6 +73,21 @@
             <button type="button" class="btn-icon" title="Historial" aria-label="Historial" (click)="verHistorial(p)">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="12" height="16" rx="2"/><path d="M9 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"/><path d="M9 11h6M9 15h4"/></svg>
             </button>
+            @if (puedeInvitarPaciente()) {
+              @if (p.tiene_acceso_esta_clinica) {
+                <button type="button" class="btn-icon" style="color: var(--green-600, green);" title="Ya tiene acceso al portal de paciente en esta clinica -- clic para quitarlo" aria-label="Quitar acceso de paciente" (click)="desinvitarAcceso(p)">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M17 11l2 2 4-4"/></svg>
+                </button>
+              } @else if (p.email) {
+                <button type="button" class="btn-icon" title="Invitar acceso al portal de paciente" aria-label="Invitar acceso" (click)="invitarAcceso(p)">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg>
+                </button>
+              } @else {
+                <span class="btn-icon" style="opacity:.35; cursor:not-allowed;" title="El paciente no tiene correo registrado" aria-label="Invitar acceso deshabilitado">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg>
+                </span>
+              }
+            }
             @if (auth.puedeEditar()) {
               <button type="button" class="btn-icon" title="Editar" aria-label="Editar" (click)="abrirEditar(p)">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>

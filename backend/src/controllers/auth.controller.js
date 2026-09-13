@@ -46,6 +46,14 @@ async function emitirTokens({ usuarioId, empresaId, empresaNombre, rol, payloadA
   return { accessToken, refreshToken };
 }
 
+async function tienePaciente(usuarioId) {
+  const { rows } = await pool.query(
+    "select 1 from usuarios_empresas_rol where usuario_id = $1 and rol = 'paciente' limit 1",
+    [usuarioId]
+  );
+  return !!rows[0];
+}
+
 // Continua el login despues de validar password (o codigo 2FA): resuelve
 // la(s) clinica(s) del usuario y emite el JWT final, o pide seleccionar
 // empresa si tiene mas de una. Compartido entre login() y verificar2FA().
@@ -53,16 +61,29 @@ async function continuarLoginTrasPassword(usuario, res) {
   // Un super-admin elige SIEMPRE la clinica activa al iniciar sesion
   // (incluso si solo tiene una), viendo todas las clinicas del sistema.
   if (usuario.es_super_admin) {
-    const { rows: todasEmpresas } = await pool.query(
-      `select e.id as empresa_id, e.nombre as empresa_nombre,
-              coalesce(uer.rol, 'admin') as rol
-       from empresas e
-       left join usuarios_empresas_rol uer
-              on uer.empresa_id = e.id and uer.usuario_id = $1
-       where e.activo = true
-       order by e.nombre`,
+    // El super-admin tiene acceso implicito de 'admin' a TODAS las
+    // clinicas activas -- eso nunca se pierde. Si ademas tiene un rol
+    // explicito no-admin en alguna (ej. 'doctor' puntual), se muestra
+    // como una opcion SEPARADA en vez de reemplazar el admin implicito.
+    // El rol 'paciente' es un caso especial: sin importar en cuantas
+    // clinicas lo autoricen, se colapsa en UNA sola opcion "Paciente"
+    // (sesion sin clinica activa, agrega todas -- ver mas abajo).
+    const { rows: empresasBase } = await pool.query(
+      `select id as empresa_id, nombre as empresa_nombre from empresas where activo = true order by nombre`
+    );
+    const { rows: rolesExtra } = await pool.query(
+      `select uer.empresa_id, uer.rol, e.nombre as empresa_nombre
+       from usuarios_empresas_rol uer
+       join empresas e on e.id = uer.empresa_id
+       where uer.usuario_id = $1 and uer.rol <> 'admin' and uer.rol <> 'paciente' and e.activo = true`,
       [usuario.id]
     );
+    const esPaciente = await tienePaciente(usuario.id);
+    const todasEmpresas = [
+      ...empresasBase.map((e) => ({ empresa_id: e.empresa_id, empresa_nombre: e.empresa_nombre, rol: 'admin' })),
+      ...rolesExtra,
+      ...(esPaciente ? [{ empresa_id: null, empresa_nombre: null, rol: 'paciente' }] : []),
+    ];
 
     if (todasEmpresas.length === 0) {
       const payload = {
@@ -88,7 +109,7 @@ async function continuarLoginTrasPassword(usuario, res) {
     });
   }
 
-  const { rows: empresas } = await pool.query(
+  const { rows: filas } = await pool.query(
     `select uer.empresa_id, uer.rol, e.nombre as empresa_nombre, e.logo as empresa_logo
      from usuarios_empresas_rol uer
      join empresas e on e.id = uer.empresa_id
@@ -96,6 +117,14 @@ async function continuarLoginTrasPassword(usuario, res) {
      order by e.nombre`,
     [usuario.id]
   );
+  // Igual criterio que la rama super-admin: sin importar en cuantas
+  // clinicas es paciente, se colapsa en UNA sola opcion "Paciente".
+  const filasStaff = filas.filter((f) => f.rol !== 'paciente');
+  const esPaciente = filas.some((f) => f.rol === 'paciente');
+  const empresas = [
+    ...filasStaff,
+    ...(esPaciente ? [{ empresa_id: null, empresa_nombre: null, empresa_logo: null, rol: 'paciente' }] : []),
+  ];
 
   if (empresas.length === 0) {
     return res.status(401).json({ mensaje: 'El usuario no tiene ninguna clinica asignada' });
@@ -587,8 +616,8 @@ async function seleccionarEmpresa(req, res, next) {
       return res.status(403).json({ mensaje: 'Para cambiar de clinica activa cierra sesion y vuelve a entrar.' });
     }
 
-    const { empresa_id } = req.body;
-    if (!empresa_id) return res.status(400).json({ mensaje: 'empresa_id es requerido' });
+    const { empresa_id, rol: rolSolicitado } = req.body;
+    if (!rolSolicitado) return res.status(400).json({ mensaje: 'rol es requerido' });
 
     const { rows: usuarioRows } = await pool.query(
       'select id, nombre, email, avatar, es_super_admin, debe_cambiar_password from usuarios where id = $1',
@@ -596,27 +625,47 @@ async function seleccionarEmpresa(req, res, next) {
     );
     const usuario = usuarioRows[0];
 
-    const { rows: relacion } = await pool.query(
-      `select uer.rol, e.nombre as empresa_nombre, e.logo as empresa_logo
-       from usuarios_empresas_rol uer
-       join empresas e on e.id = uer.empresa_id
-       where uer.usuario_id = $1 and uer.empresa_id = $2 and e.activo = true`,
-      [req.usuario.id, empresa_id]
-    );
+    let rol, empresaId, empresaNombre, empresaLogo;
 
-    let rol, empresaNombre, empresaLogo;
-    if (relacion[0]) {
-      rol = relacion[0].rol;
-      empresaNombre = relacion[0].empresa_nombre;
-      empresaLogo = relacion[0].empresa_logo;
-    } else if (usuario.es_super_admin) {
-      const { rows: empresaRows } = await pool.query('select nombre, logo from empresas where id = $1 and activo = true', [empresa_id]);
-      if (!empresaRows[0]) return res.status(404).json({ mensaje: 'Clinica no encontrada' });
-      rol = 'admin';
-      empresaNombre = empresaRows[0].nombre;
-      empresaLogo = empresaRows[0].logo;
+    if (rolSolicitado === 'paciente') {
+      // Sesion agregada: sin clinica activa, sin importar en cuantas
+      // clinicas lo autorizan (ver portalPaciente.controller.js, que
+      // resuelve todas via usuarios_empresas_rol en cada consulta).
+      if (!(await tienePaciente(usuario.id))) {
+        return res.status(403).json({ mensaje: 'No tienes acceso de paciente' });
+      }
+      rol = 'paciente';
+      empresaId = null;
+      empresaNombre = null;
+      empresaLogo = null;
     } else {
-      return res.status(403).json({ mensaje: 'No tienes acceso a esa clinica' });
+      if (!empresa_id) return res.status(400).json({ mensaje: 'empresa_id es requerido' });
+
+      // Una misma clinica puede tener DOS filas para este usuario (ej. su
+      // rol de staff y su rol de paciente) -- por eso el rol elegido en la
+      // pantalla de seleccion viene explicito en el body, no se infiere.
+      const { rows: relacion } = await pool.query(
+        `select uer.rol, e.nombre as empresa_nombre, e.logo as empresa_logo
+         from usuarios_empresas_rol uer
+         join empresas e on e.id = uer.empresa_id
+         where uer.usuario_id = $1 and uer.empresa_id = $2 and uer.rol = $3 and e.activo = true`,
+        [req.usuario.id, empresa_id, rolSolicitado]
+      );
+
+      if (relacion[0]) {
+        rol = relacion[0].rol;
+        empresaNombre = relacion[0].empresa_nombre;
+        empresaLogo = relacion[0].empresa_logo;
+      } else if (usuario.es_super_admin && rolSolicitado === 'admin') {
+        const { rows: empresaRows } = await pool.query('select nombre, logo from empresas where id = $1 and activo = true', [empresa_id]);
+        if (!empresaRows[0]) return res.status(404).json({ mensaje: 'Clinica no encontrada' });
+        rol = 'admin';
+        empresaNombre = empresaRows[0].nombre;
+        empresaLogo = empresaRows[0].logo;
+      } else {
+        return res.status(403).json({ mensaje: 'No tienes acceso a esa clinica con ese rol' });
+      }
+      empresaId = empresa_id;
     }
 
     const payload = {
@@ -624,7 +673,7 @@ async function seleccionarEmpresa(req, res, next) {
       nombre: usuario.nombre,
       email: usuario.email,
       rol,
-      empresa_id,
+      empresa_id: empresaId,
       empresa_nombre: empresaNombre,
       empresa_logo: empresaLogo,
       es_super_admin: usuario.es_super_admin,
@@ -632,7 +681,7 @@ async function seleccionarEmpresa(req, res, next) {
       debe_cambiar_password: usuario.debe_cambiar_password,
     };
     const { accessToken, refreshToken } = await emitirTokens({
-      usuarioId: usuario.id, empresaId: empresa_id, empresaNombre, rol,
+      usuarioId: usuario.id, empresaId, empresaNombre, rol,
       payloadAccessToken: { id: payload.id, nombre: payload.nombre, email: payload.email, rol: payload.rol, empresa_id: payload.empresa_id, es_super_admin: payload.es_super_admin, debe_cambiar_password: payload.debe_cambiar_password },
     });
 
@@ -646,20 +695,28 @@ async function seleccionarEmpresa(req, res, next) {
 async function misEmpresas(req, res, next) {
   try {
     if (req.usuario.es_super_admin) {
-      const { rows } = await pool.query(
-        `select e.id as empresa_id, e.nombre as empresa_nombre,
-                coalesce(uer.rol, 'admin') as rol
-         from empresas e
-         left join usuarios_empresas_rol uer
-                on uer.empresa_id = e.id and uer.usuario_id = $1
-         where e.activo = true
-         order by e.nombre`,
+      // Mismo criterio que continuarLoginTrasPassword: admin implicito en
+      // todas + cualquier rol explicito no-admin como opcion aparte, y
+      // 'paciente' colapsado en una sola entrada sin importar en cuantas.
+      const { rows: empresasBase } = await pool.query(
+        `select id as empresa_id, nombre as empresa_nombre from empresas where activo = true order by nombre`
+      );
+      const { rows: rolesExtra } = await pool.query(
+        `select uer.empresa_id, uer.rol, e.nombre as empresa_nombre
+         from usuarios_empresas_rol uer
+         join empresas e on e.id = uer.empresa_id
+         where uer.usuario_id = $1 and uer.rol <> 'admin' and uer.rol <> 'paciente' and e.activo = true`,
         [req.usuario.id]
       );
-      return res.json(rows);
+      const esPaciente = await tienePaciente(req.usuario.id);
+      return res.json([
+        ...empresasBase.map((e) => ({ empresa_id: e.empresa_id, empresa_nombre: e.empresa_nombre, rol: 'admin' })),
+        ...rolesExtra,
+        ...(esPaciente ? [{ empresa_id: null, empresa_nombre: null, rol: 'paciente' }] : []),
+      ]);
     }
 
-    const { rows } = await pool.query(
+    const { rows: filas } = await pool.query(
       `select e.id as empresa_id, e.nombre as empresa_nombre, uer.rol
        from usuarios_empresas_rol uer
        join empresas e on e.id = uer.empresa_id
@@ -667,7 +724,12 @@ async function misEmpresas(req, res, next) {
        order by e.nombre`,
       [req.usuario.id]
     );
-    res.json(rows);
+    const filasStaff = filas.filter((f) => f.rol !== 'paciente');
+    const esPaciente = filas.some((f) => f.rol === 'paciente');
+    res.json([
+      ...filasStaff,
+      ...(esPaciente ? [{ empresa_id: null, empresa_nombre: null, rol: 'paciente' }] : []),
+    ]);
   } catch (err) {
     next(err);
   }

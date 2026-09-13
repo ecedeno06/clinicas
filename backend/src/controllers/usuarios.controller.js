@@ -1,7 +1,11 @@
 const bcrypt = require('bcryptjs');
 const { pool } = require('../config/db');
 
-// GET /api/usuarios  -> usuarios de la clinica activa, con su rol
+// GET /api/usuarios  -> STAFF de la clinica activa, con su rol. El rol
+// 'paciente' nunca aparece aqui -- esta pantalla es de gestion de staff,
+// no del portal de pacientes (ver portalPaciente.controller.js); sin este
+// filtro, alguien que ademas es paciente de su propia clinica saldria
+// duplicado.
 async function listar(req, res, next) {
   try {
     const { rows } = await pool.query(
@@ -9,7 +13,7 @@ async function listar(req, res, next) {
               uer.rol, u.created_at
        from usuarios u
        join usuarios_empresas_rol uer on uer.usuario_id = u.id
-       where uer.empresa_id = $1
+       where uer.empresa_id = $1 and uer.rol <> 'paciente'
        order by u.nombre`,
       [req.empresaId]
     );
@@ -24,7 +28,7 @@ async function obtener(req, res, next) {
               uer.rol, u.created_at
        from usuarios u
        join usuarios_empresas_rol uer on uer.usuario_id = u.id
-       where u.id = $1 and uer.empresa_id = $2`,
+       where u.id = $1 and uer.empresa_id = $2 and uer.rol <> 'paciente'`,
       [req.params.id, req.empresaId]
     );
     if (!rows[0]) return res.status(404).json({ mensaje: 'Usuario no encontrado en esta clinica' });
@@ -84,10 +88,14 @@ async function crear(req, res, next) {
       usuarioId = rows[0].id;
     }
 
+    // El rol aqui siempre es de staff (el <select> del formulario solo
+    // ofrece admin/doctor/recepcionista, nunca 'paciente') -- el arbitro
+    // del upsert es el indice parcial de staff, para no tocar una fila
+    // 'paciente' que esta misma persona pudiera tener en la clinica.
     const { rows: relacion } = await pool.query(
       `insert into usuarios_empresas_rol (usuario_id, empresa_id, rol)
        values ($1, $2, coalesce($3, 'recepcionista'))
-       on conflict (usuario_id, empresa_id) do update set rol = excluded.rol
+       on conflict (usuario_id, empresa_id) where rol <> 'paciente' do update set rol = excluded.rol
        returning rol`,
       [usuarioId, empresaDestino, rol]
     );
@@ -107,7 +115,7 @@ async function actualizar(req, res, next) {
     const { nombre, password, avatar, telefono, acepta_whatsapp, activo, rol, es_super_admin } = req.body;
 
     const pertenece = await pool.query(
-      'select 1 from usuarios_empresas_rol where usuario_id = $1 and empresa_id = $2',
+      "select 1 from usuarios_empresas_rol where usuario_id = $1 and empresa_id = $2 and rol <> 'paciente'",
       [req.params.id, req.empresaId]
     );
     if (!pertenece.rows[0]) return res.status(404).json({ mensaje: 'Usuario no encontrado en esta clinica' });
@@ -135,8 +143,10 @@ async function actualizar(req, res, next) {
     );
 
     if (rol) {
+      // Solo la fila de staff -- si esta persona ademas es paciente de
+      // esta clinica, su fila 'paciente' no debe verse afectada.
       await pool.query(
-        'update usuarios_empresas_rol set rol = $1 where usuario_id = $2 and empresa_id = $3',
+        "update usuarios_empresas_rol set rol = $1 where usuario_id = $2 and empresa_id = $3 and rol <> 'paciente'",
         [rol, req.params.id, req.empresaId]
       );
     }
@@ -145,18 +155,21 @@ async function actualizar(req, res, next) {
       `select u.id, u.nombre, u.email, u.telefono, u.acepta_whatsapp, u.activo, u.avatar, u.es_super_admin, uer.rol, u.created_at
        from usuarios u
        join usuarios_empresas_rol uer on uer.usuario_id = u.id
-       where u.id = $1 and uer.empresa_id = $2`,
+       where u.id = $1 and uer.empresa_id = $2 and uer.rol <> 'paciente'`,
       [req.params.id, req.empresaId]
     );
     res.json(rows[0]);
   } catch (err) { next(err); }
 }
 
-// DELETE /api/usuarios/:id  -> quita al usuario de la clinica activa
+// DELETE /api/usuarios/:id  -> quita al usuario del STAFF de la clinica
+// activa. Si ademas es paciente de esta clinica, ese acceso NO se toca
+// (son cosas independientes -- dejar de trabajar ahi no le quita su
+// portal de paciente).
 async function eliminar(req, res, next) {
   try {
     const { rowCount } = await pool.query(
-      'delete from usuarios_empresas_rol where usuario_id = $1 and empresa_id = $2',
+      "delete from usuarios_empresas_rol where usuario_id = $1 and empresa_id = $2 and rol <> 'paciente'",
       [req.params.id, req.empresaId]
     );
     if (!rowCount) return res.status(404).json({ mensaje: 'Usuario no encontrado en esta clinica' });

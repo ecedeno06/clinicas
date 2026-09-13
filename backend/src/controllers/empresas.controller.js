@@ -63,14 +63,15 @@ async function listarUsuariosGlobales(req, res, next) {
   } catch (err) { next(err); }
 }
 
-// GET /api/empresas/:id/usuarios
+// GET /api/empresas/:id/usuarios -- solo STAFF (el rol 'paciente' no
+// aplica a esta pantalla de gestion de super-admin).
 async function listarUsuariosDeEmpresa(req, res, next) {
   try {
     const { rows } = await pool.query(
       `select u.id, u.nombre, u.email, uer.rol
        from usuarios_empresas_rol uer
        join usuarios u on u.id = uer.usuario_id
-       where uer.empresa_id = $1
+       where uer.empresa_id = $1 and uer.rol <> 'paciente'
        order by u.nombre`,
       [req.params.id]
     );
@@ -84,10 +85,12 @@ async function asociarUsuario(req, res, next) {
     const { usuario_id, rol } = req.body;
     if (!usuario_id) return res.status(400).json({ mensaje: 'usuario_id es requerido' });
 
+    // El arbitro del upsert es el indice parcial de staff, para no tocar
+    // una fila 'paciente' que este usuario pudiera tener en la clinica.
     const { rows } = await pool.query(
       `insert into usuarios_empresas_rol (usuario_id, empresa_id, rol)
        values ($1, $2, coalesce($3, 'recepcionista'))
-       on conflict (usuario_id, empresa_id) do update set rol = excluded.rol
+       on conflict (usuario_id, empresa_id) where rol <> 'paciente' do update set rol = excluded.rol
        returning rol`,
       [usuario_id, req.params.id, rol]
     );
@@ -99,11 +102,11 @@ async function asociarUsuario(req, res, next) {
   } catch (err) { next(err); }
 }
 
-// DELETE /api/empresas/:id/usuarios/:usuarioId
+// DELETE /api/empresas/:id/usuarios/:usuarioId -- solo la fila de staff.
 async function desasociarUsuario(req, res, next) {
   try {
     const { rowCount } = await pool.query(
-      'delete from usuarios_empresas_rol where usuario_id = $1 and empresa_id = $2',
+      "delete from usuarios_empresas_rol where usuario_id = $1 and empresa_id = $2 and rol <> 'paciente'",
       [req.params.usuarioId, req.params.id]
     );
     if (!rowCount) return res.status(404).json({ mensaje: 'El usuario no esta asociado a esta clinica' });

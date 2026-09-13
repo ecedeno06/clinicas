@@ -611,6 +611,10 @@ export class PacientesComponent implements OnInit {
             foto: res.paciente.foto ?? null,
             fecha_nacimiento: res.paciente.fecha_nacimiento?.substring(0, 10) ?? '',
             sexo: res.paciente.sexo ?? '',
+            estado_civil: res.paciente.estado_civil ?? '',
+            estado_laboral: res.paciente.estado_laboral ?? '',
+            tipo_trabajo: res.paciente.tipo_trabajo ?? '',
+            lugar_trabajo: res.paciente.lugar_trabajo ?? '',
             telefono: res.paciente.telefono ?? '',
             acepta_whatsapp: res.paciente.acepta_whatsapp ?? false,
             email: res.paciente.email ?? '',
@@ -666,6 +670,29 @@ export class PacientesComponent implements OnInit {
     this.srv.eliminar(p.id).subscribe({
       next: () => this.cargar(),
       error: (err) => alert(err?.error?.mensaje || 'No se pudo eliminar el paciente'),
+    });
+  }
+
+  puedeInvitarPaciente(): boolean {
+    const rol = this.auth.usuario()?.rol;
+    return this.auth.esSuperAdmin() || rol === 'admin' || rol === 'doctor';
+  }
+
+  invitarAcceso(p: Paciente): void {
+    if (!confirm(`Se enviara un correo a ${p.email} con sus credenciales de acceso. Continuar?`)) return;
+    this.srv.invitar(p.id).subscribe({
+      next: () => { alert('Invitacion enviada.'); this.cargar(); },
+      error: (err) => alert(err?.error?.mensaje || 'No se pudo enviar la invitacion'),
+    });
+  }
+
+  // Revoca el acceso de paciente en ESTA clinica -- no borra su cuenta ni
+  // su acceso de paciente en otras clinicas donde tambien lo tenga.
+  desinvitarAcceso(p: Paciente): void {
+    if (!confirm(`Quitar el acceso de paciente de "${p.nombre}" a esta clinica? Podras volver a invitarlo cuando quieras.`)) return;
+    this.srv.desinvitar(p.id).subscribe({
+      next: () => { this.cargar(); },
+      error: (err) => alert(err?.error?.mensaje || 'No se pudo quitar el acceso'),
     });
   }
 

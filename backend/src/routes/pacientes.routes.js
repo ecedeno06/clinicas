@@ -3,7 +3,9 @@ const ctrl = require('../controllers/pacientes.controller');
 const antecedentesCtrl = require('../controllers/pacienteAntecedentes.controller');
 const { requireAuth, requireEmpresa, requireRol } = require('../middleware/auth');
 
-router.use(requireAuth, requireEmpresa);
+// Este router es de gestion clinica (staff): el rol 'paciente' no accede
+// aqui, solo a su propio portal (ver portalPaciente.routes.js).
+router.use(requireAuth, requireEmpresa, requireRol('admin', 'doctor', 'recepcionista'));
 
 router.get('/', ctrl.listar);
 router.get('/buscar', ctrl.buscarPorIdentificacion);
@@ -21,5 +23,7 @@ router.post('/:id/antecedentes', antecedentesCtrl.crear);
 router.post('/', requireRol('admin', 'recepcionista'), ctrl.crear);
 router.put('/:id', requireRol('admin', 'recepcionista'), ctrl.actualizar);
 router.delete('/:id', requireRol('admin'), ctrl.eliminar);
+router.post('/:id/invitar', requireRol('admin', 'doctor'), ctrl.invitar);
+router.delete('/:id/invitar', requireRol('admin', 'doctor'), ctrl.desinvitar);
 
 module.exports = router;

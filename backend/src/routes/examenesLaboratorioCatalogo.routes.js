@@ -2,8 +2,9 @@ const router = require('express').Router();
 const ctrl = require('../controllers/examenesLaboratorioCatalogo.controller');
 const { requireAuth, requireEmpresa, requireRol } = require('../middleware/auth');
 
-// Mismo criterio que categoriasExamenesLaboratorio.routes.js.
-router.use(requireAuth, requireEmpresa);
+// Mismo criterio que categoriasExamenesLaboratorio.routes.js (el rol
+// 'paciente' no accede aqui).
+router.use(requireAuth, requireEmpresa, requireRol('admin', 'doctor', 'recepcionista'));
 
 router.get('/', ctrl.listar);
 router.post('/', requireRol('admin'), ctrl.crear);

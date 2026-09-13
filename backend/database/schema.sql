@@ -76,10 +76,12 @@ create table if not exists usuarios_empresas_rol (
     id              uuid primary key default gen_random_uuid(),
     usuario_id      uuid not null references usuarios(id) on delete cascade,
     empresa_id      uuid not null references empresas(id) on delete cascade,
-    rol             text not null check (rol in ('admin', 'doctor', 'recepcionista')) default 'recepcionista',
+    rol             text not null check (rol in ('admin', 'doctor', 'recepcionista', 'paciente')) default 'recepcionista',
     created_at      timestamptz not null default now(),
-    updated_at      timestamptz not null default now(),
-    unique (usuario_id, empresa_id)
+    updated_at      timestamptz not null default now()
+    -- Un mismo usuario puede tener a lo sumo un rol de staff Y a lo sumo
+    -- un rol 'paciente' en la MISMA clinica (ver los dos indices unicos
+    -- parciales mas abajo) -- nunca dos roles de staff a la vez.
 );
 
 -- ---------------------------------------------------------
@@ -225,9 +227,15 @@ create table if not exists pacientes (
     alergias            text,
     -- Foto del paciente en base64 (data URI), igual que usuarios.avatar
     foto                text,
+    -- Cuenta con la que este paciente puede loguearse (rol 'paciente' en
+    -- usuarios_empresas_rol), si fue invitado. Igual patron que
+    -- doctores.usuario_id: nullable, on delete set null.
+    usuario_id          uuid references usuarios(id) on delete set null,
     created_at          timestamptz not null default now(),
     updated_at          timestamptz not null default now()
 );
+
+create unique index if not exists uq_pacientes_usuario on pacientes(usuario_id) where usuario_id is not null;
 
 -- Un paciente puede tener varias direcciones (casa, trabajo, etc.), una
 -- marcada como principal -- esa es la que usan Google Maps/Waze/WhatsApp
@@ -627,7 +635,7 @@ create table if not exists sesiones (
     empresa_nombre    text,
     sucursal_id       uuid references sucursales(id) on delete set null,
     sucursal_nombre   text,
-    rol               text check (rol is null or rol in ('admin', 'doctor', 'recepcionista')),
+    rol               text check (rol is null or rol in ('admin', 'doctor', 'recepcionista', 'paciente')),
     token             text not null unique,
     activo            boolean not null default true,
     razon_salida      text,
@@ -678,6 +686,10 @@ create index if not exists idx_dos_factor_recovery_tokens_usuario on dos_factor_
 create index if not exists idx_dos_factor_recovery_tokens_token_activo on dos_factor_recovery_tokens(token) where usado = false;
 create index if not exists idx_usuarios_empresas_rol_usuario on usuarios_empresas_rol(usuario_id);
 create index if not exists idx_usuarios_empresas_rol_empresa on usuarios_empresas_rol(empresa_id);
+create unique index if not exists uq_usuarios_empresas_rol_staff
+  on usuarios_empresas_rol(usuario_id, empresa_id) where rol <> 'paciente';
+create unique index if not exists uq_usuarios_empresas_rol_paciente
+  on usuarios_empresas_rol(usuario_id, empresa_id) where rol = 'paciente';
 create index if not exists idx_pacientes_empresas_paciente on pacientes_empresas(paciente_id);
 create index if not exists idx_pacientes_empresas_empresa on pacientes_empresas(empresa_id);
 create index if not exists idx_direcciones_paciente_paciente on direcciones_paciente(paciente_id);

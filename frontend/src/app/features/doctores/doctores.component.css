@@ -45,8 +45,6 @@
   justify-content: center;
   gap: 4px;
   text-align: center;
-  background: var(--tint-green-bg);
-  color: var(--text-on-tint-green);
   border-radius: 7px;
   padding: 5px 4px;
   font-size: 9.5px;
@@ -54,6 +52,19 @@
   font-weight: 600;
   white-space: normal;
   word-break: break-word;
+}
+
+/* Verde = bloque de la clinica activa de la sesion; ambar = bloque de
+   OTRA clinica donde este mismo doctor tambien atiende (siempre visible
+   para dar el panorama completo, pero visualmente distinto -- ver
+   puedeGestionarHorario() en el componente para el permiso asociado). */
+.horario-slot-block.horario-slot-clinica-activa {
+  background: var(--tint-green-bg);
+  color: var(--text-on-tint-green);
+}
+.horario-slot-block.horario-slot-otra-clinica {
+  background: var(--tint-amber-bg);
+  color: var(--text-on-tint-amber);
 }
 
 .horario-slot-block.horario-slot-inactivo {

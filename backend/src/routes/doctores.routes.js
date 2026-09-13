@@ -3,7 +3,8 @@ const ctrl = require('../controllers/doctores.controller');
 const horariosCtrl = require('../controllers/doctorHorarios.controller');
 const { requireAuth, requireEmpresa, requireRol } = require('../middleware/auth');
 
-router.use(requireAuth, requireEmpresa);
+// Router de gestion clinica (staff): el rol 'paciente' no accede aqui.
+router.use(requireAuth, requireEmpresa, requireRol('admin', 'doctor', 'recepcionista'));
 
 router.get('/', ctrl.listar);
 router.get('/buscar', ctrl.buscarPorIdentificacion);

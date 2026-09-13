@@ -18,5 +18,6 @@ router.use('/paciente-antecedentes', require('./pacienteAntecedentes.routes'));
 router.use('/horarios', require('./doctorHorarios.routes'));
 router.use('/laboratorio', require('./laboratorio.routes'));
 router.use('/geocodificacion', require('./geocodificacion.routes'));
+router.use('/portal-paciente', require('./portalPaciente.routes'));
 
 module.exports = router;

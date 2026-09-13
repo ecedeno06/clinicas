@@ -40,6 +40,25 @@ async function verificarDoctorDeLaEmpresa(doctorId, empresaId) {
   return !!rows[0];
 }
 
+// Resuelve el doctor_id vinculado a la cuenta logueada (si es una cuenta
+// de doctor con acceso al sistema, ver doctores.usuario_id) -- null si no
+// aplica (staff que no es tambien doctor, o doctor sin cuenta vinculada).
+async function miDoctorId(usuarioId) {
+  const { rows } = await pool.query('select id from doctores where usuario_id = $1', [usuarioId]);
+  return rows[0]?.id || null;
+}
+
+// El doctor DUENO de la jornada la puede deshabilitar/eliminar sin
+// importar la clinica (todas sus sedes, incluso las de otra clinica
+// donde tambien trabaje). La clinica (admin) solo puede tocar la jornada
+// si es de SU sucursal activa -- nunca la de otra clinica del mismo
+// doctor. `horario` debe traer `sucursal_empresa_id` (ver listarPorDoctor).
+async function puedeGestionarHorario(req, horario) {
+  const propioId = await miDoctorId(req.usuario.id);
+  if (propioId && propioId === horario.doctor_id) return true;
+  return req.usuario.rol === 'admin' && horario.sucursal_empresa_id === req.empresaId;
+}
+
 // Evita que un mismo doctor tenga dos bloques que se crucen el mismo dia.
 async function hayChoqueDeBloque({ doctorId, diaSemana, horaInicio, horaFin, excluirId }) {
   const valores = [doctorId, diaSemana, horaFin, horaInicio];
@@ -70,8 +89,12 @@ async function listarPorDoctor(req, res, next) {
     // habilitarlos), solo dejan de contar para el calculo de disponibilidad
     // en Citas (ver disponibilidad() mas abajo, que si sigue filtrando por
     // activo = true) y para el chequeo de choque de horario.
+    // sucursal_empresa_id: de que clinica es CADA bloque (un doctor puede
+    // atender en varias) -- el frontend lo usa para pintar en verde los
+    // bloques de la clinica activa de la sesion y en ambar los de otra, y
+    // para decidir si el boton de deshabilitar/eliminar esta habilitado.
     const { rows } = await pool.query(
-      `select dh.*, s.nombre as sucursal_nombre
+      `select dh.*, s.nombre as sucursal_nombre, s.empresa_id as sucursal_empresa_id
        from doctor_horarios dh
        join sucursales s on s.id = dh.sucursal_id
        where dh.doctor_id = $1
@@ -127,12 +150,16 @@ async function actualizar(req, res, next) {
     const { dia_semana, hora_inicio, hora_fin, activo, sucursal_id } = req.body;
 
     const actual = await pool.query(
-      `select dh.* from doctor_horarios dh join doctores_empresas de on de.doctor_id = dh.doctor_id
-       where dh.id = $1 and de.empresa_id = $2`,
-      [req.params.id, req.empresaId]
+      `select dh.*, s.empresa_id as sucursal_empresa_id
+       from doctor_horarios dh join sucursales s on s.id = dh.sucursal_id
+       where dh.id = $1`,
+      [req.params.id]
     );
     if (!actual.rows[0]) return res.status(404).json({ mensaje: 'Horario no encontrado' });
     const horario = actual.rows[0];
+    if (!(await puedeGestionarHorario(req, horario))) {
+      return res.status(404).json({ mensaje: 'Horario no encontrado' });
+    }
 
     const nuevoDia = dia_semana ?? horario.dia_semana;
     const nuevoInicio = hora_inicio || horario.hora_inicio;
@@ -184,18 +211,26 @@ async function eliminar(req, res, next) {
     await client.query('BEGIN');
 
     const horario = await client.query(
-      `select h.* from doctor_horarios h
-       join doctores_empresas de on de.doctor_id = h.doctor_id
-       where h.id = $1 and de.empresa_id = $2
+      `select h.*, s.empresa_id as sucursal_empresa_id
+       from doctor_horarios h join sucursales s on s.id = h.sucursal_id
+       where h.id = $1
        for update`,
-      [req.params.id, req.empresaId]
+      [req.params.id]
     );
     if (!horario.rows[0]) {
       await client.query('ROLLBACK');
       return res.status(404).json({ mensaje: 'Horario no encontrado' });
     }
     const h = horario.rows[0];
+    if (!(await puedeGestionarHorario(req, h))) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ mensaje: 'Horario no encontrado' });
+    }
 
+    // La clinica de las citas afectadas es la del bloque que se borra
+    // (h.sucursal_empresa_id), NO necesariamente req.empresaId -- un
+    // doctor puede estar eliminando un bloque de una clinica distinta a
+    // la que tiene activa en su sesion.
     const objetivo = await client.query(
       `select id, estado from citas
        where doctor_id = $1
@@ -206,7 +241,7 @@ async function eliminar(req, res, next) {
          and hora_inicio >= $4
          and hora_fin <= $5
        for update`,
-      [h.doctor_id, req.empresaId, h.dia_semana, h.hora_inicio, h.hora_fin]
+      [h.doctor_id, h.sucursal_empresa_id, h.dia_semana, h.hora_inicio, h.hora_fin]
     );
 
     for (const row of objetivo.rows) {

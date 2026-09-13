@@ -104,7 +104,26 @@ async function buscarPorIdentificacion(req, res, next) {
     const identificacion = (req.query.identificacion || '').trim();
     if (!identificacion) return res.status(400).json({ mensaje: 'identificacion es requerida' });
 
-    const { rows } = await pool.query('select * from doctores where identificacion = $1', [identificacion]);
+    // Incluye especialidades -- son un hecho global de la persona (ver
+    // comentario de SELECT_DOCTOR), no dependen de la clinica actual, asi
+    // que se copian igual que nombre/telefono cuando el doctor ya existe
+    // en otra clinica de la red. Sin join a doctores_empresas: este
+    // doctor puede no estar vinculado todavia a NINGUNA clinica.
+    const { rows } = await pool.query(
+      `select d.*,
+              coalesce((
+                select json_agg(json_build_object('especialidad_id', e.id, 'nombre', e.nombre, 'numero_colegiado', de2.numero_colegiado) order by e.nombre)
+                from doctor_especialidades de2 join especialidades e on e.id = de2.especialidad_id
+                where de2.doctor_id = d.id
+              ), '[]') as especialidades,
+              (
+                select string_agg(e.nombre, ', ' order by e.nombre)
+                from doctor_especialidades de2 join especialidades e on e.id = de2.especialidad_id
+                where de2.doctor_id = d.id
+              ) as especialidad_nombre
+       from doctores d where d.identificacion = $1`,
+      [identificacion]
+    );
     if (!rows[0]) return res.json({ existe: false });
     res.json({ existe: true, doctor: rows[0] });
   } catch (err) { next(err); }

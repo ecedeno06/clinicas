@@ -1,0 +1,261 @@
+<div class="page-header">
+  <div>
+    <h1>Mis Citas</h1>
+    <div class="desc">Historial clinico de todas las clinicas donde tienes acceso</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="tabs">
+    <button type="button" class="tab-btn" [class.active]="tabSuperior() === 'consultas'" (click)="tabSuperior.set('consultas')">Consultas</button>
+    <button type="button" class="tab-btn" [class.active]="tabSuperior() === 'antecedentes'" (click)="tabSuperior.set('antecedentes')">
+      Antecedentes
+      @if (alergias()) {
+        <span class="tab-badge" style="background: var(--text-on-tint-green);">!</span>
+      }
+    </button>
+  </div>
+
+  @if (tabSuperior() === 'consultas') {
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr><th>Clinica</th><th>Fecha</th><th>Hora</th><th>Doctor</th><th>Sucursal</th><th>Estado</th><th>Diagnostico</th></tr>
+          <tr class="filter-row">
+            <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroClinica()" (ngModelChange)="filtroClinica.set($event)" /></th>
+            <th><input class="input" type="text" placeholder="dd/mm/aaaa" [ngModel]="filtroFecha()" (ngModelChange)="filtroFecha.set($event)" /></th>
+            <th></th>
+            <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroDoctor()" (ngModelChange)="filtroDoctor.set($event)" /></th>
+            <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroSucursal()" (ngModelChange)="filtroSucursal.set($event)" /></th>
+            <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroEstado()" (ngModelChange)="filtroEstado.set($event)" /></th>
+            <th>
+              @if (hayFiltros()) { <button type="button" class="btn btn-outline btn-sm" (click)="limpiarFiltros()">Limpiar</button> }
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          @if (cargandoHistorial()) {
+            <tr><td colspan="7"><div class="empty-state">Cargando historial...</div></td></tr>
+          } @else if (error()) {
+            <tr><td colspan="7"><div class="empty-state">{{ error() }}</div></td></tr>
+          } @else {
+            @for (h of historialFiltrado(); track h.id) {
+              <tr class="row-clickable" [class.row-selected]="historialSeleccionado()?.id === h.id" (click)="seleccionarHistorial(h)">
+                <td>{{ h.empresa_nombre }}</td>
+                <td style="white-space: nowrap;">{{ h.fecha_cita | date:'dd/MM/yyyy':'UTC' }}</td>
+                <td style="white-space: nowrap;">{{ h.hora_cita?.substring(0, 5) || '-' }}</td>
+                <td>{{ h.doctor_nombre }} <div class="text-muted text-sm">{{ h.especialidad_nombre }}</div></td>
+                <td>
+                  {{ h.sucursal_nombre || '-' }}
+                  @if (h.es_domicilio) {
+                    <div><span class="badge badge-violet">Domicilio</span></div>
+                  }
+                </td>
+                <td>
+                  <span class="badge"
+                    [class.badge-slate]="h.estado === 'pendiente'"
+                    [class.badge-amber]="h.estado === 'confirmada'"
+                    [class.badge-green]="h.estado === 'atendida'"
+                    [class.badge-red]="h.estado === 'cancelada' || h.estado === 'no_asistio'"
+                    [class.badge-violet]="h.estado === 'reagendar'">
+                    {{ estadoEtiqueta(h.estado) }}
+                  </span>
+                </td>
+                <td>
+                  <div>{{ h.diagnostico || '-' }}</div>
+                  @if (h.tratamiento) { <div class="text-muted text-sm">Tratamiento: {{ h.tratamiento }}</div> }
+                  @if (h.notas) { <div class="text-muted text-sm">{{ h.notas }}</div> }
+                </td>
+              </tr>
+            } @empty {
+              <tr><td colspan="7"><div class="empty-state">Todavia no tienes historial clinico.</div></td></tr>
+            }
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card mt-16">
+      <div class="tabs">
+        <button type="button" class="tab-btn" [class.active]="tabInferior() === 'signos'" (click)="tabInferior.set('signos')">Signos vitales</button>
+        <button type="button" class="tab-btn" [class.active]="tabInferior() === 'receta'" (click)="tabInferior.set('receta')">
+          Receta {{ recetasSeleccionadas().length > 0 ? '(' + recetasSeleccionadas().length + ')' : '' }}
+        </button>
+        <button type="button" class="tab-btn" [class.active]="tabInferior() === 'laboratorio'" (click)="tabInferior.set('laboratorio')">
+          Laboratorio{{ ordenesLaboratorioSeleccionadas().length > 0 ? '(' + ordenesLaboratorioSeleccionadas().length + ')' : '' }}
+        </button>
+        <button type="button" class="tab-btn" [class.active]="tabInferior() === 'evaluacion'" (click)="tabInferior.set('evaluacion')">Evaluacion</button>
+      </div>
+
+      @if (!historialSeleccionado()) {
+        <div class="empty-state">Selecciona una consulta de la lista para ver este detalle.</div>
+      } @else {
+        <div class="text-muted text-sm" style="margin-bottom:8px;">
+          {{ historialSeleccionado()!.empresa_nombre }} &middot; {{ historialSeleccionado()!.fecha_cita | date:'dd/MM/yyyy':'UTC' }} &middot; {{ historialSeleccionado()!.doctor_nombre }}
+        </div>
+
+        @if (tabInferior() === 'signos') {
+          @if (cargandoSignosSeleccionado()) {
+            <div class="empty-state">Cargando...</div>
+          } @else {
+            @if (signosVitalesSeleccionado(); as sv) {
+              <div class="stats-grid">
+                <div><div class="text-muted text-sm">Temperatura</div><div>{{ sv.temperatura ?? '-' }} °C</div></div>
+                <div><div class="text-muted text-sm">Peso</div><div>{{ sv.peso ?? '-' }} kg</div></div>
+                <div><div class="text-muted text-sm">Talla</div><div>{{ sv.talla ?? '-' }} cm</div></div>
+                <div>
+                  <div class="text-muted text-sm">IMC</div>
+                  <div>
+                    {{ sv.imc ?? '-' }} kg/m²
+                    @if (claseImc(sv.imc); as clasificacion) {
+                      <span class="badge" [class.badge-green]="clasificacion.clase === 'badge-green'" [class.badge-amber]="clasificacion.clase === 'badge-amber'" [class.badge-red]="clasificacion.clase === 'badge-red'">
+                        {{ clasificacion.etiqueta }}
+                      </span>
+                    }
+                  </div>
+                </div>
+                <div>
+                  <div class="text-muted text-sm">Presion arterial</div>
+                  <div>
+                    {{ sv.presion_sistolica ?? '-' }} / {{ sv.presion_diastolica ?? '-' }} mmHg
+                    @if (clasePresion(sv.presion_sistolica, sv.presion_diastolica); as presion) {
+                      <span class="badge" [class.badge-green]="presion.clase === 'badge-green'" [class.badge-amber]="presion.clase === 'badge-amber'" [class.badge-red]="presion.clase === 'badge-red'">
+                        {{ presion.etiqueta }}
+                      </span>
+                    }
+                  </div>
+                </div>
+                <div>
+                  <div class="text-muted text-sm">Glucosa</div>
+                  <div>
+                    {{ sv.glucosa ?? '-' }} mg/dL
+                    @if (claseGlucosa(sv.glucosa); as glucosa) {
+                      <span class="badge" [class.badge-green]="glucosa.clase === 'badge-green'" [class.badge-amber]="glucosa.clase === 'badge-amber'" [class.badge-red]="glucosa.clase === 'badge-red'">
+                        {{ glucosa.etiqueta }}
+                      </span>
+                    }
+                  </div>
+                </div>
+                <div><div class="text-muted text-sm">Glucosa glicosilada (HbA1c)</div><div>{{ sv.glucosa_glicosilada ?? '-' }} %</div></div>
+              </div>
+            } @else {
+              <div class="empty-state">No se registraron signos vitales para esta consulta.</div>
+            }
+          }
+        } @else if (tabInferior() === 'receta') {
+          @if (cargandoRecetaSeleccionada()) {
+            <div class="empty-state">Cargando...</div>
+          } @else {
+            @for (r of recetasSeleccionadas(); track r.id) {
+              <div class="card mt-16">
+                <div class="text-muted text-sm">{{ r.created_at | date:'dd/MM/yyyy HH:mm' }}</div>
+                <div class="table-wrap mt-16">
+                  <table class="data-table">
+                    <thead><tr><th>Medicamento</th><th>Dosis</th><th>Frecuencia</th><th>Duracion</th><th>Indicaciones</th></tr></thead>
+                    <tbody>
+                      @for (m of r.medicamentos; track m.id) {
+                        <tr>
+                          <td>{{ m.medicamento }}</td>
+                          <td>{{ m.dosis || '-' }}</td>
+                          <td>{{ m.frecuencia || '-' }}</td>
+                          <td>{{ m.duracion || '-' }}</td>
+                          <td>{{ m.indicaciones || '-' }}</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+                @if (r.indicaciones_generales) {
+                  <div class="text-muted text-sm mt-16">{{ r.indicaciones_generales }}</div>
+                }
+              </div>
+            } @empty {
+              <div class="empty-state">No se registraron recetas para esta consulta.</div>
+            }
+          }
+        } @else if (tabInferior() === 'laboratorio') {
+          @if (cargandoLaboratorioSeleccionado()) {
+            <div class="empty-state">Cargando...</div>
+          } @else {
+            @for (o of ordenesLaboratorioSeleccionadas(); track o.id) {
+              <div class="card mt-16">
+                <div class="flex items-center" style="justify-content: space-between;">
+                  <div class="text-muted text-sm">{{ o.created_at | date:'dd/MM/yyyy HH:mm' }}</div>
+                  <span class="badge"
+                    [class.badge-slate]="o.estado === 'pendiente'"
+                    [class.badge-green]="o.estado === 'completada'"
+                    [class.badge-red]="o.estado === 'cancelada'">
+                    {{ o.estado }}
+                  </span>
+                </div>
+                <div class="table-wrap mt-16">
+                  <table class="data-table">
+                    <thead><tr><th>Examen</th><th>Valor de referencia</th><th>Resultado</th><th>Unidad</th></tr></thead>
+                    <tbody>
+                      @for (e of o.examenes; track e.id) {
+                        <tr>
+                          <td>{{ e.nombre_examen }}</td>
+                          <td>{{ e.valor_referencia || '-' }}</td>
+                          <td>{{ e.resultado || '-' }}</td>
+                          <td>{{ e.unidad || '-' }}</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+                @if (o.observaciones) {
+                  <div class="text-muted text-sm mt-16">{{ o.observaciones }}</div>
+                }
+              </div>
+            } @empty {
+              <div class="empty-state">No se registraron ordenes de laboratorio para esta consulta.</div>
+            }
+          }
+        } @else {
+          <div class="form-group">
+            <label>Motivo de la cita</label>
+            <div>{{ historialSeleccionado()!.motivo_cita || 'No especificado' }}</div>
+          </div>
+          <div class="form-group mt-16">
+            <label>Motivo de la consulta</label>
+            <div>{{ historialSeleccionado()!.motivo_consulta || 'No especificado' }}</div>
+          </div>
+          <div class="form-group mt-16">
+            <label>Diagnostico</label>
+            <div>{{ historialSeleccionado()!.diagnostico || 'No especificado' }}</div>
+          </div>
+          <div class="form-group mt-16">
+            <label>Observaciones</label>
+            <div>{{ historialSeleccionado()!.notas || 'Sin observaciones' }}</div>
+          </div>
+        }
+      }
+    </div>
+  } @else {
+    <div class="form-group">
+      <label>Alergias</label>
+      <div>{{ alergias() || 'Ninguna registrada' }}</div>
+    </div>
+
+    <div class="table-wrap mt-16">
+      <table class="data-table">
+        <thead>
+          <tr><th>Categoria</th><th>Antecedente</th><th>Fecha inicio</th><th>Tratamiento</th><th>Doctor</th></tr>
+        </thead>
+        <tbody>
+          @for (a of antecedentes(); track a.id) {
+            <tr>
+              <td>{{ a.categoria_nombre }}</td>
+              <td>{{ a.antecedente_nombre }}</td>
+              <td>{{ a.fecha_inicio || '-' }}</td>
+              <td>{{ a.tratamiento || '-' }}</td>
+              <td>{{ a.doctor_nombre || '-' }}</td>
+            </tr>
+          } @empty {
+            <tr><td colspan="5"><div class="empty-state">Sin antecedentes patologicos registrados.</div></td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>

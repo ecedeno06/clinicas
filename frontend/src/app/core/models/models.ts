@@ -1,4 +1,4 @@
-export type Rol = 'admin' | 'doctor' | 'recepcionista';
+export type Rol = 'admin' | 'doctor' | 'recepcionista' | 'paciente';
 
 export interface Usuario {
   id: string;
@@ -92,10 +92,12 @@ export interface Campana {
   created_at?: string;
 }
 
-// Clinica a la que pertenece el usuario autenticado, con su rol en ella
+// Clinica a la que pertenece el usuario autenticado, con su rol en ella.
+// empresa_id/empresa_nombre son null solo para la opcion agregada de
+// paciente (rol 'paciente' sin clinica activa, ver auth.service.ts).
 export interface EmpresaSeleccionable {
-  empresa_id: string;
-  empresa_nombre: string;
+  empresa_id: string | null;
+  empresa_nombre: string | null;
   rol: Rol;
 }
 
@@ -187,6 +189,17 @@ export interface Paciente {
   antecedentes?: PacienteAntecedente[];
   alergias?: string;
   foto?: string | null;
+  // Cuenta con la que este paciente puede loguearse (rol 'paciente'), si
+  // fue invitado desde ALGUNA clinica -- ver PacientesService.invitar().
+  // OJO: es global (una sola cuenta para toda la red), no implica que
+  // tenga acceso de paciente en ESTA clinica en particular -- para eso
+  // usar tiene_acceso_esta_clinica.
+  usuario_id?: string | null;
+  // true solo si YA tiene rol 'paciente' asignado en la clinica activa
+  // (puede tener usuario_id seteado por acceso en otra clinica sin tener
+  // esto en true) -- lo que decide si el boton "Invitar acceso" del
+  // listado de Pacientes esta habilitado o muestra "Acceso activo".
+  tiene_acceso_esta_clinica?: boolean;
   activo: boolean;
   created_at?: string;
 }
@@ -258,6 +271,11 @@ export interface DoctorHorario {
   doctor_id: string;
   sucursal_id: string;
   sucursal_nombre?: string;
+  // De que clinica es esta sucursal -- un doctor puede atender en varias.
+  // El frontend lo usa para pintar el bloque (verde = clinica activa de
+  // la sesion, ambar = otra clinica) y para decidir si el boton de
+  // deshabilitar/eliminar esta habilitado para un admin normal.
+  sucursal_empresa_id?: string;
   dia_semana: number; // 0=domingo … 6=sabado
   hora_inicio: string;
   hora_fin: string;
@@ -337,6 +355,10 @@ export interface Cita {
 export interface HistoriaClinica {
   id: string;
   empresa_id?: string;
+  // Solo viene del portal del paciente (agrega citas de varias clinicas
+  // a la vez) -- el historial de staff siempre esta dentro de una sola
+  // clinica, no lo necesita.
+  empresa_nombre?: string;
   cita_id: string;
   paciente_id: string;
   doctor_id: string;

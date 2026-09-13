@@ -1,4 +1,7 @@
+const bcrypt = require('bcryptjs');
 const { pool } = require('../config/db');
+const { generarPasswordTemporal } = require('../utils/passwordTemporal');
+const { enviarCorreo } = require('../utils/correo');
 
 // tipo_trabajo/lugar_trabajo solo tienen sentido si estado_laboral es
 // 'trabaja' -- si no, se limpian para no dejar datos laborales viejos
@@ -65,11 +68,24 @@ const SELECT_ANTECEDENTES = `
   ), '[]') as antecedentes
 `;
 
+// El "usuario_id" del paciente es global (una sola cuenta para toda la
+// red), pero el acceso de paciente se otorga POR CLINICA
+// (usuarios_empresas_rol). Un paciente puede tener usuario_id seteado por
+// haber sido invitado en OTRA clinica sin tener todavia acceso en esta --
+// el frontend necesita distinguir ambos casos para el boton "Invitar
+// acceso" (ver pacientes.component.html).
+const TIENE_ACCESO_ESTA_CLINICA = `
+  exists(
+    select 1 from usuarios_empresas_rol uer
+    where uer.usuario_id = p.usuario_id and uer.empresa_id = pe.empresa_id and uer.rol = 'paciente'
+  ) as tiene_acceso_esta_clinica
+`;
+
 // GET /api/pacientes
 async function listar(req, res, next) {
   try {
     const { rows } = await pool.query(
-      `select p.*, pe.activo, ${SELECT_DIRECCIONES}, ${SELECT_FAMILIARES}, ${SELECT_ANTECEDENTES}
+      `select p.*, pe.activo, ${TIENE_ACCESO_ESTA_CLINICA}, ${SELECT_DIRECCIONES}, ${SELECT_FAMILIARES}, ${SELECT_ANTECEDENTES}
        from pacientes p
        join pacientes_empresas pe on pe.paciente_id = p.id
        where pe.empresa_id = $1
@@ -83,7 +99,7 @@ async function listar(req, res, next) {
 async function obtener(req, res, next) {
   try {
     const { rows } = await pool.query(
-      `select p.*, pe.activo, ${SELECT_DIRECCIONES}, ${SELECT_FAMILIARES}, ${SELECT_ANTECEDENTES}
+      `select p.*, pe.activo, ${TIENE_ACCESO_ESTA_CLINICA}, ${SELECT_DIRECCIONES}, ${SELECT_FAMILIARES}, ${SELECT_ANTECEDENTES}
        from pacientes p
        join pacientes_empresas pe on pe.paciente_id = p.id
        where p.id = $1 and pe.empresa_id = $2`,
@@ -140,7 +156,14 @@ async function buscarPorIdentificacion(req, res, next) {
     const identificacion = (req.query.identificacion || '').trim();
     if (!identificacion) return res.status(400).json({ mensaje: 'identificacion es requerida' });
 
-    const { rows } = await pool.query('select * from pacientes where identificacion = $1', [identificacion]);
+    // Incluye direcciones/familiares/antecedentes -- el frontend los usa
+    // para precargar el formulario de "Nuevo paciente" cuando la persona
+    // ya existe en otra clinica de la red (ver onIdentificacionBlur()).
+    const { rows } = await pool.query(
+      `select p.*, ${SELECT_DIRECCIONES}, ${SELECT_FAMILIARES}, ${SELECT_ANTECEDENTES}
+       from pacientes p where p.identificacion = $1`,
+      [identificacion]
+    );
     if (!rows[0]) return res.json({ existe: false });
     res.json({ existe: true, paciente: rows[0] });
   } catch (err) { next(err); }
@@ -190,7 +213,7 @@ async function crear(req, res, next) {
         `insert into pacientes (nombre, identificacion, fecha_nacimiento, sexo, telefono, acepta_whatsapp, email, alergias, foto, estado_civil, estado_laboral, tipo_trabajo, lugar_trabajo)
          values ($1,$2,$3,$4,$5, coalesce($6, false),$7,$8,$9,$10,$11,$12,$13) returning *`,
         [
-          nombre, identificacion || null, fecha_nacimiento || null, sexo, telefono, acepta_whatsapp, email,
+          nombre, identificacion || null, fecha_nacimiento || null, sexo || null, telefono, acepta_whatsapp, email,
           alergias, foto || null,
           estado_civil || null, estado_laboral || null, tipoTrabajo, lugarTrabajo,
         ]
@@ -212,7 +235,7 @@ async function crear(req, res, next) {
     await client.query('commit');
 
     const { rows } = await pool.query(
-      `select p.*, pe.activo, ${SELECT_DIRECCIONES}, ${SELECT_FAMILIARES}, ${SELECT_ANTECEDENTES}
+      `select p.*, pe.activo, ${TIENE_ACCESO_ESTA_CLINICA}, ${SELECT_DIRECCIONES}, ${SELECT_FAMILIARES}, ${SELECT_ANTECEDENTES}
        from pacientes p join pacientes_empresas pe on pe.paciente_id = p.id and pe.empresa_id = $2
        where p.id = $1`,
       [paciente.id, req.empresaId]
@@ -270,7 +293,7 @@ async function actualizar(req, res, next) {
          lugar_trabajo = $13
        where id = $14 returning *`,
       [
-        nombre, identificacion, fecha_nacimiento || null, sexo, telefono, acepta_whatsapp, email,
+        nombre, identificacion, fecha_nacimiento || null, sexo || null, telefono, acepta_whatsapp, email,
         alergias, foto,
         estado_civil || null, estado_laboral || null, tipoTrabajo, lugarTrabajo,
         req.params.id,
@@ -295,7 +318,7 @@ async function actualizar(req, res, next) {
     await client.query('commit');
 
     const { rows: final } = await pool.query(
-      `select p.*, pe.activo, ${SELECT_DIRECCIONES}, ${SELECT_FAMILIARES}, ${SELECT_ANTECEDENTES}
+      `select p.*, pe.activo, ${TIENE_ACCESO_ESTA_CLINICA}, ${SELECT_DIRECCIONES}, ${SELECT_FAMILIARES}, ${SELECT_ANTECEDENTES}
        from pacientes p join pacientes_empresas pe on pe.paciente_id = p.id and pe.empresa_id = $2
        where p.id = $1`,
       [req.params.id, req.empresaId]
@@ -471,4 +494,136 @@ async function recetasHistorial(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { listar, obtener, crear, actualizar, eliminar, historial, buscarPorIdentificacion, signosVitalesHistorial, laboratorioHistorial, recetasHistorial };
+// POST /api/pacientes/:id/invitar
+// Crea (o reutiliza) una cuenta de acceso de solo lectura para el paciente
+// (rol 'paciente' en usuarios_empresas_rol, solo ve su propio perfil y sus
+// citas -- ver portalPaciente.controller.js). Si el correo del paciente ya
+// es una cuenta existente (ej. tambien es doctor/admin en otra clinica), se
+// reutiliza esa misma cuenta en vez de crear una segunda -- pero nunca se le
+// pisa el rol que ya tenga en una clinica donde ya trabaja.
+async function invitar(req, res, next) {
+  const client = await pool.connect();
+  try {
+    const pacienteRes = await client.query(
+      `select p.* from pacientes p
+       join pacientes_empresas pe on pe.paciente_id = p.id
+       where p.id = $1 and pe.empresa_id = $2`,
+      [req.params.id, req.empresaId]
+    );
+    const paciente = pacienteRes.rows[0];
+    if (!paciente) return res.status(404).json({ mensaje: 'Paciente no encontrado' });
+    if (!paciente.email) return res.status(400).json({ mensaje: 'El paciente no tiene correo registrado' });
+
+    await client.query('begin');
+
+    let usuarioId = paciente.usuario_id;
+    let nuevaCuenta = false;
+    let passwordTemporal = null;
+
+    if (!usuarioId) {
+      const existente = await client.query('select id from usuarios where email = $1', [paciente.email]);
+      if (existente.rows[0]) {
+        usuarioId = existente.rows[0].id;
+      } else {
+        passwordTemporal = generarPasswordTemporal();
+        const passwordHash = await bcrypt.hash(passwordTemporal, 10);
+        const nuevo = await client.query(
+          `insert into usuarios (nombre, email, password_hash, activo, debe_cambiar_password)
+           values ($1, $2, $3, true, true) returning id`,
+          [paciente.nombre, paciente.email, passwordHash]
+        );
+        usuarioId = nuevo.rows[0].id;
+        nuevaCuenta = true;
+      }
+      await client.query('update pacientes set usuario_id = $1 where id = $2', [usuarioId, paciente.id]);
+    }
+
+    // Una cuenta puede tener a la vez un rol de staff (admin/doctor/
+    // recepcionista) Y el rol 'paciente' en la MISMA clinica -- ej. un
+    // admin que ademas es paciente de su propia clinica ve "Clinica
+    // (admin)" y "Clinica (paciente)" como opciones separadas al hacer
+    // login (ver auth.controller.js#continuarLoginTrasPassword). Por eso
+    // aqui solo bloqueamos si YA es paciente ahi, sin importar si tiene
+    // ademas un rol de staff.
+    const yaEsPaciente = await client.query(
+      "select 1 from usuarios_empresas_rol where usuario_id = $1 and empresa_id = $2 and rol = 'paciente'",
+      [usuarioId, req.empresaId]
+    );
+    if (yaEsPaciente.rows[0]) {
+      await client.query('rollback');
+      return res.status(409).json({ mensaje: 'Este paciente ya tiene acceso a esta clinica.' });
+    }
+    await client.query(
+      `insert into usuarios_empresas_rol (usuario_id, empresa_id, rol) values ($1, $2, 'paciente')`,
+      [usuarioId, req.empresaId]
+    );
+
+    const empresaRes = await client.query('select nombre from empresas where id = $1', [req.empresaId]);
+    const empresaNombre = empresaRes.rows[0]?.nombre || 'la clinica';
+
+    await client.query('commit');
+
+    const enlace = `${process.env.CORS_ORIGIN || 'http://localhost:4201'}/login`;
+    const correo = nuevaCuenta
+      ? {
+          destinatario: paciente.email,
+          asunto: `Acceso a tu portal de paciente - ${empresaNombre}`,
+          texto: `Hola ${paciente.nombre},\n\n${empresaNombre} te dio acceso a tu portal de paciente, donde puedes consultar tus datos y tus citas.\n\nUsuario: ${paciente.email}\nContrasena temporal: ${passwordTemporal}\n\nIngresa aqui: ${enlace}\n\nPor seguridad, se te pedira cambiar esta contrasena la primera vez que inicies sesion.`,
+        }
+      : {
+          destinatario: paciente.email,
+          asunto: `Acceso a tu portal de paciente - ${empresaNombre}`,
+          texto: `Hola ${paciente.nombre},\n\n${empresaNombre} te dio acceso a tu portal de paciente, donde puedes consultar tus datos y tus citas.\n\nYa tenias una cuenta en el sistema (${paciente.email}): inicia sesion con tu contrasena habitual.\n\nIngresa aqui: ${enlace}`,
+        };
+    enviarCorreo(correo).catch((err) => console.error('Error enviando correo de invitacion a paciente:', err.message));
+
+    const { rows: final } = await pool.query(
+      `select p.*, pe.activo, ${TIENE_ACCESO_ESTA_CLINICA}, ${SELECT_DIRECCIONES}, ${SELECT_FAMILIARES}, ${SELECT_ANTECEDENTES}
+       from pacientes p join pacientes_empresas pe on pe.paciente_id = p.id and pe.empresa_id = $2
+       where p.id = $1`,
+      [paciente.id, req.empresaId]
+    );
+    res.json(final[0]);
+  } catch (err) {
+    await client.query('rollback');
+    next(err);
+  } finally {
+    client.release();
+  }
+}
+
+// DELETE /api/pacientes/:id/invitar -- revoca el acceso de paciente en
+// ESTA clinica puntual (borra solo la fila usuarios_empresas_rol de esta
+// clinica). No borra la cuenta ni toca su acceso de paciente en otras
+// clinicas -- si tenia varias, sigue entrando como paciente para las
+// demas. pacientes.usuario_id no se limpia: el vinculo con la cuenta es
+// global y sigue siendo util si se le vuelve a invitar aqui despues.
+async function desinvitar(req, res, next) {
+  try {
+    const pacienteRes = await pool.query(
+      `select p.usuario_id from pacientes p
+       join pacientes_empresas pe on pe.paciente_id = p.id
+       where p.id = $1 and pe.empresa_id = $2`,
+      [req.params.id, req.empresaId]
+    );
+    const paciente = pacienteRes.rows[0];
+    if (!paciente) return res.status(404).json({ mensaje: 'Paciente no encontrado' });
+    if (!paciente.usuario_id) return res.status(404).json({ mensaje: 'Este paciente no tiene acceso en esta clinica' });
+
+    const { rowCount } = await pool.query(
+      "delete from usuarios_empresas_rol where usuario_id = $1 and empresa_id = $2 and rol = 'paciente'",
+      [paciente.usuario_id, req.empresaId]
+    );
+    if (!rowCount) return res.status(404).json({ mensaje: 'Este paciente no tiene acceso en esta clinica' });
+
+    const { rows: final } = await pool.query(
+      `select p.*, pe.activo, ${TIENE_ACCESO_ESTA_CLINICA}, ${SELECT_DIRECCIONES}, ${SELECT_FAMILIARES}, ${SELECT_ANTECEDENTES}
+       from pacientes p join pacientes_empresas pe on pe.paciente_id = p.id and pe.empresa_id = $2
+       where p.id = $1`,
+      [req.params.id, req.empresaId]
+    );
+    res.json(final[0]);
+  } catch (err) { next(err); }
+}
+
+module.exports = { listar, obtener, crear, actualizar, eliminar, historial, buscarPorIdentificacion, signosVitalesHistorial, laboratorioHistorial, recetasHistorial, invitar, desinvitar };

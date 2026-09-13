@@ -16,6 +16,7 @@ export class LoginComponent {
   cargando = signal(false);
   error = signal<string | null>(null);
   empresasParaElegir = signal<EmpresaSeleccionable[] | null>(null);
+  verPassword = signal(false);
 
   // Login detenido esperando el codigo de la app autenticadora.
   usuarioId2FA = signal<string | null>(null);
@@ -70,7 +71,7 @@ export class LoginComponent {
         } else if ('requiereSeleccionEmpresa' in res) {
           this.empresasParaElegir.set(res.empresas);
         } else {
-          this.router.navigate(['/dashboard']);
+          this.router.navigate(this.destinoTrasLogin());
         }
       },
       error: (err) => {
@@ -78,6 +79,12 @@ export class LoginComponent {
         this.error.set(err?.error?.mensaje || 'No se pudo iniciar sesion');
       },
     });
+  }
+
+  // El rol 'paciente' no tiene acceso a /dashboard (ver staff.guard.ts) --
+  // entra directo a su propio portal.
+  private destinoTrasLogin(): string[] {
+    return this.auth.usuario()?.rol === 'paciente' ? ['/portal/perfil'] : ['/dashboard'];
   }
 
   enviarCodigo2FA(): void {
@@ -91,7 +98,7 @@ export class LoginComponent {
           this.usuarioId2FA.set(null);
           this.empresasParaElegir.set(res.empresas);
         } else {
-          this.router.navigate(['/dashboard']);
+          this.router.navigate(this.destinoTrasLogin());
         }
       },
       error: (err) => {
@@ -209,11 +216,11 @@ export class LoginComponent {
     });
   }
 
-  elegirEmpresa(empresaId: string) {
+  elegirEmpresa(empresaId: string | null, rol: string) {
     this.cargando.set(true);
     this.error.set(null);
-    this.auth.seleccionarEmpresa(empresaId).subscribe({
-      next: () => this.router.navigate(['/dashboard']),
+    this.auth.seleccionarEmpresa(empresaId, rol).subscribe({
+      next: () => this.router.navigate(this.destinoTrasLogin()),
       error: (err) => {
         this.cargando.set(false);
         this.error.set(err?.error?.mensaje || 'No se pudo seleccionar la clinica');

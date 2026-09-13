@@ -95,11 +95,14 @@ export class AuthService {
       );
   }
 
-  // Completa el login cuando hay mas de una clinica, o cambia la clinica
-  // activa con la sesion ya iniciada.
-  seleccionarEmpresa(empresaId: string): Observable<LoginResponse> {
+  // Completa el login cuando hay mas de una clinica (o mas de un rol en
+  // la misma clinica, ej. admin + paciente), o cambia la clinica activa
+  // con la sesion ya iniciada. El rol va explicito porque una misma
+  // empresa_id puede tener dos filas para este usuario. empresaId es
+  // null para la opcion agregada de paciente (sin clinica activa).
+  seleccionarEmpresa(empresaId: string | null, rol: string): Observable<LoginResponse> {
     return this.http
-      .post<LoginResponse>(`${environment.apiUrl}/auth/seleccionar-empresa`, { empresa_id: empresaId })
+      .post<LoginResponse>(`${environment.apiUrl}/auth/seleccionar-empresa`, { empresa_id: empresaId, rol })
       .pipe(tap((res) => this.guardarSesionFinal(res)));
   }
 

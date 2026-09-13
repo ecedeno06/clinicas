@@ -2,12 +2,12 @@ const router = require('express').Router();
 const ctrl = require('../controllers/categoriasExamenesLaboratorio.controller');
 const { requireAuth, requireEmpresa, requireRol } = require('../middleware/auth');
 
-// Lectura: cualquier usuario logueado ve el catalogo global + el propio
-// de su clinica activa. Escritura: requiere rol admin en la clinica
-// activa (un super admin siempre lo tiene, ver auth.controller.js
-// seleccionarEmpresa) -- el controller valida ademas si la fila es
-// global o de otra clinica.
-router.use(requireAuth, requireEmpresa);
+// Lectura: cualquier usuario STAFF logueado ve el catalogo global + el
+// propio de su clinica activa (el rol 'paciente' no accede aqui).
+// Escritura: requiere rol admin en la clinica activa (un super admin
+// siempre lo tiene, ver auth.controller.js seleccionarEmpresa) -- el
+// controller valida ademas si la fila es global o de otra clinica.
+router.use(requireAuth, requireEmpresa, requireRol('admin', 'doctor', 'recepcionista'));
 
 router.get('/', ctrl.listar);
 router.post('/', requireRol('admin'), ctrl.crear);

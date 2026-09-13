@@ -2,7 +2,8 @@ const router = require('express').Router();
 const ctrl = require('../controllers/laboratorio.controller');
 const { requireAuth, requireEmpresa, requireRol } = require('../middleware/auth');
 
-router.use(requireAuth, requireEmpresa);
+// Router de gestion clinica (staff): el rol 'paciente' no accede aqui.
+router.use(requireAuth, requireEmpresa, requireRol('admin', 'doctor', 'recepcionista'));
 
 // Ordenes pendientes de toda la clinica (card del tablero). Debe ir antes
 // de '/:ordenId' para que Express no la confunda con un id.

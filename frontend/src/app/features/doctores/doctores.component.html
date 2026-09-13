@@ -136,13 +136,16 @@
             <div class="horario-day-head">{{ dia.substring(0, 3) }}</div>
             <div class="horario-day-body">
               @for (h of horariosPorDia(i); track h.id) {
-                <div class="horario-slot-block" [class.horario-slot-inactivo]="!h.activo">
+                <div class="horario-slot-block"
+                  [class.horario-slot-inactivo]="!h.activo"
+                  [class.horario-slot-clinica-activa]="esDeClinicaActiva(h)"
+                  [class.horario-slot-otra-clinica]="!esDeClinicaActiva(h)">
                   {{ formatoAmPm(h.hora_inicio) }}&ndash;{{ formatoAmPm(h.hora_fin) }}
                   <div class="text-muted text-sm">{{ h.sucursal_nombre }}</div>
                   @if (!h.activo) {
                     <div class="text-muted text-sm">Deshabilitado</div>
                   }
-                  @if (esAdmin()) {
+                  @if (puedeGestionarHorario(h)) {
                     <div class="horario-slot-acciones">
                       @if (h.activo) {
                         <button type="button" class="horario-slot-icon" title="Deshabilitar (no contar en disponibilidad)" aria-label="Deshabilitar" (click)="toggleActivoHorario(h)">

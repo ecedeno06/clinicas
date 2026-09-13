@@ -36,4 +36,16 @@ export class PacientesService {
   recetasHistorial(id: string): Observable<Receta[]> {
     return this.http.get<Receta[]>(`${this.base}/${id}/recetas-historial`);
   }
+
+  // Crea/reutiliza una cuenta de acceso de solo lectura para el paciente
+  // (rol 'paciente') y le envia el correo con las credenciales.
+  invitar(id: string): Observable<Paciente> {
+    return this.http.post<Paciente>(`${this.base}/${id}/invitar`, {});
+  }
+
+  // Revoca el acceso de paciente en ESTA clinica (no borra la cuenta ni
+  // su acceso en otras clinicas donde tambien sea paciente).
+  desinvitar(id: string): Observable<Paciente> {
+    return this.http.delete<Paciente>(`${this.base}/${id}/invitar`);
+  }
 }
