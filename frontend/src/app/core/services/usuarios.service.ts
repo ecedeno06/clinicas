@@ -17,4 +17,8 @@ export class UsuariosService {
   buscarPorEmail(email: string): Observable<{ existe: boolean; nombre?: string }> {
     return this.http.get<{ existe: boolean; nombre?: string }>(`${this.base}/buscar`, { params: { email } });
   }
+
+  resetearPassword(id: string): Observable<{ mensaje: string }> {
+    return this.http.post<{ mensaje: string }>(`${this.base}/${id}/resetear-password`, {});
+  }
 }

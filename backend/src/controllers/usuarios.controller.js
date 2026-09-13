@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const { pool } = require('../config/db');
-const { obtenerPolitica, validarPassword } = require('../utils/politicaPassword');
+const { obtenerPolitica, validarPassword, generarPasswordSegunPolitica } = require('../utils/politicaPassword');
+const { enviarCorreo } = require('../utils/correo');
 
 // GET /api/usuarios  -> STAFF de la clinica activa, con su rol. El rol
 // 'paciente' nunca aparece aqui -- esta pantalla es de gestion de staff,
@@ -184,4 +185,47 @@ async function eliminar(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { listar, obtener, crear, actualizar, eliminar, buscarPorEmail };
+// POST /api/usuarios/:id/resetear-password -- genera un password nuevo
+// (segun la politica activa, no solo el minimo) y lo envia por correo al
+// usuario; nunca se devuelve en la respuesta. El correo se envia ANTES
+// de guardar el cambio: si el envio falla, la contrasena actual no se
+// toca (evita dejar al usuario sin acceso y sin saber la clave nueva).
+async function resetearPassword(req, res, next) {
+  try {
+    const { rows } = await pool.query(
+      `select u.id, u.nombre, u.email from usuarios u
+       join usuarios_empresas_rol uer on uer.usuario_id = u.id
+       where u.id = $1 and uer.empresa_id = $2 and uer.rol <> 'paciente'`,
+      [req.params.id, req.empresaId]
+    );
+    const usuario = rows[0];
+    if (!usuario) return res.status(404).json({ mensaje: 'Usuario no encontrado en esta clinica' });
+
+    const politica = await obtenerPolitica();
+    const passwordTemporal = generarPasswordSegunPolitica(politica);
+    const password_hash = await bcrypt.hash(passwordTemporal, 10);
+
+    const empresaRes = await pool.query('select nombre from empresas where id = $1', [req.empresaId]);
+    const empresaNombre = empresaRes.rows[0]?.nombre || 'la clinica';
+    const enlace = `${process.env.CORS_ORIGIN || 'http://localhost:4201'}/login`;
+
+    try {
+      await enviarCorreo({
+        destinatario: usuario.email,
+        asunto: `Tu contrasena fue restablecida - ${empresaNombre}`,
+        texto: `Hola ${usuario.nombre},\n\nUn administrador de ${empresaNombre} restablecio tu contrasena.\n\nUsuario: ${usuario.email}\nContrasena temporal: ${passwordTemporal}\n\nIngresa aqui: ${enlace}\n\nPor seguridad, se te pedira cambiar esta contrasena la primera vez que inicies sesion.`,
+      });
+    } catch (err) {
+      return res.status(502).json({ mensaje: 'No se pudo enviar el correo con la nueva contrasena. Intenta de nuevo.' });
+    }
+
+    await pool.query(
+      'update usuarios set password_hash = $1, debe_cambiar_password = true where id = $2',
+      [password_hash, usuario.id]
+    );
+
+    res.json({ mensaje: `Se envio una nueva contrasena al correo ${usuario.email}` });
+  } catch (err) { next(err); }
+}
+
+module.exports = { listar, obtener, crear, actualizar, eliminar, buscarPorEmail, resetearPassword };

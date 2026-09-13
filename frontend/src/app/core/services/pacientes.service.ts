@@ -48,4 +48,8 @@ export class PacientesService {
   desinvitar(id: string): Observable<Paciente> {
     return this.http.delete<Paciente>(`${this.base}/${id}/invitar`);
   }
+
+  resetearPassword(id: string): Observable<{ mensaje: string }> {
+    return this.http.post<{ mensaje: string }>(`${this.base}/${id}/resetear-password`, {});
+  }
 }

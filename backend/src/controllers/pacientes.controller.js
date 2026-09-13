@@ -2,7 +2,7 @@ const bcrypt = require('bcryptjs');
 const { pool } = require('../config/db');
 const { generarPasswordTemporal } = require('../utils/passwordTemporal');
 const { enviarCorreo } = require('../utils/correo');
-const { obtenerPolitica } = require('../utils/politicaPassword');
+const { obtenerPolitica, generarPasswordSegunPolitica } = require('../utils/politicaPassword');
 
 // tipo_trabajo/lugar_trabajo solo tienen sentido si estado_laboral es
 // 'trabaja' -- si no, se limpian para no dejar datos laborales viejos
@@ -631,4 +631,53 @@ async function desinvitar(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { listar, obtener, crear, actualizar, eliminar, historial, buscarPorIdentificacion, signosVitalesHistorial, laboratorioHistorial, recetasHistorial, invitar, desinvitar };
+// POST /api/pacientes/:id/resetear-password -- solo si el paciente ya
+// tiene acceso de portal EN ESTA CLINICA (mismo criterio que
+// desinvitar). Genera un password nuevo (segun la politica activa, no
+// solo el minimo -- ver generarPasswordSegunPolitica) y lo envia por
+// correo; nunca se devuelve en la respuesta. El correo se envia ANTES de
+// guardar el cambio: si el envio falla, la contrasena actual no se
+// toca.
+async function resetearPassword(req, res, next) {
+  try {
+    const pacienteRes = await pool.query(
+      `select p.nombre, p.email, p.usuario_id, ${TIENE_ACCESO_ESTA_CLINICA}
+       from pacientes p
+       join pacientes_empresas pe on pe.paciente_id = p.id
+       where p.id = $1 and pe.empresa_id = $2`,
+      [req.params.id, req.empresaId]
+    );
+    const paciente = pacienteRes.rows[0];
+    if (!paciente) return res.status(404).json({ mensaje: 'Paciente no encontrado' });
+    if (!paciente.tiene_acceso_esta_clinica) {
+      return res.status(404).json({ mensaje: 'Este paciente no tiene acceso al portal en esta clinica' });
+    }
+
+    const politica = await obtenerPolitica();
+    const passwordTemporal = generarPasswordSegunPolitica(politica);
+    const password_hash = await bcrypt.hash(passwordTemporal, 10);
+
+    const empresaRes = await pool.query('select nombre from empresas where id = $1', [req.empresaId]);
+    const empresaNombre = empresaRes.rows[0]?.nombre || 'la clinica';
+    const enlace = `${process.env.CORS_ORIGIN || 'http://localhost:4201'}/login`;
+
+    try {
+      await enviarCorreo({
+        destinatario: paciente.email,
+        asunto: `Tu contrasena fue restablecida - ${empresaNombre}`,
+        texto: `Hola ${paciente.nombre},\n\n${empresaNombre} restablecio la contrasena de tu portal de paciente.\n\nUsuario: ${paciente.email}\nContrasena temporal: ${passwordTemporal}\n\nIngresa aqui: ${enlace}\n\nPor seguridad, se te pedira cambiar esta contrasena la primera vez que inicies sesion.`,
+      });
+    } catch (err) {
+      return res.status(502).json({ mensaje: 'No se pudo enviar el correo con la nueva contrasena. Intenta de nuevo.' });
+    }
+
+    await pool.query(
+      'update usuarios set password_hash = $1, debe_cambiar_password = true where id = $2',
+      [password_hash, paciente.usuario_id]
+    );
+
+    res.json({ mensaje: `Se envio una nueva contrasena al correo ${paciente.email}` });
+  } catch (err) { next(err); }
+}
+
+module.exports = { listar, obtener, crear, actualizar, eliminar, historial, buscarPorIdentificacion, signosVitalesHistorial, laboratorioHistorial, recetasHistorial, invitar, desinvitar, resetearPassword };

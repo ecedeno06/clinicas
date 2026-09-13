@@ -406,6 +406,11 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; colo
   cursor: pointer;
 }
 .btn-icon:hover { background: var(--slate-50); }
+.btn-icon:disabled { opacity: 0.6; cursor: default; }
+.btn-icon:disabled:hover { background: none; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin 0.8s linear infinite; }
 
 /* Insignia de "ya tiene registro" sobre un btn-icon de fila (esquina
    inferior derecha). Verde = ya registrado; para laboratorio tambien se

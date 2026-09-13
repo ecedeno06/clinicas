@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const { pool } = require('../config/db');
 const { porcentajeSimilitud } = require('./levenshtein');
 
@@ -43,4 +44,43 @@ function validarPista(pista, password, politica) {
   return errores;
 }
 
-module.exports = { obtenerPolitica, validarPassword, validarPista };
+const GEN_MAYUSCULAS = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // sin I/O -- se confunden con 1/0
+const GEN_MINUSCULAS = 'abcdefghijkmnpqrstuvwxyz';
+const GEN_NUMEROS = '23456789';
+const GEN_ESPECIALES = '!@#$%^&*-_+=';
+
+function elegirAlAzar(pool) {
+  return pool[crypto.randomInt(pool.length)];
+}
+
+function barajar(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = crypto.randomInt(i + 1);
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// Genera un password aleatorio (crypto.randomInt, no Math.random) que
+// cumple con TODA la politica activa -- a diferencia de
+// generarPasswordTemporal() (usada al invitar a un paciente), que solo
+// respeta la longitud minima. Se usa para "resetear password" de un
+// usuario de staff, donde el nuevo password se envia por correo sin
+// exponerse nunca en la respuesta de la API.
+function generarPasswordSegunPolitica(politica) {
+  const obligatorios = [];
+  if (politica.requiere_mayuscula) obligatorios.push(elegirAlAzar(GEN_MAYUSCULAS));
+  if (politica.requiere_minuscula) obligatorios.push(elegirAlAzar(GEN_MINUSCULAS));
+  if (politica.requiere_numero) obligatorios.push(elegirAlAzar(GEN_NUMEROS));
+  if (politica.requiere_caracter_especial) obligatorios.push(elegirAlAzar(GEN_ESPECIALES));
+
+  const longitud = Math.max(politica.longitud_minima, obligatorios.length, 10);
+  const poolCompleto = GEN_MAYUSCULAS + GEN_MINUSCULAS + GEN_NUMEROS + GEN_ESPECIALES;
+  const resto = [];
+  for (let i = obligatorios.length; i < longitud; i++) resto.push(elegirAlAzar(poolCompleto));
+
+  return barajar([...obligatorios, ...resto]).join('');
+}
+
+module.exports = { obtenerPolitica, validarPassword, validarPista, generarPasswordSegunPolitica };

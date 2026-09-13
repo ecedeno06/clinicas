@@ -167,4 +167,21 @@ export class UsuariosComponent implements OnInit {
       error: (err) => alert(err?.error?.mensaje || 'No se pudo quitar al usuario'),
     });
   }
+
+  reseteandoPassword = signal<string | null>(null);
+
+  resetearPassword(u: Usuario): void {
+    if (!confirm(`Se generara una nueva contrasena para "${u.nombre}" y se enviara a ${u.email}. Continuar?`)) return;
+    this.reseteandoPassword.set(u.id);
+    this.srv.resetearPassword(u.id).subscribe({
+      next: (res) => {
+        this.reseteandoPassword.set(null);
+        alert(res.mensaje);
+      },
+      error: (err) => {
+        this.reseteandoPassword.set(null);
+        alert(err?.error?.mensaje || 'No se pudo resetear la contrasena');
+      },
+    });
+  }
 }

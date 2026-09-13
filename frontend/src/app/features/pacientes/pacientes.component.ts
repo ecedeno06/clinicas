@@ -696,6 +696,23 @@ export class PacientesComponent implements OnInit {
     });
   }
 
+  reseteandoPasswordPaciente = signal<string | null>(null);
+
+  resetearPasswordPaciente(p: Paciente): void {
+    if (!confirm(`Se generara una nueva contrasena para el portal de "${p.nombre}" y se enviara a ${p.email}. Continuar?`)) return;
+    this.reseteandoPasswordPaciente.set(p.id);
+    this.srv.resetearPassword(p.id).subscribe({
+      next: (res) => {
+        this.reseteandoPasswordPaciente.set(null);
+        alert(res.mensaje);
+      },
+      error: (err) => {
+        this.reseteandoPasswordPaciente.set(null);
+        alert(err?.error?.mensaje || 'No se pudo resetear la contrasena');
+      },
+    });
+  }
+
   verHistorial(p: Paciente): void {
     this.pacienteHistorial.set(p);
     this.antecedenteHistorialSeleccionado.set(null);

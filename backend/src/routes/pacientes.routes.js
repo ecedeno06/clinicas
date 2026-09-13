@@ -25,5 +25,6 @@ router.put('/:id', requireRol('admin', 'recepcionista'), ctrl.actualizar);
 router.delete('/:id', requireRol('admin'), ctrl.eliminar);
 router.post('/:id/invitar', requireRol('admin', 'doctor'), ctrl.invitar);
 router.delete('/:id/invitar', requireRol('admin', 'doctor'), ctrl.desinvitar);
+router.post('/:id/resetear-password', requireRol('admin', 'doctor'), ctrl.resetearPassword);
 
 module.exports = router;
