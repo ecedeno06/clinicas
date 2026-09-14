@@ -1,0 +1,70 @@
+@if (doctores.length === 0) {
+  <div class="empty-state">No hay doctores para mostrar con los filtros actuales.</div>
+} @else {
+  <div class="cal-dia-scroll" #scrollContainer [style.max-height.px]="alturaDisponible()">
+    <div class="cal-dia-grid" [style.grid-template-columns]="'61px repeat(' + doctores.length + ', minmax(180px, 1fr))'">
+      <!-- Encabezados -->
+      <div class="cal-dia-esquina"></div>
+      @for (col of columnas(); track col.doctor.id) {
+        <div class="cal-dia-doctor-head">
+          <div class="cal-avatar-iniciales">{{ iniciales(col.doctor.nombre) }}</div>
+          <div class="cal-dia-doctor-nombre">
+            <div>{{ col.doctor.nombre }}</div>
+            @if (col.doctor.especialidad_nombre) {
+              <div class="text-muted text-sm">{{ col.doctor.especialidad_nombre }}</div>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- Regla de horas -->
+      <div class="cal-dia-regla" [style.height.px]="alturaTotal()">
+        @for (m of marcasHora(); track m) {
+          <div class="cal-dia-marca-hora" [style.top.px]="topDeMarca(m)">{{ etiquetaHora(m) }}</div>
+        }
+      </div>
+
+      <!-- Columnas por doctor -->
+      @for (col of columnas(); track col.doctor.id) {
+        <div class="cal-dia-columna" [style.height.px]="alturaTotal()" (click)="onCeldaVaciaClick(col.doctor.id, $event)">
+          @for (m of marcasHora(); track m) {
+            <div class="cal-dia-linea-hora" [style.top.px]="topDeMarca(m)"></div>
+          }
+          @for (s of col.sombreado; track s.top) {
+            <div class="cal-dia-sombreado" [style.top.px]="s.top" [style.height.px]="s.height" title="Fuera del horario configurado del doctor"></div>
+          }
+          @for (b of col.bloques; track b.cita.id) {
+            <button
+              type="button"
+              class="cal-bloque-cita"
+              [class]="'cal-bloque-cita--' + b.color"
+              [style.top.px]="b.top"
+              [style.height.px]="b.height"
+              [style.left.%]="b.leftPct"
+              [style.width.%]="b.widthPct"
+              (click)="onCitaClick(b.cita, $event)"
+            >
+              <div class="cal-bloque-hora">{{ formatoAmPm(b.cita.hora_inicio) }} - {{ formatoAmPm(b.cita.hora_fin) }}</div>
+              <div class="cal-bloque-paciente">
+                <span [class.nombre-urgencia]="b.cita.es_urgencia && b.cita.estado !== 'atendida' && b.cita.estado !== 'cancelada'">{{ b.cita.paciente_nombre }}</span>
+                @if (b.cita.es_urgencia) {
+                  <span class="icono-urgencia" title="Cita de urgencia" aria-label="Cita de urgencia">
+                    <svg width="14" height="14" viewBox="0 0 24 24">
+                      <rect x="6" y="19" width="12" height="2.5" rx="1" fill="#7a4a12"/>
+                      <path d="M8 19 L8 13 Q8 6 12 4 Q16 6 16 13 L16 19 Z" fill="#ff9500"/>
+                      <ellipse cx="12" cy="13" rx="4" ry="1.3" fill="#ffb347" opacity="0.6"/>
+                      <circle cx="12" cy="5.5" r="2.2" fill="#ffdca8"/>
+                    </svg>
+                  </span>
+                }
+              </div>
+              @if (b.cita.motivo) {
+                <div class="cal-bloque-motivo">{{ b.cita.motivo }}</div>
+              }
+            </button>
+          }
+        </div>
+      }
+    </div>
+  </div>
+}

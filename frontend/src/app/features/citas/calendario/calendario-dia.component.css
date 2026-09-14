@@ -1,0 +1,155 @@
+.cal-dia-scroll {
+  /* El eje cubre las 24 horas -- sin un alto acotado con su propio scroll
+     vertical, el grid entero (24 * pxPorHora) estiraria toda la pagina en
+     vez de quedar como un panel navegable, como cualquier calendario tipo
+     Google Calendar. Este valor es solo el respaldo antes de que el
+     componente mida el alto real disponible con JS (ver
+     medirAlturaDisponible() en el .ts) y lo aplique como estilo en linea,
+     que pisa este max-height -- un numero fijo aqui no puede acertarle
+     porque .content es flex:1 y su alto real depende del resto del layout. */
+  max-height: calc(100vh - 260px);
+  overflow: auto;
+  background: var(--white);
+  border: 1px solid var(--slate-100);
+  border-radius: var(--radius);
+}
+
+.cal-dia-grid {
+  display: grid;
+  grid-auto-rows: min-content;
+  min-width: 720px;
+}
+
+.cal-dia-esquina {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--white);
+  border-bottom: 1px solid var(--slate-100);
+}
+
+.cal-dia-doctor-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--white);
+  border-bottom: 1px solid var(--slate-100);
+  border-left: 1px solid var(--slate-100);
+}
+
+.cal-avatar-iniciales {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--tint-teal-bg);
+  color: var(--text-on-tint-teal);
+}
+
+.cal-dia-doctor-nombre {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--slate-900);
+  min-width: 0;
+}
+
+.cal-dia-regla {
+  position: relative;
+  border-right: 1px solid var(--slate-100);
+}
+
+.cal-dia-marca-hora {
+  position: absolute;
+  right: 8px;
+  transform: translateY(-50%);
+  font-size: 10.5px;
+  color: var(--slate-500);
+  white-space: nowrap;
+}
+
+.cal-dia-columna {
+  position: relative;
+  border-left: 1px solid var(--slate-100);
+  cursor: pointer;
+}
+
+.cal-dia-linea-hora {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px solid var(--slate-100);
+}
+
+/* Horas en que el doctor no atiende segun su horario configurado --
+   pointer-events:none para que el clic pase a .cal-dia-columna debajo,
+   que igual rechaza y avisa (onCeldaVaciaClick); esto es solo la senal
+   visual. */
+.cal-dia-sombreado {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: repeating-linear-gradient(
+    135deg,
+    var(--slate-100),
+    var(--slate-100) 6px,
+    transparent 6px,
+    transparent 12px
+  );
+  pointer-events: none;
+}
+
+.cal-bloque-cita {
+  position: absolute;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px 6px;
+  margin: 0 2px;
+  border-radius: 7px;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  font-family: inherit;
+}
+
+.cal-bloque-hora {
+  font-size: 10px;
+  font-weight: 700;
+  opacity: 0.85;
+  white-space: nowrap;
+}
+
+.cal-bloque-paciente {
+  font-size: 12px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cal-bloque-motivo {
+  font-size: 10.5px;
+  opacity: 0.85;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cal-bloque-cita--slate { background: var(--slate-100); color: var(--slate-700, var(--slate-900)); }
+.cal-bloque-cita--amber { background: var(--tint-amber-bg); color: var(--text-on-tint-amber); }
+.cal-bloque-cita--green { background: var(--tint-green-bg); color: var(--text-on-tint-green); }
+.cal-bloque-cita--red { background: var(--tint-red-bg); color: var(--text-on-tint-red); }
+.cal-bloque-cita--violet { background: var(--tint-violet-bg); color: var(--text-on-tint-violet); }
+
+.cal-bloque-cita:hover { filter: brightness(0.96); }

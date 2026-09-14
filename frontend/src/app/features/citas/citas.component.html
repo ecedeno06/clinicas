@@ -3,11 +3,122 @@
     <h1>Citas</h1>
     <div class="desc">Agenda de citas paciente / doctor</div>
   </div>
-  @if (auth.puedeEditar()) {
-    <button class="btn btn-accent" (click)="abrirNuevo()">+ Nueva cita</button>
-  }
+  <div class="flex items-center gap-12">
+    <div class="vista-toggle">
+      <button type="button" class="vista-toggle-btn" [class.active]="vista() === 'lista'" (click)="cambiarVista('lista')">Lista</button>
+      <button type="button" class="vista-toggle-btn" [class.active]="vista() === 'calendario'" (click)="cambiarVista('calendario')">Calendario</button>
+    </div>
+    @if (auth.puedeEditar() && vista() === 'lista') {
+      <button class="btn btn-accent" (click)="abrirNuevo()">+ Nueva cita</button>
+    }
+  </div>
 </div>
 
+@if (vista() === 'calendario') {
+  <div class="cal-toolbar no-print">
+    <div class="cal-toolbar-nav">
+      <button type="button" class="btn btn-outline btn-sm" (click)="irAHoy()">Hoy</button>
+      <button type="button" class="btn-icon" title="Dia anterior" aria-label="Dia anterior" (click)="irADia(-1)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <button type="button" class="btn-icon" title="Dia siguiente" aria-label="Dia siguiente" (click)="irADia(1)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+      </button>
+      <div class="cal-toolbar-fecha">{{ fechaCalendarioLegible() }}</div>
+    </div>
+    <div class="cal-toolbar-acciones">
+      <div class="vista-toggle">
+        <button type="button" class="vista-toggle-btn active">Dia</button>
+        <button type="button" class="vista-toggle-btn" disabled title="Semana -- proximamente">Semana</button>
+      </div>
+      <button type="button" class="btn-icon" title="Refrescar" aria-label="Refrescar" (click)="cargarCalendario()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+      </button>
+      <button type="button" class="btn-icon" title="Imprimir" aria-label="Imprimir" (click)="imprimirCalendario()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      </button>
+      @if (auth.puedeEditar()) {
+        <button type="button" class="btn btn-accent btn-sm" (click)="abrirNuevo()">+ Nuevo</button>
+      }
+    </div>
+  </div>
+
+  <div class="cal-layout">
+    <aside class="cal-sidebar card no-print">
+      <div class="form-group">
+        <label>Sucursal</label>
+        <select class="input" [ngModel]="filtroCalSucursal()" (ngModelChange)="onFiltroCalSucursalChange($event)">
+          <option value="">Todas</option>
+          @for (s of sucursales(); track s.id) { <option [value]="s.id">{{ s.nombre }}</option> }
+        </select>
+      </div>
+
+      <div class="form-group mt-16">
+        <label>Doctor</label>
+        <div class="cal-sidebar-lista">
+          @for (d of doctoresActivos(); track d.id) {
+            <label class="cal-sidebar-item">
+              <input type="checkbox" [checked]="filtroCalDoctorIds().size === 0 || filtroCalDoctorIds().has(d.id)" (change)="toggleFiltroCalDoctor(d.id)" />
+              <span class="cal-avatar-iniciales cal-avatar-sm">{{ iniciales(d.nombre) }}</span>
+              {{ d.nombre }}
+            </label>
+          }
+        </div>
+      </div>
+
+      <div class="form-group mt-16">
+        <label>Estado</label>
+        <div class="cal-sidebar-lista">
+          @for (e of estadosCita; track e) {
+            <label class="cal-sidebar-item">
+              <input type="checkbox" [checked]="filtroCalEstados().has(e)" (change)="toggleFiltroCalEstado(e)" />
+              <span class="badge" [class]="'badge-' + colorEstadoCita(e)">{{ e }}</span>
+            </label>
+          }
+        </div>
+      </div>
+
+      <div class="mt-16">
+        <app-mini-calendario-mes [fechaSeleccionada]="fechaCalendario()" (fechaElegida)="seleccionarFechaCalendario($event)"></app-mini-calendario-mes>
+      </div>
+    </aside>
+
+    <div class="cal-main">
+      @if (cargandoCalendario()) {
+        <div class="empty-state">Cargando...</div>
+      } @else {
+        <app-calendario-dia
+          [citas]="citasCalendarioFiltradas()"
+          [doctores]="doctoresVisiblesCalendario()"
+          [disponibilidadPorDoctor]="disponibilidadCalendarioPorDoctor()"
+          [sucursalFiltro]="filtroCalSucursal()"
+          (citaClick)="abrirPopover($event.cita, $event.origen)"
+          (celdaClick)="abrirNuevoDesdeCelda($event)"
+        ></app-calendario-dia>
+      }
+    </div>
+  </div>
+
+  <app-cita-detalle-popover
+    [cita]="citaPopover()"
+    [origen]="origenPopover()"
+    [puedeEditar]="auth.puedeEditar()"
+    [puedeEliminar]="auth.puedeEliminar()"
+    [puedeVerHistoria]="puedeVerHistoria()"
+    [puedeRegistrarSignos]="puedeRegistrarSignos()"
+    [whatsappHref]="citaPopover() && puedeCompartirUbicacion(citaPopover()!) ? whatsappUrl(citaPopover()!) : null"
+    (cerrar)="cerrarPopover()"
+    (cambiarEstado)="cambiarEstadoDesdePopover($event)"
+    (editar)="editarDesdePopover($event)"
+    (eliminar)="eliminarDesdePopover($event)"
+    (abrirHistoria)="abrirHistoriaDesdePopover($event)"
+    (abrirSignos)="abrirSignosDesdePopover($event)"
+    (abrirRecetas)="abrirRecetasDesdePopover($event)"
+    (abrirLaboratorio)="abrirLaboratorioDesdePopover($event)"
+  ></app-cita-detalle-popover>
+}
+
+@if (vista() === 'lista') {
 <div class="table-wrap">
   <table class="data-table">
     <thead>
@@ -136,6 +247,7 @@
     </tbody>
   </table>
 </div>
+}
 
 @if (panelAbierto()) {
   <div class="overlay">

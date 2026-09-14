@@ -156,6 +156,111 @@
   flex-shrink: 0;
 }
 
+/* ---------- Toggle Lista / Calendario y Dia / Semana ---------- */
+.vista-toggle {
+  display: flex;
+  border: 1px solid var(--slate-300);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.vista-toggle-btn {
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 7px 12px;
+  border: none;
+  background: var(--white);
+  color: var(--slate-500);
+  cursor: pointer;
+}
+.vista-toggle-btn + .vista-toggle-btn { border-left: 1px solid var(--slate-300); }
+.vista-toggle-btn.active { background: var(--slate-950); color: var(--white); }
+.vista-toggle-btn:disabled { cursor: default; opacity: 0.5; }
+
+/* ---------- Barra superior del calendario ---------- */
+.cal-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.cal-toolbar-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cal-toolbar-fecha {
+  font-weight: 700;
+  font-size: 14.5px;
+  color: var(--slate-900);
+  text-transform: capitalize;
+  margin-left: 4px;
+}
+.cal-toolbar-acciones {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ---------- Layout sidebar + calendario ---------- */
+.cal-layout {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+.cal-sidebar {
+  width: 230px;
+  flex-shrink: 0;
+}
+.cal-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.cal-sidebar-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+.cal-sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.cal-avatar-iniciales {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  background: var(--tint-teal-bg);
+  color: var(--text-on-tint-teal);
+}
+
+/* En mobile/pantalla angosta el sidebar pasa a estar arriba (a lo ancho) y
+   el calendario scrollea horizontalmente sus columnas de doctor (ver
+   .cal-dia-scroll en calendario-dia.component.css) -- adaptar columnas
+   fijas por doctor a una pantalla muy angosta no tiene una solucion unica,
+   scroll horizontal es la mas simple y predecible. */
+@media (max-width: 720px) {
+  .cal-layout { flex-direction: column; }
+  .cal-sidebar { width: 100%; }
+}
+
+@media print {
+  .no-print { display: none !important; }
+}
+
 /* Checkbox "Enviar Mensaje WhatsApp" en Nueva cita: texto e icono en
    verde luminoso (mismo tono de marca que los botones de WhatsApp del
    resto de la app) para que resalte justo antes de Guardar. */

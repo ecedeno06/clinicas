@@ -1,0 +1,94 @@
+.popover-backdrop {
+  position: fixed;
+  inset: 0;
+  background: transparent;
+  z-index: 60;
+}
+
+.cita-popover {
+  position: fixed;
+  z-index: 61;
+  width: 320px;
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+  background: var(--white);
+  border: 1px solid var(--slate-100);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  padding: 16px;
+}
+
+.cita-popover-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cita-popover-paciente {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--slate-950);
+}
+
+.cita-popover-header .close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  color: var(--slate-500);
+  line-height: 1;
+}
+
+.cita-popover-datos {
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--slate-900);
+}
+
+.cita-popover-motivo {
+  margin-top: 8px;
+  padding: 8px 10px;
+  background: var(--slate-50);
+  border-radius: 8px;
+  font-size: 12.5px;
+}
+
+.cita-popover-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 14px;
+}
+
+.cita-popover-pill {
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  opacity: 0.55;
+}
+.cita-popover-pill:disabled { cursor: default; }
+.cita-popover-pill.activo { opacity: 1; border-color: currentColor; }
+.cita-popover-pill:not(:disabled):hover { opacity: 0.85; }
+
+.cita-popover-pill--slate { background: var(--slate-100); color: var(--slate-500); }
+.cita-popover-pill--amber { background: var(--tint-amber-bg); color: var(--text-on-tint-amber); }
+.cita-popover-pill--green { background: var(--tint-green-bg); color: var(--text-on-tint-green); }
+.cita-popover-pill--red { background: var(--tint-red-bg); color: var(--text-on-tint-red); }
+.cita-popover-pill--violet { background: var(--tint-violet-bg); color: var(--text-on-tint-violet); }
+
+.cita-popover-accesos {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cita-popover-accesos-spacer {
+  flex: 1;
+}

@@ -1,5 +1,6 @@
 import { Component, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { catchError, forkJoin, map, of } from 'rxjs';
 import { FormArray, FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { CitasService } from '../../core/services/citas.service';
@@ -26,11 +27,24 @@ import { extraerLatLng } from '../../core/components/mapa-selector/mapa-selector
 import { direccionPrincipal } from '../../core/utils/direccion.util';
 import { generarPdf, encabezadoClinica, formatoFechaCorta } from '../../core/utils/pdf.util';
 import { TDocumentDefinitions } from 'pdfmake/interfaces';
+import { MiniCalendarioMesComponent } from './calendario/mini-calendario-mes.component';
+import { CalendarioDiaComponent, CeldaVaciaClick } from './calendario/calendario-dia.component';
+import { CitaDetallePopoverComponent } from './calendario/cita-detalle-popover.component';
+import { colorEstadoCita, iniciales } from './calendario/calendario.util';
 
 @Component({
   selector: 'app-citas',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule, SelectorFotoComponent, BuscadorAntecedenteComponent],
+  imports: [
+    CommonModule,
+    ReactiveFormsModule,
+    FormsModule,
+    SelectorFotoComponent,
+    BuscadorAntecedenteComponent,
+    MiniCalendarioMesComponent,
+    CalendarioDiaComponent,
+    CitaDetallePopoverComponent,
+  ],
   templateUrl: './citas.component.html',
   styleUrl: './citas.component.css',
 })
@@ -184,6 +198,173 @@ export class CitasComponent implements OnInit {
     this.filtroCampana.set('');
     this.filtroEstado.set('');
   }
+
+  // ---------- Vista Calendario (dia, por doctor) ----------
+  vista = signal<'lista' | 'calendario'>('lista');
+  readonly estadosCita: EstadoCita[] = ['pendiente', 'confirmada', 'atendida', 'cancelada', 'no_asistio', 'reagendar'];
+  iniciales = iniciales;
+  colorEstadoCita = colorEstadoCita;
+
+  fechaCalendario = signal(hoyISO());
+  citasCalendario = signal<Cita[]>([]);
+  cargandoCalendario = signal(false);
+  // Sucursal es el unico filtro que se manda al backend (junto con la
+  // fecha); doctor y estado se aplican en cliente sobre lo ya cargado del
+  // dia (ver seccion 4/5 del plan) -- el calendario nunca deja de mostrar
+  // "todos" solo porque se agrego un doctor nuevo despues.
+  filtroCalSucursal = signal('');
+  filtroCalDoctorIds = signal<Set<string>>(new Set());
+  filtroCalEstados = signal<Set<EstadoCita>>(new Set(this.estadosCita));
+
+  citaPopover = signal<Cita | null>(null);
+  origenPopover = signal<HTMLElement | null>(null);
+
+  // Disponibilidad de cada doctor activo para la fecha mostrada -- una
+  // llamada por doctor (igual que sugiere el plan para no necesitar un
+  // endpoint batch nuevo), usada por CalendarioDiaComponent para sombrear
+  // las horas en que no atiende y para bloquear el clic en una celda vacia
+  // fuera de su horario.
+  disponibilidadCalendarioPorDoctor = signal<Map<string, Disponibilidad>>(new Map());
+
+  fechaCalendarioLegible = computed(() => {
+    const [anio, mes, dia] = this.fechaCalendario().split('-').map(Number);
+    const texto = new Date(anio, mes - 1, dia).toLocaleDateString('es', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+    return texto.charAt(0).toUpperCase() + texto.slice(1);
+  });
+
+  doctoresActivos = computed(() => this.doctores().filter((d) => d.activo));
+
+  // Conjunto vacio = "todos" (asi un doctor nuevo aparece sin tener que
+  // tocar el filtro); ver toggleFiltroCalDoctor().
+  doctoresVisiblesCalendario = computed(() => {
+    const seleccionados = this.filtroCalDoctorIds();
+    return seleccionados.size === 0 ? this.doctoresActivos() : this.doctoresActivos().filter((d) => seleccionados.has(d.id));
+  });
+
+  citasCalendarioFiltradas = computed(() => {
+    const doctorIds = this.filtroCalDoctorIds();
+    const estados = this.filtroCalEstados();
+    return this.citasCalendario().filter((c) => {
+      if (doctorIds.size > 0 && !doctorIds.has(c.doctor_id)) return false;
+      if (!estados.has(c.estado)) return false;
+      return true;
+    });
+  });
+
+  cambiarVista(v: 'lista' | 'calendario'): void {
+    this.vista.set(v);
+    if (v === 'calendario') this.cargarCalendario();
+  }
+
+  cargarCalendario(): void {
+    this.cargandoCalendario.set(true);
+    const filtros: Record<string, string> = { desde: this.fechaCalendario(), hasta: this.fechaCalendario() };
+    if (this.filtroCalSucursal()) filtros['sucursal_id'] = this.filtroCalSucursal();
+    this.srv.listar(filtros).subscribe({
+      next: (data) => { this.citasCalendario.set(data); this.cargandoCalendario.set(false); },
+      error: () => this.cargandoCalendario.set(false),
+    });
+    this.cargarDisponibilidadCalendario();
+  }
+
+  // Un llamado por doctor activo (no hay endpoint batch), en paralelo con
+  // forkJoin -- aceptable para un dia con pocos doctores visibles (ver
+  // "Fuera de alcance de esta v1" del plan). Si algun doctor individual
+  // falla, se le deja sin restriccion en vez de romper todo el calendario.
+  private cargarDisponibilidadCalendario(): void {
+    const doctores = this.doctoresActivos();
+    if (doctores.length === 0) { this.disponibilidadCalendarioPorDoctor.set(new Map()); return; }
+    const fecha = this.fechaCalendario();
+    forkJoin(
+      doctores.map((d) =>
+        this.doctoresSrv.disponibilidad(d.id, fecha).pipe(
+          map((disp) => [d.id, disp] as const),
+          catchError(() => of([d.id, null] as const))
+        )
+      )
+    ).subscribe((resultados) => {
+      const mapa = new Map<string, Disponibilidad>();
+      for (const [doctorId, disp] of resultados) {
+        if (disp) mapa.set(doctorId, disp);
+      }
+      this.disponibilidadCalendarioPorDoctor.set(mapa);
+    });
+  }
+
+  irAHoy(): void { this.fechaCalendario.set(hoyISO()); this.cargarCalendario(); }
+
+  irADia(delta: number): void {
+    const [anio, mes, dia] = this.fechaCalendario().split('-').map(Number);
+    this.fechaCalendario.set(fechaISO(new Date(anio, mes - 1, dia + delta)));
+    this.cargarCalendario();
+  }
+
+  seleccionarFechaCalendario(fecha: string): void {
+    this.fechaCalendario.set(fecha);
+    this.cargarCalendario();
+  }
+
+  onFiltroCalSucursalChange(sucursalId: string): void {
+    this.filtroCalSucursal.set(sucursalId);
+    this.cargarCalendario();
+  }
+
+  // Vacio representa "todos" -- si al desmarcar uno quedan todos los demas
+  // marcados, se vuelve a vaciar el set (ver doctoresVisiblesCalendario).
+  toggleFiltroCalDoctor(doctorId: string): void {
+    const idsActivos = this.doctoresActivos().map((d) => d.id);
+    const actuales = this.filtroCalDoctorIds().size === 0 ? new Set(idsActivos) : new Set(this.filtroCalDoctorIds());
+    if (actuales.has(doctorId)) actuales.delete(doctorId); else actuales.add(doctorId);
+    this.filtroCalDoctorIds.set(actuales.size === idsActivos.length ? new Set() : actuales);
+  }
+
+  toggleFiltroCalEstado(estado: EstadoCita): void {
+    const actuales = new Set(this.filtroCalEstados());
+    if (actuales.has(estado)) actuales.delete(estado); else actuales.add(estado);
+    this.filtroCalEstados.set(actuales);
+  }
+
+  imprimirCalendario(): void { window.print(); }
+
+  abrirPopover(cita: Cita, origen: HTMLElement): void {
+    this.citaPopover.set(cita);
+    this.origenPopover.set(origen);
+  }
+
+  cerrarPopover(): void {
+    this.citaPopover.set(null);
+    this.origenPopover.set(null);
+  }
+
+  cambiarEstadoDesdePopover(estado: EstadoCita): void {
+    const cita = this.citaPopover();
+    if (!cita) return;
+    this.srv.actualizar(cita.id, { estado }).subscribe({
+      next: (actualizada) => { this.citaPopover.set(actualizada); this.cargarCalendario(); },
+      error: (err) => alert(err?.error?.mensaje || 'No se pudo actualizar el estado'),
+    });
+  }
+
+  // Clic en una celda vacia del calendario: mismo formulario de "Nueva
+  // cita" de siempre, solo que ya viene con doctor/fecha/horario
+  // precargados (mismo patron que elegirFranja()).
+  abrirNuevoDesdeCelda(c: CeldaVaciaClick): void {
+    this.abrirNuevo();
+    // emitEvent:false por el mismo motivo que en abrirNuevo(): evitar que
+    // doctor_id y fecha disparen actualizarDisponibilidad() por separado,
+    // uno con el otro campo todavia sin el valor nuevo.
+    this.form.patchValue({ doctor_id: c.doctorId, fecha: this.fechaCalendario(), hora_inicio: c.hora_inicio, hora_fin: c.hora_fin }, { emitEvent: false });
+    this.actualizarDisponibilidad();
+  }
+
+  // Las acciones del popover reutilizan tal cual los metodos que ya usa la
+  // tabla -- solo hay que cerrar el popover primero.
+  editarDesdePopover(c: Cita): void { this.cerrarPopover(); this.abrirEditar(c); }
+  eliminarDesdePopover(c: Cita): void { this.cerrarPopover(); this.eliminar(c); }
+  abrirHistoriaDesdePopover(c: Cita): void { this.cerrarPopover(); this.abrirHistoria(c); }
+  abrirSignosDesdePopover(c: Cita): void { this.cerrarPopover(); this.abrirSignos(c); }
+  abrirRecetasDesdePopover(c: Cita): void { this.cerrarPopover(); this.abrirRecetas(c); }
+  abrirLaboratorioDesdePopover(c: Cita): void { this.cerrarPopover(); this.abrirLaboratorio(c); }
 
   citasFiltradas = computed(() => {
     const fecha = this.filtroFecha().trim().toLowerCase();
@@ -471,7 +652,14 @@ export class CitasComponent implements OnInit {
     this.form.patchValue({ hora_inicio: aTexto(ahora), hora_fin: aTexto(fin) });
   }
 
-  cargar(): void { this.srv.listar().subscribe((data) => this.citas.set(data)); }
+  cargar(): void {
+    this.srv.listar().subscribe((data) => this.citas.set(data));
+    // Mismo dato, dos vistas: si la vista Calendario esta activa se
+    // refresca tambien con su propio filtro de fecha/sucursal (ver
+    // cargarCalendario()), asi que cualquier guardar/eliminar existente que
+    // ya llama a cargar() mantiene ambas vistas al dia sin tocarlos.
+    if (this.vista() === 'calendario') this.cargarCalendario();
+  }
 
   puedeVerHistoria(): boolean {
     const rol = this.auth.usuario()?.rol;
@@ -1220,4 +1408,11 @@ function formatearFecha(iso: string | null | undefined): string {
   if (!iso) return '';
   const [anio, mes, dia] = iso.substring(0, 10).split('-');
   return `${dia}/${mes}/${anio}`;
+}
+
+function fechaISO(d: Date): string {
+  const anio = d.getFullYear();
+  const mes = String(d.getMonth() + 1).padStart(2, '0');
+  const dia = String(d.getDate()).padStart(2, '0');
+  return `${anio}-${mes}-${dia}`;
 }

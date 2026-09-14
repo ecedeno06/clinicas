@@ -1,0 +1,28 @@
+<div class="mini-cal">
+  <div class="mini-cal-header">
+    <button type="button" class="mini-cal-nav" (click)="mesAnterior()" aria-label="Mes anterior">&lsaquo;</button>
+    <div class="mini-cal-titulo">{{ tituloMes() }}</div>
+    <button type="button" class="mini-cal-nav" (click)="mesSiguiente()" aria-label="Mes siguiente">&rsaquo;</button>
+  </div>
+
+  <div class="mini-cal-dias-semana">
+    @for (d of nombresDia; track $index) {
+      <div class="mini-cal-dia-semana">{{ d }}</div>
+    }
+  </div>
+
+  <div class="mini-cal-grilla">
+    @for (dia of grilla(); track dia.fecha) {
+      <button
+        type="button"
+        class="mini-cal-celda"
+        [class.fuera-de-mes]="!dia.enMes"
+        [class.hoy]="esHoy(dia.fecha)"
+        [class.seleccionado]="dia.fecha === fechaSeleccionada"
+        (click)="elegir(dia.fecha)"
+      >
+        {{ diaDeMes(dia.fecha) }}
+      </button>
+    }
+  </div>
+</div>
