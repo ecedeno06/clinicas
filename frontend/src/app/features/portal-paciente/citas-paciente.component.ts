@@ -11,11 +11,13 @@ import { clasificarGlucosa } from '../../core/utils/glucosa.util';
 // "Mis Citas" del portal del paciente: mismo diseno que el "Historial
 // clinico" que ya usa el staff en pacientes.component.ts/.html (tabs
 // Consultas/Antecedentes arriba, tabla + filtros, panel de detalle abajo
-// con Signos vitales/Receta/Laboratorio) -- pero como pagina completa (no
-// drawer) y agregando consultas de TODAS las clinicas que autorizan al
-// paciente (columna Clinica, ausente en la version de staff porque ahi ya
-// se sabe la clinica). Sin el boton de compartir ubicacion por WhatsApp ni
-// los iconos rapidos de receta/laboratorio en la fila -- fuera de alcance.
+// con Signos vitales/Receta/Laboratorio), incluyendo los iconos rapidos de
+// receta/laboratorio en la fila -- pero como pagina completa (no drawer) y
+// agregando consultas de TODAS las clinicas que autorizan al paciente
+// (columna Clinica, ausente en la version de staff porque ahi ya se sabe
+// la clinica). Sin el boton de compartir ubicacion por WhatsApp -- fuera
+// de alcance (ese comparte la ubicacion DEL PACIENTE con el doctor, no
+// tiene sentido en su propio portal).
 @Component({
   selector: 'app-citas-paciente',
   standalone: true,
@@ -132,6 +134,22 @@ export class CitasPacienteComponent implements OnInit {
       next: (data) => { this.ordenesLaboratorioSeleccionadas.set(data); this.cargandoLaboratorioSeleccionado.set(false); },
       error: () => this.cargandoLaboratorioSeleccionado.set(false),
     });
+  }
+
+  // Selecciona la fila y salta directo al tab "Receta", sin pasar por
+  // "Signos vitales" primero. Detiene la propagacion para no disparar
+  // tambien el (click) de la fila (que haria lo mismo mas el tab por defecto).
+  verRecetaDeHistorial(h: HistoriaClinica, event: MouseEvent): void {
+    event.stopPropagation();
+    this.seleccionarHistorial(h);
+    this.tabInferior.set('receta');
+  }
+
+  // Igual que verRecetaDeHistorial, pero para el tab "Laboratorio".
+  verLaboratorioDeHistorial(h: HistoriaClinica, event: MouseEvent): void {
+    event.stopPropagation();
+    this.seleccionarHistorial(h);
+    this.tabInferior.set('laboratorio');
   }
 
   claseImc(imc: number | null | undefined): { etiqueta: string; clase: string } | null {

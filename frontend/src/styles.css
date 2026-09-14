@@ -604,6 +604,18 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; colo
   padding: 18px;
 }
 
+/* Tab "Evaluacion" (Mis Citas del portal del paciente): motivo -> motivo
+   de consulta -> diagnostico -> observaciones, como pasos de un mismo
+   flujo clinico -- cada uno en su propia tarjeta, unidas por una flecha. */
+.eval-flow { display: flex; flex-direction: column; max-width: 560px; }
+.eval-card { padding: 14px 16px; }
+.eval-label {
+  font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--slate-500); margin-bottom: 6px;
+}
+.eval-value { font-size: 14px; color: var(--slate-900); white-space: pre-wrap; }
+.eval-arrow { display: flex; justify-content: center; padding: 2px 0; color: var(--teal-500); }
+
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));

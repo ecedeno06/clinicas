@@ -20,7 +20,7 @@
     <div class="table-wrap">
       <table class="data-table">
         <thead>
-          <tr><th>Clinica</th><th>Fecha</th><th>Hora</th><th>Doctor</th><th>Sucursal</th><th>Estado</th><th>Diagnostico</th></tr>
+          <tr><th>Clinica</th><th>Fecha</th><th>Hora</th><th>Doctor</th><th>Sucursal</th><th>Estado</th><th>Diagnostico</th><th></th></tr>
           <tr class="filter-row">
             <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroClinica()" (ngModelChange)="filtroClinica.set($event)" /></th>
             <th><input class="input" type="text" placeholder="dd/mm/aaaa" [ngModel]="filtroFecha()" (ngModelChange)="filtroFecha.set($event)" /></th>
@@ -28,6 +28,7 @@
             <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroDoctor()" (ngModelChange)="filtroDoctor.set($event)" /></th>
             <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroSucursal()" (ngModelChange)="filtroSucursal.set($event)" /></th>
             <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroEstado()" (ngModelChange)="filtroEstado.set($event)" /></th>
+            <th></th>
             <th>
               @if (hayFiltros()) { <button type="button" class="btn btn-outline btn-sm" (click)="limpiarFiltros()">Limpiar</button> }
             </th>
@@ -35,9 +36,9 @@
         </thead>
         <tbody>
           @if (cargandoHistorial()) {
-            <tr><td colspan="7"><div class="empty-state">Cargando historial...</div></td></tr>
+            <tr><td colspan="8"><div class="empty-state">Cargando historial...</div></td></tr>
           } @else if (error()) {
-            <tr><td colspan="7"><div class="empty-state">{{ error() }}</div></td></tr>
+            <tr><td colspan="8"><div class="empty-state">{{ error() }}</div></td></tr>
           } @else {
             @for (h of historialFiltrado(); track h.id) {
               <tr class="row-clickable" [class.row-selected]="historialSeleccionado()?.id === h.id" (click)="seleccionarHistorial(h)">
@@ -66,9 +67,24 @@
                   @if (h.tratamiento) { <div class="text-muted text-sm">Tratamiento: {{ h.tratamiento }}</div> }
                   @if (h.notas) { <div class="text-muted text-sm">{{ h.notas }}</div> }
                 </td>
+                <td class="table-actions">
+                  @if (h.tiene_receta) {
+                    <button type="button" class="btn-icon" title="Ver receta" aria-label="Ver receta" (click)="verRecetaDeHistorial(h, $event)">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 20.5 3.5 13.5a5 5 0 0 1 7-7l7 7a5 5 0 0 1-7 7Z"/><path d="m8.5 8.5 7 7"/></svg>
+                    </button>
+                  }
+                  @if (h.tiene_laboratorio) {
+                    <button type="button" class="btn-icon"
+                      [class.btn-icon-amber]="h.estado_laboratorio === 'pendiente'"
+                      [class.btn-icon-green]="h.estado_laboratorio === 'completada'"
+                      [title]="'Ver laboratorio (' + h.estado_laboratorio + ')'" aria-label="Ver laboratorio" (click)="verLaboratorioDeHistorial(h, $event)">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2v6L4 20a1 1 0 0 0 1 2h14a1 1 0 0 0 1-2L15 8V2"/><path d="M9 2h6"/><path d="M8.5 15h7"/></svg>
+                    </button>
+                  }
+                </td>
               </tr>
             } @empty {
-              <tr><td colspan="7"><div class="empty-state">Todavia no tienes historial clinico.</div></td></tr>
+              <tr><td colspan="8"><div class="empty-state">Todavia no tienes historial clinico.</div></td></tr>
             }
           }
         </tbody>
@@ -212,21 +228,32 @@
             }
           }
         } @else {
-          <div class="form-group">
-            <label>Motivo de la cita</label>
-            <div>{{ historialSeleccionado()!.motivo_cita || 'No especificado' }}</div>
-          </div>
-          <div class="form-group mt-16">
-            <label>Motivo de la consulta</label>
-            <div>{{ historialSeleccionado()!.motivo_consulta || 'No especificado' }}</div>
-          </div>
-          <div class="form-group mt-16">
-            <label>Diagnostico</label>
-            <div>{{ historialSeleccionado()!.diagnostico || 'No especificado' }}</div>
-          </div>
-          <div class="form-group mt-16">
-            <label>Observaciones</label>
-            <div>{{ historialSeleccionado()!.notas || 'Sin observaciones' }}</div>
+          <div class="eval-flow">
+            <div class="card eval-card">
+              <div class="eval-label">Motivo de la cita</div>
+              <div class="eval-value">{{ historialSeleccionado()!.motivo_cita || 'No especificado' }}</div>
+            </div>
+            <div class="eval-arrow">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v16M6 14l6 6 6-6"/></svg>
+            </div>
+            <div class="card eval-card">
+              <div class="eval-label">Motivo de la consulta</div>
+              <div class="eval-value">{{ historialSeleccionado()!.motivo_consulta || 'No especificado' }}</div>
+            </div>
+            <div class="eval-arrow">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v16M6 14l6 6 6-6"/></svg>
+            </div>
+            <div class="card eval-card">
+              <div class="eval-label">Diagnostico</div>
+              <div class="eval-value">{{ historialSeleccionado()!.diagnostico || 'No especificado' }}</div>
+            </div>
+            <div class="eval-arrow">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v16M6 14l6 6 6-6"/></svg>
+            </div>
+            <div class="card eval-card">
+              <div class="eval-label">Observaciones</div>
+              <div class="eval-value">{{ historialSeleccionado()!.notas || 'Sin observaciones' }}</div>
+            </div>
           </div>
         }
       }
