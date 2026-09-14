@@ -47,6 +47,7 @@
   text-align: center;
   border-radius: 7px;
   padding: 5px 4px;
+  margin-bottom: 8px;
   font-size: 9.5px;
   line-height: 1.3;
   font-weight: 600;
@@ -57,14 +58,50 @@
 /* Verde = bloque de la clinica activa de la sesion; ambar = bloque de
    OTRA clinica donde este mismo doctor tambien atiende (siempre visible
    para dar el panorama completo, pero visualmente distinto -- ver
-   puedeGestionarHorario() en el componente para el permiso asociado). */
+   puedeGestionarHorario() en el componente para el permiso asociado).
+   Fondo luminoso (mismo lenguaje neon que .theme-toggle en styles.css):
+   color saturado + halo de box-shadow en capas, mas intenso en dark. */
 .horario-slot-block.horario-slot-clinica-activa {
-  background: var(--tint-green-bg);
+  background: rgba(57, 255, 20, 0.18);
   color: var(--text-on-tint-green);
+  box-shadow:
+    0 0 0 1px rgba(57, 255, 20, 0.4),
+    0 0 10px 2px rgba(57, 255, 20, 0.45),
+    0 0 20px 5px rgba(57, 255, 20, 0.22);
 }
 .horario-slot-block.horario-slot-otra-clinica {
-  background: var(--tint-amber-bg);
+  background: rgba(255, 176, 0, 0.2);
   color: var(--text-on-tint-amber);
+  box-shadow:
+    0 0 0 1px rgba(255, 176, 0, 0.45),
+    0 0 10px 2px rgba(255, 176, 0, 0.5),
+    0 0 20px 5px rgba(255, 176, 0, 0.25);
+}
+
+[data-theme="dark"] .horario-slot-block.horario-slot-clinica-activa {
+  background: rgba(57, 255, 20, 0.16);
+  box-shadow:
+    0 0 0 1px rgba(57, 255, 20, 0.55),
+    0 0 14px 3px rgba(57, 255, 20, 0.55),
+    0 0 26px 8px rgba(57, 255, 20, 0.3);
+}
+[data-theme="dark"] .horario-slot-block.horario-slot-otra-clinica {
+  background: rgba(255, 176, 0, 0.18);
+  box-shadow:
+    0 0 0 1px rgba(255, 176, 0, 0.6),
+    0 0 14px 3px rgba(255, 176, 0, 0.6),
+    0 0 26px 8px rgba(255, 176, 0, 0.32);
+}
+
+/* De que clinica es la sucursal -- linea secundaria bajo el nombre de la
+   sucursal, mas discreta (importa sobre todo en el bloque ambar: "no es
+   la clinica activa" por si solo no dice de CUAL es). */
+.horario-slot-empresa {
+  font-size: 8.5px;
+  font-weight: 400;
+  opacity: 0.8;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
 .horario-slot-block.horario-slot-inactivo {
@@ -92,15 +129,28 @@
 }
 .horario-slot-icon:hover { opacity: 1; }
 
+.drawer-horario { width: 950px; }
+
 .horario-add-form {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--slate-100);
+}
+.horario-row {
   display: flex;
   align-items: flex-end;
   gap: 12px;
   flex-wrap: wrap;
-  padding-top: 16px;
-  border-top: 1px solid var(--slate-100);
+  width: 100%;
 }
-.horario-add-form .form-group { margin: 0; min-width: 130px; }
+/* flex: 1 1 0 (no "auto") reparte el ancho de la fila en partes iguales
+   sin importar cuanto texto tenga la opcion seleccionada -- sin esto, un
+   <select> con una opcion larga (ej. el nombre de una sucursal) se
+   ensancha mucho mas que su vecino con opciones cortas (ej. el dia). */
+.horario-add-form .form-group { margin: 0; flex: 1 1 0; min-width: 130px; }
 .horario-add-form .form-group:has(.time12) { min-width: 220px; }
 
 .time12 {

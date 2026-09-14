@@ -276,6 +276,9 @@ export interface DoctorHorario {
   // la sesion, ambar = otra clinica) y para decidir si el boton de
   // deshabilitar/eliminar esta habilitado para un admin normal.
   sucursal_empresa_id?: string;
+  // Solo para mostrar en la pastilla -- un admin viendo un bloque ambar
+  // necesita saber de que clinica es, no solo que "no es la mia".
+  empresa_nombre?: string;
   dia_semana: number; // 0=domingo … 6=sabado
   hora_inicio: string;
   hora_fin: string;

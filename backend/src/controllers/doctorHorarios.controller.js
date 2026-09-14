@@ -93,10 +93,14 @@ async function listarPorDoctor(req, res, next) {
     // atender en varias) -- el frontend lo usa para pintar en verde los
     // bloques de la clinica activa de la sesion y en ambar los de otra, y
     // para decidir si el boton de deshabilitar/eliminar esta habilitado.
+    // empresa_nombre: solo para mostrar en la pastilla (un admin viendo un
+    // bloque ambar necesita saber de que clinica es, no solo que "no es la
+    // mia").
     const { rows } = await pool.query(
-      `select dh.*, s.nombre as sucursal_nombre, s.empresa_id as sucursal_empresa_id
+      `select dh.*, s.nombre as sucursal_nombre, s.empresa_id as sucursal_empresa_id, e.nombre as empresa_nombre
        from doctor_horarios dh
        join sucursales s on s.id = dh.sucursal_id
+       join empresas e on e.id = s.empresa_id
        where dh.doctor_id = $1
        order by dh.dia_semana asc, dh.hora_inicio asc`,
       [req.params.doctorId]
