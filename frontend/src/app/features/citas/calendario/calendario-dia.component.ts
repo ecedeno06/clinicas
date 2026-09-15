@@ -8,27 +8,19 @@ import {
   calcularEjeHoras,
   calcularRangosBloqueados,
   colorEstadoCita,
-  estaDentroDeRangos,
   etiquetaHora,
   horasDelEje,
   iniciales,
   minutosAHora,
   minutosDesdeMedianoche,
   posicionBloque,
+  redondearInicioDisponible,
 } from './calendario.util';
 
 export interface CeldaVaciaClick {
   doctorId: string;
   hora_inicio: string;
   hora_fin: string;
-  // Sucursal donde el doctor tiene ESA franja libre -- undefined solo si
-  // el doctor todavia no tiene ningun horario configurado (ver
-  // rangosLibresPorDoctor), caso en el que no hay de donde inferirla.
-  sucursalId?: string;
-}
-
-interface RangoConSucursal extends RangoMin {
-  sucursal_id: string;
 }
 
 // Alto de cada hora en la regla vertical -- a mas alto, mas legible cada
@@ -84,6 +76,11 @@ export class CalendarioDiaComponent implements AfterViewInit {
 
   @Output() citaClick = new EventEmitter<{ cita: Cita; origen: HTMLElement }>();
   @Output() celdaClick = new EventEmitter<CeldaVaciaClick>();
+  // Arrastrar una cita dentro de la MISMA columna de doctor la reagenda a
+  // la hora soltada (conservando su duracion) -- el backend hoy no acepta
+  // cambiar doctor_id en actualizar(), por eso no se permite soltar en la
+  // columna de otro doctor (ver onColumnaDragOver).
+  @Output() citaMovida = new EventEmitter<{ cita: Cita; hora_inicio: string; hora_fin: string }>();
 
   @ViewChild('scrollContainer') private scrollContainerRef?: ElementRef<HTMLDivElement>;
 
@@ -93,6 +90,11 @@ export class CalendarioDiaComponent implements AfterViewInit {
   // layout (sidebar, toolbar, etc.), dejando un hueco en blanco antes del
   // footer. null antes de medir: el CSS de respaldo se usa mientras tanto.
   alturaDisponible = signal<number | null>(null);
+
+  // Cita que se esta arrastrando ahora mismo (null = no hay drag en curso).
+  // Publico: el template lo usa para atenuar el bloque de origen y para
+  // resaltar solo la columna donde SI se puede soltar.
+  citaArrastrada = signal<Cita | null>(null);
 
   private _citas = signal<Cita[]>([]);
   private _doctores = signal<Doctor[]>([]);
@@ -112,28 +114,27 @@ export class CalendarioDiaComponent implements AfterViewInit {
   // Rangos (en minutos) en que cada doctor SI atiende, segun su horario
   // configurado y la sucursal filtrada -- null significa "sin restriccion"
   // (mismo criterio que sinDisponibilidad() en citas.component.ts: un
-  // doctor que todavia no tiene ningun horario configurado sigue pudiendo
-  // recibir citas libremente, en cualquier hora).
-  // Cada rango recuerda de que sucursal viene (sucursal_id) -- un doctor
-  // puede tener franjas libres en varias sucursales el mismo dia, y al
-  // hacer clic en una celda vacia hace falta saber en CUAL de ellas cae
-  // ese horario para precargar el formulario con la sucursal correcta
-  // (ver onCeldaVaciaClick), no solo con this.sucursales()[0] por defecto.
+  // doctor que nunca configuro NINGUN horario, en ninguna clinica, sigue
+  // pudiendo recibir citas libremente). Si en cambio SI tiene horario
+  // configurado pero en OTRA clinica (no esta), se bloquea el dia
+  // completo (arreglo []): que use el horario en otro lado no dice nada
+  // sobre su disponibilidad aca.
   private rangosLibresPorDoctor = computed(() => {
-    const mapa = new Map<string, RangoConSucursal[] | null>();
+    const mapa = new Map<string, RangoMin[] | null>();
     const disponibilidad = this._disponibilidad();
     const sucursalFiltro = this._sucursalFiltro();
     for (const doctor of this._doctores()) {
       const disp = disponibilidad.get(doctor.id);
-      if (!disp || !disp.tiene_horario_configurado) { mapa.set(doctor.id, null); continue; }
+      if (!disp) { mapa.set(doctor.id, null); continue; }
+      if (!disp.tiene_horario_configurado) {
+        mapa.set(doctor.id, disp.tiene_horario_en_otra_clinica ? [] : null);
+        continue;
+      }
       const sucursales = sucursalFiltro ? disp.sucursales.filter((s) => s.sucursal_id === sucursalFiltro) : disp.sucursales;
       const libres = sucursales
         .filter((s) => s.atiende)
-        .flatMap((s) => s.libres.map((f) => ({
-          inicio: minutosDesdeMedianoche(f.hora_inicio),
-          fin: minutosDesdeMedianoche(f.hora_fin),
-          sucursal_id: s.sucursal_id,
-        })));
+        .flatMap((s) => s.libres)
+        .map((f) => ({ inicio: minutosDesdeMedianoche(f.hora_inicio), fin: minutosDesdeMedianoche(f.hora_fin) }));
       mapa.set(doctor.id, libres);
     }
     return mapa;
@@ -176,24 +177,67 @@ export class CalendarioDiaComponent implements AfterViewInit {
     const rect = col.getBoundingClientRect();
     const offsetY = event.clientY - rect.top - PADDING_VERTICAL;
     const minutosClickeados = this.eje().inicioMin + offsetY / PX_POR_MINUTO;
-    const inicioRedondeado = Math.round(minutosClickeados / PASO_SLOT_MIN) * PASO_SLOT_MIN;
-    const fin = inicioRedondeado + PASO_SLOT_MIN;
 
     // No se ofrece crear una cita "rapida" haciendo clic fuera del horario
     // configurado del doctor -- sigue estando disponible el boton general
     // "+ Nuevo", donde se puede marcar Urgencia para saltarse esta regla,
     // igual que en el formulario completo (ver sinDisponibilidad()).
     const libres = this.rangosLibresPorDoctor().get(doctorId) ?? null;
-    if (!estaDentroDeRangos(inicioRedondeado, libres)) {
+    const inicioRedondeado = redondearInicioDisponible(minutosClickeados, PASO_SLOT_MIN, libres, PASO_SLOT_MIN);
+    if (inicioRedondeado === null) {
       alert('Este doctor no atiende en este horario segun su horario configurado.');
       return;
     }
 
-    // libres === null es "sin restriccion" (doctor sin horario configurado
-    // todavia) -- ahi no hay sucursal que inferir, se deja que el
-    // formulario use su default habitual.
-    const rango = libres?.find((r) => inicioRedondeado >= r.inicio && inicioRedondeado < r.fin);
-    this.celdaClick.emit({ doctorId, sucursalId: rango?.sucursal_id, hora_inicio: minutosAHora(inicioRedondeado), hora_fin: minutosAHora(fin) });
+    const fin = inicioRedondeado + PASO_SLOT_MIN;
+    this.celdaClick.emit({ doctorId, hora_inicio: minutosAHora(inicioRedondeado), hora_fin: minutosAHora(fin) });
+  }
+
+  onCitaDragStart(cita: Cita, event: DragEvent): void {
+    this.citaArrastrada.set(cita);
+    event.dataTransfer?.setData('text/plain', cita.id);
+    if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
+  }
+
+  // Tambien se limpia aca (no solo en el drop): si se suelta fuera de
+  // cualquier columna valida (ej. fuera del calendario), el navegador
+  // nunca dispara "drop", solo "dragend".
+  onCitaDragEnd(): void {
+    this.citaArrastrada.set(null);
+  }
+
+  // Solo permite el drop (preventDefault) si la columna es la del MISMO
+  // doctor de la cita arrastrada -- de lo contrario el navegador muestra el
+  // cursor de "no permitido" y drop() nunca llega a dispararse ahi.
+  onColumnaDragOver(doctorId: string, event: DragEvent): void {
+    if (this.citaArrastrada()?.doctor_id !== doctorId) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+  }
+
+  onColumnaDrop(doctorId: string, event: DragEvent): void {
+    event.preventDefault();
+    const cita = this.citaArrastrada();
+    this.citaArrastrada.set(null);
+    if (!cita || cita.doctor_id !== doctorId) return;
+
+    const col = event.currentTarget as HTMLElement;
+    const rect = col.getBoundingClientRect();
+    const offsetY = event.clientY - rect.top - PADDING_VERTICAL;
+    const minutosSoltado = this.eje().inicioMin + offsetY / PX_POR_MINUTO;
+    const duracionMin = minutosDesdeMedianoche(cita.hora_fin) - minutosDesdeMedianoche(cita.hora_inicio);
+
+    const libres = this.rangosLibresPorDoctor().get(doctorId) ?? null;
+    const inicioRedondeado = redondearInicioDisponible(minutosSoltado, duracionMin, libres, PASO_SLOT_MIN);
+    if (inicioRedondeado === null) {
+      alert('Este doctor no atiende en este horario segun su horario configurado.');
+      return;
+    }
+
+    if (inicioRedondeado === minutosDesdeMedianoche(cita.hora_inicio)) return; // solto en el mismo lugar
+
+    const fin = inicioRedondeado + duracionMin;
+    this.citaMovida.emit({ cita, hora_inicio: minutosAHora(inicioRedondeado), hora_fin: minutosAHora(fin) });
   }
 
   @HostListener('window:resize')

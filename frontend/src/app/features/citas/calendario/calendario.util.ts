@@ -134,12 +134,21 @@ export interface RangoMin {
   fin: number;
 }
 
-// null = sin restriccion (ej. el doctor todavia no tiene ningun horario
-// configurado -- mismo criterio que sinDisponibilidad() en citas.component.ts,
-// un doctor sin horario configurado sigue pudiendo recibir citas libremente).
-export function estaDentroDeRangos(minutos: number, rangos: RangoMin[] | null): boolean {
-  if (rangos === null) return true;
-  return rangos.some((r) => minutos >= r.inicio && minutos < r.fin);
+// Redondea un clic/soltar de arrastre al paso de la grilla (ej. 30 min),
+// pero sin salirse del rango libre real donde cayo -- un bloque de
+// horario puede no calzar justo en esa grilla (ej. termina a las 23:59,
+// dejando un unico slot libre de 23:00 a 23:30). Redondear "a ciegas"
+// puede empujar el inicio fuera del rango aunque el clic haya caido
+// dentro de una zona visualmente disponible (sombreada como libre).
+// Devuelve null si el punto crudo cayo fuera de cualquier rango
+// disponible (solo relevante cuando rangos no es null).
+export function redondearInicioDisponible(minutosCrudos: number, duracionMin: number, rangos: RangoMin[] | null, pasoMin: number): number | null {
+  const redondeado = Math.round(minutosCrudos / pasoMin) * pasoMin;
+  if (rangos === null) return redondeado;
+  const rango = rangos.find((r) => minutosCrudos >= r.inicio && minutosCrudos < r.fin);
+  if (!rango) return null;
+  const maxInicio = Math.max(rango.inicio, rango.fin - duracionMin);
+  return Math.min(Math.max(redondeado, rango.inicio), maxInicio);
 }
 
 // El complemento de los rangos libres dentro del eje visible -- para

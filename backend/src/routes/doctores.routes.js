@@ -8,10 +8,19 @@ router.use(requireAuth, requireEmpresa, requireRol('admin', 'doctor', 'recepcion
 
 router.get('/', ctrl.listar);
 router.get('/buscar', ctrl.buscarPorIdentificacion);
+// Portal del doctor: sus propios datos + en que clinicas tiene rol
+// 'doctor' -- antes de "/:id" para que "mi-perfil" no se confunda con un id.
+router.get('/mi-perfil', ctrl.miPerfil);
 router.get('/:id', ctrl.obtener);
 router.post('/', requireRol('admin'), ctrl.crear);
 router.put('/:id', requireRol('admin'), ctrl.actualizar);
 router.delete('/:id', requireRol('admin'), ctrl.eliminar);
+// Dar/quitar acceso al sistema (rol 'doctor') y resetear su contrasena --
+// solo admin: es una accion administrativa, no algo que un doctor haga
+// sobre otro (a diferencia de invitar-paciente, que si permite doctor).
+router.post('/:id/invitar', requireRol('admin'), ctrl.invitar);
+router.delete('/:id/invitar', requireRol('admin'), ctrl.desinvitar);
+router.post('/:id/resetear-password', requireRol('admin'), ctrl.resetearPassword);
 
 // Disponibilidad calculada (horario semanal - citas ya agendadas ese dia).
 router.get('/:id/disponibilidad', horariosCtrl.disponibilidad);

@@ -1,8 +1,10 @@
+/* Mismo lenguaje visual del tablero de horario en
+   doctores.component.css -- duplicado aca por el encapsulamiento de
+   estilos de Angular (cada componente standalone solo ve su propio CSS). */
 .horario-week-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 8px;
-  margin-bottom: 20px;
 }
 
 .horario-day-col {
@@ -10,16 +12,6 @@
   border-radius: 10px;
   overflow: hidden;
   background: var(--white);
-  cursor: pointer;
-}
-
-.horario-day-col.on { border-color: var(--tint-green-bg); }
-
-/* Dia elegido en el campo "Dia" del formulario de abajo -- clic en la
-   columna es un atajo para elegirlo ahi, en vez de usar el <select>. */
-.horario-day-col.seleccionado {
-  border-color: var(--teal-500);
-  box-shadow: 0 0 0 1px var(--teal-500);
 }
 
 .horario-day-head {
@@ -32,8 +24,6 @@
   font-weight: 600;
   color: var(--slate-500);
 }
-
-.horario-day-col.on .horario-day-head { color: var(--text-on-tint-green); }
 
 .horario-day-body {
   padding: 8px 6px;
@@ -63,12 +53,9 @@
   word-break: break-word;
 }
 
-/* Verde = bloque de la clinica activa de la sesion; ambar = bloque de
-   OTRA clinica donde este mismo doctor tambien atiende (siempre visible
-   para dar el panorama completo, pero visualmente distinto -- ver
-   puedeGestionarHorario() en el componente para el permiso asociado).
-   Fondo luminoso (mismo lenguaje neon que .theme-toggle en styles.css):
-   color saturado + halo de box-shadow en capas, mas intenso en dark. */
+/* Verde = bloque de la clinica activa de esta sesion; ambar = bloque de
+   OTRA clinica donde este doctor tambien atiende (siempre visible para
+   ver el panorama completo). */
 .horario-slot-block.horario-slot-clinica-activa {
   background: rgba(57, 255, 20, 0.18);
   color: var(--text-on-tint-green);
@@ -101,9 +88,6 @@
     0 0 26px 8px rgba(255, 176, 0, 0.32);
 }
 
-/* De que clinica es la sucursal -- linea secundaria bajo el nombre de la
-   sucursal, mas discreta (importa sobre todo en el bloque ambar: "no es
-   la clinica activa" por si solo no dice de CUAL es). */
 .horario-slot-empresa {
   font-size: 8.5px;
   font-weight: 400;
@@ -136,36 +120,4 @@
   opacity: 0.75;
 }
 .horario-slot-icon:hover { opacity: 1; }
-
-.drawer-horario { width: 950px; }
-
-.horario-add-form {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 12px;
-  padding-top: 16px;
-  border-top: 1px solid var(--slate-100);
-}
-.horario-row {
-  display: flex;
-  align-items: flex-end;
-  gap: 12px;
-  flex-wrap: wrap;
-  width: 100%;
-}
-/* flex: 1 1 0 (no "auto") reparte el ancho de la fila en partes iguales
-   sin importar cuanto texto tenga la opcion seleccionada -- sin esto, un
-   <select> con una opcion larga (ej. el nombre de una sucursal) se
-   ensancha mucho mas que su vecino con opciones cortas (ej. el dia). */
-.horario-add-form .form-group { margin: 0; flex: 1 1 0; min-width: 130px; }
-.horario-add-form .form-group:has(.time12) { min-width: 220px; }
-
-.time12 {
-  display: flex;
-  gap: 6px;
-}
-.time12 select { min-width: 0; }
-.time12 select:nth-child(1) { flex: 1.1; }
-.time12 select:nth-child(2) { flex: 1.1; }
-.time12 select:nth-child(3) { flex: 1.3; }
+.horario-slot-icon:disabled { opacity: 0.4; cursor: default; }

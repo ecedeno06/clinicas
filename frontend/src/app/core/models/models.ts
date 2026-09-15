@@ -262,8 +262,22 @@ export interface Doctor {
   telefono?: string;
   acepta_whatsapp?: boolean;
   email?: string;
+  foto?: string | null;
+  // true solo si YA tiene rol 'doctor' asignado en la clinica activa
+  // (puede tener usuario_id seteado por acceso en otra clinica sin tener
+  // esto en true) -- lo que decide si el boton "Invitar acceso" del
+  // listado de Doctores esta habilitado o muestra "Acceso activo".
+  tiene_acceso_esta_clinica?: boolean;
   activo: boolean;
   created_at?: string;
+}
+
+// Respuesta de GET /doctores/mi-perfil (portal del doctor): sus datos +
+// en que clinicas tiene rol 'doctor', sin importar cual este activa en la
+// sesion ahora mismo (ver DoctoresService.miPerfil()).
+export interface PerfilDoctor {
+  doctor: Doctor;
+  empresas: { empresa_id: string; empresa_nombre: string; activo: boolean }[];
 }
 
 export interface DoctorHorario {
@@ -301,6 +315,10 @@ export interface DisponibilidadSucursal {
 export interface Disponibilidad {
   atiende: boolean;
   tiene_horario_configurado: boolean;
+  // true si el doctor tiene horario cargado en OTRA clinica (no esta) --
+  // distingue "nunca configuro horario en ningun lado" (sigue libre aca)
+  // de "tiene horario, pero no aca" (se bloquea aca).
+  tiene_horario_en_otra_clinica: boolean;
   dia_semana: number;
   ocupados: FranjaHoraria[];
   sucursales: DisponibilidadSucursal[];

@@ -1,0 +1,10 @@
+/* Modal chico y centrado (no un drawer lateral de ancho completo) --
+   se abre ARRIBA del drawer de "Nueva cita" que ya esta abierto detras,
+   asi que se ve como un paso rapido, no como cambiar de pantalla. */
+.paciente-rapido-overlay {
+  align-items: center;
+  justify-content: center;
+}
+.paciente-rapido-card {
+  width: min(420px, 92vw);
+}

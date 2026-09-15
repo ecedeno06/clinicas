@@ -107,7 +107,7 @@ export class EmpresasComponent implements OnInit {
 
   desasociarUsuario(empresaId: string, u: UsuarioDeEmpresa): void {
     if (!confirm(`Quitar a "${u.nombre}" de esta clinica?`)) return;
-    this.srv.desasociarUsuario(empresaId, u.id).subscribe({
+    this.srv.desasociarUsuario(empresaId, u.id, u.rol).subscribe({
       next: () => this.cargarUsuariosDeEmpresa(empresaId),
       error: (err) => alert(err?.error?.mensaje || 'No se pudo quitar al usuario'),
     });

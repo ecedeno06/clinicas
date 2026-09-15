@@ -153,6 +153,10 @@ export class UsuariosComponent implements OnInit {
     if (this.usuarioExistente()) { delete data.nombre; delete data.password; }
 
     const actual = this.editando();
+    // rol_actual: cual de sus roles de staff en esta clinica se esta
+    // editando -- solo importa si tiene mas de uno (ej. admin Y doctor a
+    // la vez); el backend lo ignora si no hace falta.
+    if (actual) data.rol_actual = actual.rol;
     const req = actual ? this.srv.actualizar(actual.id, data) : this.srv.crear(data);
     req.subscribe({
       next: () => { this.cerrarPanel(); this.cargar(); },
@@ -162,7 +166,7 @@ export class UsuariosComponent implements OnInit {
 
   eliminar(u: Usuario): void {
     if (!confirm(`Quitar a "${u.nombre}" de esta clinica?`)) return;
-    this.srv.eliminar(u.id).subscribe({
+    this.srv.eliminar(u.id, u.rol ?? undefined).subscribe({
       next: () => this.cargar(),
       error: (err) => alert(err?.error?.mensaje || 'No se pudo quitar al usuario'),
     });

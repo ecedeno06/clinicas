@@ -53,6 +53,7 @@
   font-weight: 700;
   background: var(--tint-teal-bg);
   color: var(--text-on-tint-teal);
+  object-fit: cover;
 }
 
 .cal-dia-doctor-nombre {
@@ -80,6 +81,13 @@
   position: relative;
   border-left: 1px solid var(--slate-100);
   cursor: pointer;
+}
+
+/* Columna del MISMO doctor de la cita que se esta arrastrando -- es la
+   unica donde se puede soltar (el backend no permite reasignar doctor_id
+   al actualizar una cita). */
+.cal-dia-columna--activa {
+  background: var(--tint-teal-bg);
 }
 
 .cal-dia-linea-hora {
@@ -118,9 +126,14 @@
   border-radius: 7px;
   border: none;
   text-align: left;
-  cursor: pointer;
+  cursor: grab;
   overflow: hidden;
   font-family: inherit;
+}
+
+.cal-bloque-cita--arrastrando {
+  opacity: 0.4;
+  cursor: grabbing;
 }
 
 .cal-bloque-hora {

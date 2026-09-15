@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, computed } from '@angular/core';
+import { Component, OnInit, ViewChild, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { catchError, forkJoin, map, of } from 'rxjs';
 import { FormArray, FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -19,10 +19,12 @@ import { Campana, CampanaDoctor, Cita, Disponibilidad, Doctor, Especialidad, Est
 import { clasificarImc } from '../../core/utils/imc.util';
 import { clasificarPresion } from '../../core/utils/presion.util';
 import { clasificarGlucosa } from '../../core/utils/glucosa.util';
-import { combinar12, formatoAmPm, HORAS_12, MINUTOS_60, partes12 } from '../../core/utils/hora12.util';
+import { combinar12, combinarHoraFin12, formatoAmPm, HORAS_12, MINUTOS_60, partes12 } from '../../core/utils/hora12.util';
 import { hoyISO } from '../../core/utils/fecha.util';
 import { SelectorFotoComponent } from '../../core/components/selector-foto/selector-foto.component';
 import { BuscadorAntecedenteComponent } from '../../core/components/buscador-antecedente/buscador-antecedente.component';
+import { BuscadorPacienteComponent } from '../../core/components/buscador-paciente/buscador-paciente.component';
+import { PacienteRapidoFormComponent } from '../../core/components/paciente-rapido-form/paciente-rapido-form.component';
 import { extraerLatLng } from '../../core/components/mapa-selector/mapa-selector.component';
 import { direccionPrincipal } from '../../core/utils/direccion.util';
 import { generarPdf, encabezadoClinica, formatoFechaCorta } from '../../core/utils/pdf.util';
@@ -41,6 +43,8 @@ import { colorEstadoCita, iniciales } from './calendario/calendario.util';
     FormsModule,
     SelectorFotoComponent,
     BuscadorAntecedenteComponent,
+    BuscadorPacienteComponent,
+    PacienteRapidoFormComponent,
     MiniCalendarioMesComponent,
     CalendarioDiaComponent,
     CitaDetallePopoverComponent,
@@ -51,6 +55,12 @@ import { colorEstadoCita, iniciales } from './calendario/calendario.util';
 export class CitasComponent implements OnInit {
   citas = signal<Cita[]>([]);
   pacientes = signal<Paciente[]>([]);
+  // Mini-formulario de creacion rapida de paciente (ver
+  // abrirPacienteRapido()), disparado desde app-buscador-paciente cuando
+  // no encuentra a nadie entre los pacientes ya vinculados a esta clinica.
+  pacienteRapidoAbierto = signal(false);
+  nombreParaPacienteRapido = signal('');
+  @ViewChild(BuscadorPacienteComponent) buscadorPaciente?: BuscadorPacienteComponent;
   doctores = signal<Doctor[]>([]);
   sucursales = signal<Sucursal[]>([]);
   especialidades = signal<Especialidad[]>([]);
@@ -188,12 +198,21 @@ export class CitasComponent implements OnInit {
   filtroCampana = signal('');
   filtroEstado = signal('');
 
-  hayFiltros = computed(() => !!(this.filtroFecha() || this.filtroPaciente() || this.filtroDoctor() || this.filtroSucursal() || this.filtroCampana() || this.filtroEstado()));
+  // Un usuario con rol 'doctor' solo puede ver SUS propias citas -- no es
+  // un simple filtro de conveniencia que se pueda quitar, sino el alcance
+  // real de lo que se le pide al backend (ver cargar()/cargarCalendario()),
+  // asi que el campo "Doctor" queda fijo con su propio nombre y no cuenta
+  // como "hay filtros" ni se toca al Limpiar. miDoctorId se resuelve una
+  // sola vez via doctoresSrv.miPerfil() (ver ngOnInit).
+  miDoctorId = signal<string | null>(null);
+  filtroDoctorBloqueado = computed(() => this.auth.usuario()?.rol === 'doctor');
+
+  hayFiltros = computed(() => !!(this.filtroFecha() || this.filtroPaciente() || (!this.filtroDoctorBloqueado() && this.filtroDoctor()) || this.filtroSucursal() || this.filtroCampana() || this.filtroEstado()));
 
   limpiarFiltros(): void {
     this.filtroFecha.set('');
     this.filtroPaciente.set('');
-    this.filtroDoctor.set('');
+    if (!this.filtroDoctorBloqueado()) this.filtroDoctor.set('');
     this.filtroSucursal.set('');
     this.filtroCampana.set('');
     this.filtroEstado.set('');
@@ -267,6 +286,7 @@ export class CitasComponent implements OnInit {
     this.cargandoCalendario.set(true);
     const filtros: Record<string, string> = { desde: this.fechaCalendario(), hasta: this.fechaCalendario() };
     if (this.filtroCalSucursal()) filtros['sucursal_id'] = this.filtroCalSucursal();
+    if (this.miDoctorId()) filtros['doctor_id'] = this.miDoctorId()!;
     this.srv.listar(filtros).subscribe({
       next: (data) => { this.citasCalendario.set(data); this.cargandoCalendario.set(false); },
       error: () => this.cargandoCalendario.set(false),
@@ -282,15 +302,6 @@ export class CitasComponent implements OnInit {
     const doctores = this.doctoresActivos();
     if (doctores.length === 0) { this.disponibilidadCalendarioPorDoctor.set(new Map()); return; }
     const fecha = this.fechaCalendario();
-    // El endpoint de disponibilidad es del doctor (entidad global) y
-    // devuelve TODAS las sucursales donde tiene horario, sin importar de
-    // que clinica sean -- correcto para "ocupados" (choque de horario
-    // cruzado entre clinicas), pero incorrecto para decidir si el doctor
-    // "atiende" en el calendario de ESTA clinica: sin filtrar, una franja
-    // libre en la sucursal de OTRA clinica se mostraba como disponible
-    // aqui, y al hacer clic quedaba precargada una sucursal que ni
-    // siquiera aparece en el <select> de esta clinica (queda en blanco).
-    const sucursalesEmpresa = new Set(this.sucursales().map((s) => s.id));
     forkJoin(
       doctores.map((d) =>
         this.doctoresSrv.disponibilidad(d.id, fecha).pipe(
@@ -301,7 +312,7 @@ export class CitasComponent implements OnInit {
     ).subscribe((resultados) => {
       const mapa = new Map<string, Disponibilidad>();
       for (const [doctorId, disp] of resultados) {
-        if (disp) mapa.set(doctorId, { ...disp, sucursales: disp.sucursales.filter((s) => sucursalesEmpresa.has(s.sucursal_id)) });
+        if (disp) mapa.set(doctorId, disp);
       }
       this.disponibilidadCalendarioPorDoctor.set(mapa);
     });
@@ -369,15 +380,18 @@ export class CitasComponent implements OnInit {
     // emitEvent:false por el mismo motivo que en abrirNuevo(): evitar que
     // doctor_id y fecha disparen actualizarDisponibilidad() por separado,
     // uno con el otro campo todavia sin el valor nuevo.
-    // sucursal_id: solo se pisa el default de abrirNuevo() (sucursales()[0])
-    // si el clic cayo en una franja libre con sucursal identificada -- de lo
-    // contrario un doctor que atiende en varias sucursales terminaba con la
-    // sucursal equivocada precargada (la primera de la lista, no
-    // necesariamente donde tiene horario ese dia a esa hora).
-    const cambios: Record<string, any> = { doctor_id: c.doctorId, fecha: this.fechaCalendario(), hora_inicio: c.hora_inicio, hora_fin: c.hora_fin };
-    if (c.sucursalId) cambios['sucursal_id'] = c.sucursalId;
-    this.form.patchValue(cambios, { emitEvent: false });
+    this.form.patchValue({ doctor_id: c.doctorId, fecha: this.fechaCalendario(), hora_inicio: c.hora_inicio, hora_fin: c.hora_fin }, { emitEvent: false });
     this.actualizarDisponibilidad();
+  }
+
+  // Arrastrar y soltar una cita a otra hora dentro de su misma columna --
+  // el backend ya valida choques de horario/paciente al actualizar, igual
+  // que el formulario de edicion normal.
+  moverCita(ev: { cita: Cita; hora_inicio: string; hora_fin: string }): void {
+    this.srv.actualizar(ev.cita.id, { hora_inicio: ev.hora_inicio, hora_fin: ev.hora_fin }).subscribe({
+      next: () => this.cargarCalendario(),
+      error: (err) => alert(err?.error?.mensaje || 'No se pudo reagendar la cita'),
+    });
   }
 
   // Las acciones del popover reutilizan tal cual los metodos que ya usa la
@@ -475,7 +489,21 @@ export class CitasComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    this.cargar();
+    if (this.auth.usuario()?.rol === 'doctor') {
+      // Resuelve el doctor_id propio ANTES del primer cargar(): asi la
+      // primera consulta que sale ya viaja acotada a "mis citas", sin un
+      // parpadeo donde se ven citas de otros doctores.
+      this.doctoresSrv.miPerfil().subscribe({
+        next: (p) => {
+          this.miDoctorId.set(p.doctor.id);
+          this.filtroDoctor.set(p.doctor.nombre);
+          this.cargar();
+        },
+        error: () => this.cargar(),
+      });
+    } else {
+      this.cargar();
+    }
     this.pacientesSrv.listar().subscribe((data) => this.pacientes.set(data));
     this.doctoresSrv.listar().subscribe((data) => this.doctores.set(data));
     this.categoriasAntecedentesSrv.listar().subscribe((data) => this.categoriasCatalogo.set(data));
@@ -500,7 +528,7 @@ export class CitasComponent implements OnInit {
     const params = this.route.snapshot.queryParamMap;
     if (params.get('fecha')) this.filtroFecha.set(params.get('fecha')!);
     if (params.get('paciente')) this.filtroPaciente.set(params.get('paciente')!);
-    if (params.get('doctor')) this.filtroDoctor.set(params.get('doctor')!);
+    if (params.get('doctor') && !this.filtroDoctorBloqueado()) this.filtroDoctor.set(params.get('doctor')!);
     if (params.get('sucursal')) this.filtroSucursal.set(params.get('sucursal')!);
     if (params.get('estado')) this.filtroEstado.set(params.get('estado')!);
   }
@@ -620,9 +648,12 @@ export class CitasComponent implements OnInit {
 
   // Solo bloquea Guardar cuando el doctor SI tiene un horario configurado
   // (al menos un bloque, en cualquier dia) pero ese dia no atiende en la
-  // sucursal elegida, o ya esta completo ahi. Un doctor sin ningun horario
-  // cargado todavia sigue pudiendo recibir citas con total libertad, como
-  // antes de este tablero.
+  // sucursal elegida, o ya esta completo ahi. Un doctor que nunca
+  // configuro NINGUN horario, en ninguna clinica, sigue pudiendo recibir
+  // citas con total libertad, como antes de este tablero. Pero si SI
+  // configuro horario, solo que en OTRA clinica (no esta), se bloquea
+  // igual que si no atendiera ese dia -- que trabaje en otro lado no dice
+  // nada sobre su disponibilidad aca (ver tiene_horario_en_otra_clinica).
   //
   // Si la cita es de una campana, este chequeo NO aplica: una campana
   // puede reclutar doctores que no trabajan regularmente en esa sucursal
@@ -634,7 +665,8 @@ export class CitasComponent implements OnInit {
     if (this.form.get('es_urgencia')?.value) return false;
     if (this.horarioSinCambios()) return false;
     const disp = this.disponibilidad();
-    if (!disp || !disp.tiene_horario_configurado) return false;
+    if (!disp) return false;
+    if (!disp.tiene_horario_configurado) return disp.tiene_horario_en_otra_clinica;
     const sucursalDisp = this.disponibilidadSucursalActual();
     if (!sucursalDisp) return true;
     return !sucursalDisp.atiende || sucursalDisp.libres.length === 0;
@@ -654,12 +686,15 @@ export class CitasComponent implements OnInit {
     return partes12(valor);
   }
 
+  // "Hora de fin" usa combinarHoraFin12(): "12:00 a.m." solo tiene sentido
+  // como fin del dia (24:00, ver hora12.util.ts) -- ej. una cita de
+  // 11:30pm a 12:00am (medianoche) sin necesitar partirla en dos dias.
   actualizarHora12(campo: 'hora_inicio' | 'hora_fin', parte: 'h' | 'm' | 'periodo', valor: number | string): void {
     const actual = this.partesHora(campo);
     const h12 = parte === 'h' ? Number(valor) : actual.h ?? 12;
     const m = parte === 'm' ? String(valor) : actual.m ?? '00';
     const periodo = (parte === 'periodo' ? valor : actual.periodo ?? 'a.m.') as 'a.m.' | 'p.m.';
-    const hora24 = combinar12(h12, m, periodo);
+    const hora24 = campo === 'hora_fin' ? combinarHoraFin12(h12, m, periodo) : combinar12(h12, m, periodo);
     if (campo === 'hora_inicio') this.form.patchValue({ hora_inicio: hora24 });
     else this.form.patchValue({ hora_fin: hora24 });
   }
@@ -676,7 +711,9 @@ export class CitasComponent implements OnInit {
   }
 
   cargar(): void {
-    this.srv.listar().subscribe((data) => this.citas.set(data));
+    const filtros: Record<string, string> = {};
+    if (this.miDoctorId()) filtros['doctor_id'] = this.miDoctorId()!;
+    this.srv.listar(filtros).subscribe((data) => this.citas.set(data));
     // Mismo dato, dos vistas: si la vista Calendario esta activa se
     // refresca tambien con su propio filtro de fecha/sucursal (ver
     // cargarCalendario()), asi que cualquier guardar/eliminar existente que
@@ -850,6 +887,34 @@ export class CitasComponent implements OnInit {
   }
 
   cerrarPanel(): void { this.panelAbierto.set(false); }
+
+  // El buscador no encontro a nadie con ese nombre (ni en esta clinica ni
+  // en el resto de la red) -- se abre el mini-formulario de creacion
+  // rapida, precargado con lo que ya se escribio.
+  abrirPacienteRapido(nombre: string): void {
+    this.nombreParaPacienteRapido.set(nombre);
+    this.pacienteRapidoAbierto.set(true);
+  }
+
+  cerrarPacienteRapido(): void {
+    this.pacienteRapidoAbierto.set(false);
+  }
+
+  onPacienteRapidoCreado(paciente: Paciente): void {
+    this.agregarPacienteALista(paciente);
+    // fijarSeleccion() en vez de form.patchValue(): el buscador es un
+    // ControlValueAccessor, y su @Input pacientesConocidos (con el que
+    // resuelve el nombre a mostrar) recien se actualiza en el PROXIMO
+    // ciclo de deteccion de cambios -- form.patchValue() llamaria a
+    // writeValue() ahora mismo, cuando esa lista todavia no incluye al
+    // paciente recien creado, y el campo quedaria vacio.
+    this.buscadorPaciente?.fijarSeleccion(paciente.id, paciente.nombre);
+    this.cerrarPacienteRapido();
+  }
+
+  private agregarPacienteALista(paciente: Paciente): void {
+    this.pacientes.update((lista) => [...lista.filter((p) => p.id !== paciente.id), paciente].sort((a, b) => a.nombre.localeCompare(b.nombre)));
+  }
 
   guardar(): void {
     if (this.form.invalid) return;

@@ -6,13 +6,14 @@ import { EspecialidadesService } from '../../core/services/especialidades.servic
 import { SucursalesService } from '../../core/services/sucursales.service';
 import { AuthService } from '../../core/services/auth.service';
 import { Doctor, DoctorEspecialidad, DoctorHorario, Especialidad, Sucursal } from '../../core/models/models';
-import { combinar12, formatoAmPm, HORAS_12, MINUTOS_60, partes12 } from '../../core/utils/hora12.util';
+import { combinar12, combinarHoraFin12, formatoAmPm, HORAS_12, MINUTOS_60, partes12 } from '../../core/utils/hora12.util';
 import { TelefonoInputComponent } from '../../core/components/telefono-input/telefono-input.component';
+import { SelectorFotoComponent } from '../../core/components/selector-foto/selector-foto.component';
 
 @Component({
   selector: 'app-doctores',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule, TelefonoInputComponent],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, TelefonoInputComponent, SelectorFotoComponent],
   templateUrl: './doctores.component.html',
   styleUrl: './doctores.component.css',
 })
@@ -64,6 +65,7 @@ export class DoctoresComponent implements OnInit {
     telefono: [''],
     acepta_whatsapp: [false],
     email: [''],
+    foto: [null as string | null],
     activo: [true],
     especialidades: this.fb.array([this.crearEspecialidadGroup()]),
   });
@@ -101,6 +103,42 @@ export class DoctoresComponent implements OnInit {
 
   esAdmin(): boolean { return this.auth.esSuperAdmin() || this.auth.usuario()?.rol === 'admin'; }
 
+  // Dar acceso al sistema (rol staff) es mas sensible que invitar-paciente
+  // (portal de solo lectura) -- por eso solo admin, a diferencia de
+  // puedeInvitarPaciente() que tambien permite doctor.
+  puedeInvitarDoctor(): boolean {
+    return this.esAdmin();
+  }
+
+  invitarAcceso(d: Doctor): void {
+    if (!confirm(`Se enviara un correo a ${d.email} con sus credenciales de acceso al sistema. Continuar?`)) return;
+    this.srv.invitar(d.id).subscribe({
+      next: () => { alert('Invitacion enviada.'); this.cargar(); },
+      error: (err) => alert(err?.error?.mensaje || 'No se pudo enviar la invitacion'),
+    });
+  }
+
+  // Revoca el acceso de doctor en ESTA clinica -- no borra su cuenta ni su
+  // acceso en otras clinicas donde tambien trabaje.
+  desinvitarAcceso(d: Doctor): void {
+    if (!confirm(`Quitar el acceso al sistema de "${d.nombre}" en esta clinica? Podras volver a invitarlo cuando quieras.`)) return;
+    this.srv.desinvitar(d.id).subscribe({
+      next: () => this.cargar(),
+      error: (err) => alert(err?.error?.mensaje || 'No se pudo quitar el acceso'),
+    });
+  }
+
+  reseteandoPasswordDoctor = signal<string | null>(null);
+
+  resetearPasswordDoctor(d: Doctor): void {
+    if (!confirm(`Se generara una nueva contrasena de acceso para "${d.nombre}" y se enviara a ${d.email}. Continuar?`)) return;
+    this.reseteandoPasswordDoctor.set(d.id);
+    this.srv.resetearPassword(d.id).subscribe({
+      next: (res) => { this.reseteandoPasswordDoctor.set(null); alert(res.mensaje); },
+      error: (err) => { this.reseteandoPasswordDoctor.set(null); alert(err?.error?.mensaje || 'No se pudo resetear la contrasena'); },
+    });
+  }
+
   crearEspecialidadGroup(e?: Partial<DoctorEspecialidad>) {
     return this.fb.group({
       especialidad_id: [e?.especialidad_id ?? '', Validators.required],
@@ -135,11 +173,24 @@ export class DoctoresComponent implements OnInit {
     this.tokenBusquedaIdentificacion++;
     this.editando.set(d);
     this.doctorExistente.set(null);
-    this.form.reset({ nombre: d.nombre, identificacion: d.identificacion, telefono: d.telefono, acepta_whatsapp: d.acepta_whatsapp, email: d.email, activo: d.activo });
+    this.form.reset({ nombre: d.nombre, identificacion: d.identificacion, telefono: d.telefono, acepta_whatsapp: d.acepta_whatsapp, email: d.email, foto: d.foto ?? null, activo: d.activo });
     this.habilitarCamposIdentidad();
     this.especialidadesArray.clear();
     (d.especialidades.length ? d.especialidades : [undefined]).forEach((e) => this.especialidadesArray.push(this.crearEspecialidadGroup(e)));
     this.panelAbierto.set(true);
+  }
+
+  // Mismo criterio que en Pacientes: el drawer solo guarda la foto cuando
+  // se envia el formulario completo, no de inmediato -- por eso solo se
+  // actualiza el control, sin llamar al backend aca.
+  onFotoSeleccionada(base64: string): void {
+    this.form.patchValue({ foto: base64 });
+    this.form.get('foto')?.markAsDirty();
+  }
+
+  onFotoEliminada(): void {
+    this.form.patchValue({ foto: null });
+    this.form.get('foto')?.markAsDirty();
   }
 
   // Solo aplica al registrar un doctor nuevo: busca en TODA la red (no
@@ -165,6 +216,7 @@ export class DoctoresComponent implements OnInit {
             telefono: res.doctor.telefono ?? '',
             acepta_whatsapp: res.doctor.acepta_whatsapp ?? false,
             email: res.doctor.email ?? '',
+            foto: res.doctor.foto ?? null,
           });
           this.especialidadesArray.clear();
           (res.doctor.especialidades?.length ? res.doctor.especialidades : [undefined]).forEach((e) => this.especialidadesArray.push(this.crearEspecialidadGroup(e)));
@@ -232,12 +284,14 @@ export class DoctoresComponent implements OnInit {
     return partes12(valor);
   }
 
+  // "Hasta" usa combinarHoraFin12(): "12:00 a.m." solo tiene sentido como
+  // fin del dia (24:00, ver hora12.util.ts), nunca como su inicio (00:00).
   actualizarHoraHorario12(campo: 'hora_inicio' | 'hora_fin', parte: 'h' | 'm' | 'periodo', valor: number | string): void {
     const actual = this.partesHoraHorario(campo);
     const h12 = parte === 'h' ? Number(valor) : actual.h ?? 12;
     const m = parte === 'm' ? String(valor) : actual.m ?? '00';
     const periodo = (parte === 'periodo' ? valor : actual.periodo ?? 'a.m.') as 'a.m.' | 'p.m.';
-    const hora24 = combinar12(h12, m, periodo);
+    const hora24 = campo === 'hora_fin' ? combinarHoraFin12(h12, m, periodo) : combinar12(h12, m, periodo);
     if (campo === 'hora_inicio') this.horarioForm.patchValue({ hora_inicio: hora24 });
     else this.horarioForm.patchValue({ hora_fin: hora24 });
   }

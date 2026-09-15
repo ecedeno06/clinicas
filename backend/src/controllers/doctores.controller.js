@@ -1,4 +1,18 @@
+const bcrypt = require('bcryptjs');
 const { pool } = require('../config/db');
+const { generarPasswordTemporal } = require('../utils/passwordTemporal');
+const { enviarCorreo } = require('../utils/correo');
+const { obtenerPolitica, generarPasswordSegunPolitica } = require('../utils/politicaPassword');
+
+// true si la cuenta vinculada a este doctor (doctores.usuario_id) ya tiene
+// el rol 'doctor' en ESTA clinica puntual -- ver invitar()/desinvitar()
+// mas abajo. Un doctor sin usuario_id (nunca invitado) siempre da false.
+const TIENE_ACCESO_ESTA_CLINICA = `
+  exists(
+    select 1 from usuarios_empresas_rol uer
+    where uer.usuario_id = d.usuario_id and uer.empresa_id = de.empresa_id and uer.rol = 'doctor'
+  ) as tiene_acceso_esta_clinica
+`;
 
 // Un doctor puede tener varias especialidades (tabla puente
 // doctor_especialidades), cada una con su propio numero de colegiado.
@@ -19,6 +33,7 @@ const SELECT_DOCTOR = `
   select
     d.*,
     de.activo,
+    ${TIENE_ACCESO_ESTA_CLINICA},
     coalesce((
       select json_agg(json_build_object('especialidad_id', e.id, 'nombre', e.nombre, 'numero_colegiado', de2.numero_colegiado) order by e.nombre)
       from doctor_especialidades de2
@@ -137,7 +152,7 @@ async function buscarPorIdentificacion(req, res, next) {
 async function crear(req, res, next) {
   const client = await pool.connect();
   try {
-    const { nombre, identificacion, especialidades, telefono, acepta_whatsapp, email, activo } = req.body;
+    const { nombre, identificacion, especialidades, telefono, acepta_whatsapp, email, activo, foto } = req.body;
 
     const errorEspecialidades = await validarEspecialidades(client, especialidades);
     if (errorEspecialidades) return res.status(400).json({ mensaje: errorEspecialidades });
@@ -165,9 +180,9 @@ async function crear(req, res, next) {
         return res.status(400).json({ mensaje: 'nombre es requerido para un doctor nuevo' });
       }
       const ins = await client.query(
-        `insert into doctores (nombre, identificacion, telefono, acepta_whatsapp, email)
-         values ($1,$2,$3, coalesce($4, false),$5) returning *`,
-        [nombre, identificacion || null, telefono, acepta_whatsapp, email]
+        `insert into doctores (nombre, identificacion, telefono, acepta_whatsapp, email, foto)
+         values ($1,$2,$3, coalesce($4, false),$5,$6) returning *`,
+        [nombre, identificacion || null, telefono, acepta_whatsapp, email, foto || null]
       );
       doctor = ins.rows[0];
     }
@@ -198,7 +213,7 @@ async function crear(req, res, next) {
 async function actualizar(req, res, next) {
   const client = await pool.connect();
   try {
-    const { nombre, identificacion, especialidades, telefono, acepta_whatsapp, email, activo } = req.body;
+    const { nombre, identificacion, especialidades, telefono, acepta_whatsapp, email, activo, foto } = req.body;
 
     const vinculo = await client.query(
       'select 1 from doctores_empresas where doctor_id = $1 and empresa_id = $2',
@@ -223,11 +238,12 @@ async function actualizar(req, res, next) {
            identificacion = coalesce($2, identificacion),
            telefono = coalesce($3, telefono),
            acepta_whatsapp = coalesce($4, acepta_whatsapp),
-           email = coalesce($5, email)
+           email = coalesce($5, email),
+           foto = coalesce($9, foto)
          where id = $6
        )
        update doctores_empresas set activo = coalesce($7, activo) where doctor_id = $6 and empresa_id = $8`,
-      [nombre, identificacion, telefono, acepta_whatsapp, email, req.params.id, activo, req.empresaId]
+      [nombre, identificacion, telefono, acepta_whatsapp, email, req.params.id, activo, req.empresaId, foto]
     );
 
     if (especialidades !== undefined) await reemplazarEspecialidades(client, req.params.id, especialidades);
@@ -287,4 +303,215 @@ async function eliminar(req, res, next) {
   }
 }
 
-module.exports = { listar, obtener, buscarPorIdentificacion, crear, actualizar, eliminar };
+// POST /api/doctores/:id/invitar (solo admin)
+// Crea (o reutiliza) una cuenta de acceso al sistema para el doctor, con
+// rol 'doctor' en ESTA clinica -- puede loguearse, elegir esta clinica al
+// entrar, y ver/gestionar sus propias citas y horarios (incluidos los de
+// otras clinicas donde trabaje, ver doctorHorarios.controller.js). Mismo
+// patron que pacientes.controller.js#invitar, pero dar acceso de STAFF es
+// mas sensible que dar acceso de portal de solo lectura -- por eso queda
+// restringido a admin (ver doctores.routes.js), a diferencia de invitar
+// paciente que tambien permite doctor.
+async function invitar(req, res, next) {
+  const client = await pool.connect();
+  try {
+    const doctorRes = await client.query(
+      `select d.* from doctores d
+       join doctores_empresas de on de.doctor_id = d.id
+       where d.id = $1 and de.empresa_id = $2`,
+      [req.params.id, req.empresaId]
+    );
+    const doctor = doctorRes.rows[0];
+    if (!doctor) return res.status(404).json({ mensaje: 'Doctor no encontrado' });
+    if (!doctor.email) return res.status(400).json({ mensaje: 'El doctor no tiene correo registrado' });
+
+    await client.query('begin');
+
+    let usuarioId = doctor.usuario_id;
+    let nuevaCuenta = false;
+    let passwordTemporal = null;
+
+    if (!usuarioId) {
+      const existente = await client.query('select id from usuarios where email = $1', [doctor.email]);
+      if (existente.rows[0]) {
+        usuarioId = existente.rows[0].id;
+      } else {
+        const politica = await obtenerPolitica();
+        passwordTemporal = generarPasswordTemporal(Math.max(10, politica.longitud_minima));
+        const passwordHash = await bcrypt.hash(passwordTemporal, 10);
+        const nuevo = await client.query(
+          `insert into usuarios (nombre, email, password_hash, activo, debe_cambiar_password)
+           values ($1, $2, $3, true, true) returning id`,
+          [doctor.nombre, doctor.email, passwordHash]
+        );
+        usuarioId = nuevo.rows[0].id;
+        nuevaCuenta = true;
+      }
+      await client.query('update doctores set usuario_id = $1 where id = $2', [usuarioId, doctor.id]);
+    }
+
+    // Una cuenta puede tener a la vez el rol 'doctor' Y otro rol de staff
+    // (admin/recepcionista) en la MISMA clinica -- ej. el dueno de la
+    // clinica que ademas atiende como doctor ahi mismo. La base lo permite
+    // (uq_usuarios_empresas_rol_staff incluye "rol" en la clave unica);
+    // aca solo bloqueamos si YA es doctor en esta clinica especificamente,
+    // mismo criterio que invitar-paciente.
+    const yaEsDoctor = await client.query(
+      "select 1 from usuarios_empresas_rol where usuario_id = $1 and empresa_id = $2 and rol = 'doctor'",
+      [usuarioId, req.empresaId]
+    );
+    if (yaEsDoctor.rows[0]) {
+      await client.query('rollback');
+      return res.status(409).json({ mensaje: 'Este doctor ya tiene acceso a esta clinica.' });
+    }
+    await client.query(
+      `insert into usuarios_empresas_rol (usuario_id, empresa_id, rol) values ($1, $2, 'doctor')`,
+      [usuarioId, req.empresaId]
+    );
+
+    const empresaRes = await client.query('select nombre from empresas where id = $1', [req.empresaId]);
+    const empresaNombre = empresaRes.rows[0]?.nombre || 'la clinica';
+
+    await client.query('commit');
+
+    const enlace = `${process.env.CORS_ORIGIN || 'http://localhost:4201'}/login`;
+    const correo = nuevaCuenta
+      ? {
+          destinatario: doctor.email,
+          asunto: `Acceso al sistema - ${empresaNombre}`,
+          texto: `Hola ${doctor.nombre},\n\n${empresaNombre} te dio acceso al sistema con rol de doctor: puedes ver tus citas y gestionar tu horario.\n\nUsuario: ${doctor.email}\nContrasena temporal: ${passwordTemporal}\n\nIngresa aqui: ${enlace}\n\nPor seguridad, se te pedira cambiar esta contrasena la primera vez que inicies sesion.`,
+        }
+      : {
+          destinatario: doctor.email,
+          asunto: `Acceso al sistema - ${empresaNombre}`,
+          texto: `Hola ${doctor.nombre},\n\n${empresaNombre} te dio acceso al sistema con rol de doctor: puedes ver tus citas y gestionar tu horario.\n\nYa tenias una cuenta en el sistema (${doctor.email}): inicia sesion con tu contrasena habitual y elige esta clinica.\n\nIngresa aqui: ${enlace}`,
+        };
+    enviarCorreo(correo).catch((err) => console.error('Error enviando correo de invitacion a doctor:', err.message));
+
+    const doctorFinal = await obtenerDoctorConEspecialidades(pool, doctor.id, req.empresaId);
+    res.json(doctorFinal);
+  } catch (err) {
+    await client.query('rollback');
+    next(err);
+  } finally {
+    client.release();
+  }
+}
+
+// DELETE /api/doctores/:id/invitar (solo admin) -- revoca el acceso de
+// doctor en ESTA clinica puntual (borra solo la fila usuarios_empresas_rol
+// de esta clinica). No borra la cuenta ni toca su acceso en otras
+// clinicas donde tambien trabaje, ni doctores.usuario_id (el vinculo con
+// la cuenta es global y sigue siendo util si se le vuelve a invitar aqui
+// despues).
+async function desinvitar(req, res, next) {
+  try {
+    const doctorRes = await pool.query(
+      `select d.usuario_id from doctores d
+       join doctores_empresas de on de.doctor_id = d.id
+       where d.id = $1 and de.empresa_id = $2`,
+      [req.params.id, req.empresaId]
+    );
+    const doctor = doctorRes.rows[0];
+    if (!doctor) return res.status(404).json({ mensaje: 'Doctor no encontrado' });
+    if (!doctor.usuario_id) return res.status(404).json({ mensaje: 'Este doctor no tiene acceso en esta clinica' });
+
+    const { rowCount } = await pool.query(
+      "delete from usuarios_empresas_rol where usuario_id = $1 and empresa_id = $2 and rol = 'doctor'",
+      [doctor.usuario_id, req.empresaId]
+    );
+    if (!rowCount) return res.status(404).json({ mensaje: 'Este doctor no tiene acceso en esta clinica' });
+
+    const doctorFinal = await obtenerDoctorConEspecialidades(pool, req.params.id, req.empresaId);
+    res.json(doctorFinal);
+  } catch (err) { next(err); }
+}
+
+// POST /api/doctores/:id/resetear-password (solo admin) -- mismo patron
+// que pacientes.controller.js#resetearPassword: el correo se envia ANTES
+// de guardar el cambio, para no dejar al doctor con una contrasena que
+// nunca le llego.
+async function resetearPassword(req, res, next) {
+  try {
+    const doctorRes = await pool.query(
+      `select d.nombre, d.email, d.usuario_id, ${TIENE_ACCESO_ESTA_CLINICA}
+       from doctores d
+       join doctores_empresas de on de.doctor_id = d.id
+       where d.id = $1 and de.empresa_id = $2`,
+      [req.params.id, req.empresaId]
+    );
+    const doctor = doctorRes.rows[0];
+    if (!doctor) return res.status(404).json({ mensaje: 'Doctor no encontrado' });
+    if (!doctor.tiene_acceso_esta_clinica) {
+      return res.status(404).json({ mensaje: 'Este doctor no tiene acceso al sistema en esta clinica' });
+    }
+
+    const politica = await obtenerPolitica();
+    const passwordTemporal = generarPasswordSegunPolitica(politica);
+    const password_hash = await bcrypt.hash(passwordTemporal, 10);
+
+    const empresaRes = await pool.query('select nombre from empresas where id = $1', [req.empresaId]);
+    const empresaNombre = empresaRes.rows[0]?.nombre || 'la clinica';
+    const enlace = `${process.env.CORS_ORIGIN || 'http://localhost:4201'}/login`;
+
+    try {
+      await enviarCorreo({
+        destinatario: doctor.email,
+        asunto: `Tu contrasena fue restablecida - ${empresaNombre}`,
+        texto: `Hola ${doctor.nombre},\n\n${empresaNombre} restablecio tu contrasena de acceso al sistema.\n\nUsuario: ${doctor.email}\nContrasena temporal: ${passwordTemporal}\n\nIngresa aqui: ${enlace}\n\nPor seguridad, se te pedira cambiar esta contrasena la primera vez que inicies sesion.`,
+      });
+    } catch (err) {
+      return res.status(502).json({ mensaje: 'No se pudo enviar el correo con la nueva contrasena. Intenta de nuevo.' });
+    }
+
+    await pool.query(
+      'update usuarios set password_hash = $1, debe_cambiar_password = true where id = $2',
+      [password_hash, doctor.usuario_id]
+    );
+
+    res.json({ mensaje: `Se envio una nueva contrasena al correo ${doctor.email}` });
+  } catch (err) { next(err); }
+}
+
+// GET /api/doctores/mi-perfil (autenticado, cuenta con doctores.usuario_id
+// propio) -- portal del doctor: sus datos + en que clinicas tiene rol
+// 'doctor' (sin importar cual este activa en la sesion ahora mismo), para
+// que pueda ver/gestionar su horario en cualquiera de ellas (ver
+// doctorHorarios.controller.js, que ya soporta esto cross-clinica).
+async function miPerfil(req, res, next) {
+  try {
+    const { rows: idRows } = await pool.query('select id from doctores where usuario_id = $1', [req.usuario.id]);
+    if (!idRows[0]) return res.status(404).json({ mensaje: 'Esta cuenta no tiene un perfil de doctor vinculado' });
+    const doctorId = idRows[0].id;
+
+    const { rows: doctorRows } = await pool.query(
+      `select d.*,
+              coalesce((
+                select json_agg(json_build_object('especialidad_id', esp.id, 'nombre', esp.nombre, 'numero_colegiado', de2.numero_colegiado) order by esp.nombre)
+                from doctor_especialidades de2 join especialidades esp on esp.id = de2.especialidad_id
+                where de2.doctor_id = d.id
+              ), '[]') as especialidades,
+              (
+                select string_agg(esp.nombre, ', ' order by esp.nombre)
+                from doctor_especialidades de2 join especialidades esp on esp.id = de2.especialidad_id
+                where de2.doctor_id = d.id
+              ) as especialidad_nombre
+       from doctores d where d.id = $1`,
+      [doctorId]
+    );
+
+    const { rows: empresas } = await pool.query(
+      `select e.id as empresa_id, e.nombre as empresa_nombre, coalesce(de.activo, false) as activo
+       from usuarios_empresas_rol uer
+       join empresas e on e.id = uer.empresa_id
+       left join doctores_empresas de on de.doctor_id = $1 and de.empresa_id = e.id
+       where uer.usuario_id = $2 and uer.rol = 'doctor'
+       order by e.nombre`,
+      [doctorId, req.usuario.id]
+    );
+
+    res.json({ doctor: doctorRows[0], empresas });
+  } catch (err) { next(err); }
+}
+
+module.exports = { listar, obtener, buscarPorIdentificacion, crear, actualizar, eliminar, invitar, desinvitar, resetearPassword, miPerfil };

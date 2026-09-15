@@ -9,11 +9,16 @@ function formatearFechaLarga(fecha) {
   return `${d.getUTCDate()} de ${MESES[d.getUTCMonth()]} de ${d.getUTCFullYear()}`;
 }
 
-// hora: string "HH:MM:SS" o "HH:MM" (columna time de Postgres).
+// hora: string "HH:MM:SS" o "HH:MM" (columna time de Postgres). 24:xx
+// representa el fin del dia (ej. una cita que termina justo a
+// medianoche) -- se lee "12:xx a.m.", nunca "12:xx p.m." como daria el
+// calculo normal de abajo (hora_inicio nunca llega a valer 24:xx, violaria
+// hora_fin > hora_inicio, asi que esta lectura es siempre correcta).
 function formatoAmPm(hora) {
   const [horaStr, minutoStr] = String(hora).split(':');
   let horas = parseInt(horaStr, 10);
   const minutos = minutoStr || '00';
+  if (horas >= 24) return `12:${minutos} a.m.`;
   const sufijo = horas >= 12 ? 'p.m.' : 'a.m.';
   horas = horas % 12 || 12;
   return `${horas}:${minutos} ${sufijo}`;

@@ -35,6 +35,28 @@
             <button type="button" class="btn-icon" title="Horario" aria-label="Horario" (click)="abrirHorario(d)">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg>
             </button>
+            @if (puedeInvitarDoctor()) {
+              @if (d.tiene_acceso_esta_clinica) {
+                <button type="button" class="btn-icon" style="color: var(--green-600, green);" title="Ya tiene acceso al sistema en esta clinica -- clic para quitarlo" aria-label="Quitar acceso de doctor" (click)="desinvitarAcceso(d)">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M17 11l2 2 4-4"/></svg>
+                </button>
+                <button type="button" class="btn-icon" title="Resetear contrasena de acceso (se envia por correo)" aria-label="Resetear contrasena del doctor" [disabled]="reseteandoPasswordDoctor() === d.id" (click)="resetearPasswordDoctor(d)">
+                  @if (reseteandoPasswordDoctor() === d.id) {
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="spin"><path d="M21 12a9 9 0 1 1-9-9"/></svg>
+                  } @else {
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                  }
+                </button>
+              } @else if (d.email) {
+                <button type="button" class="btn-icon" title="Invitar acceso al sistema (rol doctor)" aria-label="Invitar acceso" (click)="invitarAcceso(d)">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg>
+                </button>
+              } @else {
+                <span class="btn-icon" style="opacity:.35; cursor:not-allowed;" title="El doctor no tiene correo registrado" aria-label="Invitar acceso deshabilitado">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg>
+                </span>
+              }
+            }
             @if (esAdmin()) {
               <button type="button" class="btn-icon" title="Editar" aria-label="Editar" (click)="abrirEditar(d)">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
@@ -67,9 +89,18 @@
             con sus datos actuales.
           </p>
         }
-        <div class="form-group">
-          <label>Nombre *</label>
-          <input class="input" formControlName="nombre" placeholder="Dr. Juan Perez" />
+        <div class="flex gap-16" style="align-items: flex-start;">
+          <div class="form-group" style="flex: 1;">
+            <label>Nombre *</label>
+            <input class="input" formControlName="nombre" placeholder="Dr. Juan Perez" />
+          </div>
+          <app-selector-foto
+            [foto]="form.get('foto')?.value"
+            [nombre]="form.get('nombre')?.value || ''"
+            titulo="Foto del doctor"
+            (fotoCambiada)="onFotoSeleccionada($event)"
+            (fotoEliminada)="onFotoEliminada()"
+          ></app-selector-foto>
         </div>
         <div class="form-group mt-16">
           <label>Identificacion (cedula)</label>
@@ -132,7 +163,13 @@
 
       <div class="horario-week-grid">
         @for (dia of diasSemana; track dia; let i = $index) {
-          <div class="horario-day-col" [class.on]="tieneHorarioActivo(i)">
+          <div
+            class="horario-day-col"
+            [class.on]="tieneHorarioActivo(i)"
+            [class.seleccionado]="horarioForm.get('dia_semana')?.value === i"
+            (click)="horarioForm.patchValue({ dia_semana: i })"
+            title="Elegir {{ dia }} en el formulario de abajo"
+          >
             <div class="horario-day-head">{{ dia.substring(0, 3) }}</div>
             <div class="horario-day-body">
               @for (h of horariosPorDia(i); track h.id) {

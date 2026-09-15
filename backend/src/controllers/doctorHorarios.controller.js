@@ -291,18 +291,41 @@ async function disponibilidad(req, res, next) {
     const diaSemanaResult = await pool.query('select extract(dow from $1::date)::int as dia_semana', [fecha]);
     const diaSemana = diaSemanaResult.rows[0].dia_semana;
 
+    // Un doctor puede trabajar en varias clinicas (doctores_empresas), cada
+    // una con sucursales y horarios propios -- estas dos consultas se
+    // limitan a las sucursales de la clinica ACTIVA (req.empresaId); sin
+    // ese filtro, un horario configurado en otra clinica se filtraba aca
+    // igual, haciendo parecer disponible a un doctor que en esta clinica
+    // no tiene ningun horario cargado.
     const tieneHorarioResult = await pool.query(
-      'select exists(select 1 from doctor_horarios where doctor_id = $1 and activo = true) as existe',
-      [req.params.id]
+      `select exists(
+         select 1 from doctor_horarios dh
+         join sucursales s on s.id = dh.sucursal_id
+         where dh.doctor_id = $1 and dh.activo = true and s.empresa_id = $2
+       ) as existe`,
+      [req.params.id, req.empresaId]
+    );
+
+    // Distingue "nunca configuro horario en ningun lado" (doctor nuevo,
+    // sigue totalmente libre en esta clinica) de "tiene horario, pero no
+    // en esta clinica" (se bloquea aca -- ver tiene_horario_configurado
+    // mas abajo y su uso en el frontend, calendario y sinDisponibilidad()).
+    const tieneHorarioOtraClinicaResult = await pool.query(
+      `select exists(
+         select 1 from doctor_horarios dh
+         join sucursales s on s.id = dh.sucursal_id
+         where dh.doctor_id = $1 and dh.activo = true and s.empresa_id <> $2
+       ) as existe`,
+      [req.params.id, req.empresaId]
     );
 
     const bloquesResult = await pool.query(
       `select dh.sucursal_id, s.nombre as sucursal_nombre, s.zona_horaria, dh.hora_inicio, dh.hora_fin
        from doctor_horarios dh
        join sucursales s on s.id = dh.sucursal_id
-       where dh.doctor_id = $1 and dh.dia_semana = $2 and dh.activo = true
+       where dh.doctor_id = $1 and dh.dia_semana = $2 and dh.activo = true and s.empresa_id = $3
        order by s.nombre asc, dh.hora_inicio asc`,
-      [req.params.id, diaSemana]
+      [req.params.id, diaSemana, req.empresaId]
     );
 
     const citasResult = await pool.query(
@@ -353,6 +376,7 @@ async function disponibilidad(req, res, next) {
     res.json({
       atiende: sucursales.some((s) => s.atiende),
       tiene_horario_configurado: tieneHorarioResult.rows[0].existe,
+      tiene_horario_en_otra_clinica: tieneHorarioOtraClinicaResult.rows[0].existe,
       dia_semana: diaSemana,
       ocupados: citasResult.rows.map((c) => ({ hora_inicio: c.hora_inicio.substring(0, 5), hora_fin: c.hora_fin.substring(0, 5) })),
       sucursales,

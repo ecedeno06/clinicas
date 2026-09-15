@@ -93,15 +93,18 @@ async function crear(req, res, next) {
     }
 
     // El rol aqui siempre es de staff (el <select> del formulario solo
-    // ofrece admin/doctor/recepcionista, nunca 'paciente') -- el arbitro
-    // del upsert es el indice parcial de staff, para no tocar una fila
-    // 'paciente' que esta misma persona pudiera tener en la clinica.
-    const { rows: relacion } = await pool.query(
+    // ofrece admin/doctor/recepcionista, nunca 'paciente'). Una cuenta
+    // puede tener MAS de un rol de staff en la misma clinica (ej. admin Y
+    // doctor -- ver uq_usuarios_empresas_rol_staff, incluye "rol" en la
+    // clave unica) -- por eso ya no se hace upsert reemplazando el rol
+    // anterior: si ya tenia ESE rol especifico no se duplica (on conflict
+    // do nothing), si tenia uno distinto ahora simplemente se suma.
+    const rolFinal = rol || 'recepcionista';
+    await pool.query(
       `insert into usuarios_empresas_rol (usuario_id, empresa_id, rol)
-       values ($1, $2, coalesce($3, 'recepcionista'))
-       on conflict (usuario_id, empresa_id) where rol <> 'paciente' do update set rol = excluded.rol
-       returning rol`,
-      [usuarioId, empresaDestino, rol]
+       values ($1, $2, $3)
+       on conflict (usuario_id, empresa_id, rol) where rol <> 'paciente' do nothing`,
+      [usuarioId, empresaDestino, rolFinal]
     );
 
     const { rows: usuarioRows } = await pool.query(
@@ -109,14 +112,17 @@ async function crear(req, res, next) {
       [usuarioId]
     );
 
-    res.status(201).json({ ...usuarioRows[0], rol: relacion[0].rol });
+    res.status(201).json({ ...usuarioRows[0], rol: rolFinal });
   } catch (err) { next(err); }
 }
 
-// PUT /api/usuarios/:id  { nombre, password, avatar, telefono, acepta_whatsapp, activo, rol, es_super_admin? }
+// PUT /api/usuarios/:id  { nombre, password, avatar, telefono, acepta_whatsapp, activo, rol, rol_actual?, es_super_admin? }
+// rol_actual: cual de sus roles de staff en esta clinica se esta
+// editando -- solo hace falta si el usuario tiene mas de uno (ver
+// uq_usuarios_empresas_rol_staff, ahora permite admin+doctor a la vez).
 async function actualizar(req, res, next) {
   try {
-    const { nombre, password, avatar, telefono, acepta_whatsapp, activo, rol, es_super_admin } = req.body;
+    const { nombre, password, avatar, telefono, acepta_whatsapp, activo, rol, rol_actual, es_super_admin } = req.body;
 
     const pertenece = await pool.query(
       "select 1 from usuarios_empresas_rol where usuario_id = $1 and empresa_id = $2 and rol <> 'paciente'",
@@ -151,34 +157,62 @@ async function actualizar(req, res, next) {
     );
 
     if (rol) {
-      // Solo la fila de staff -- si esta persona ademas es paciente de
-      // esta clinica, su fila 'paciente' no debe verse afectada.
-      await pool.query(
-        "update usuarios_empresas_rol set rol = $1 where usuario_id = $2 and empresa_id = $3 and rol <> 'paciente'",
-        [rol, req.params.id, req.empresaId]
+      // Si tiene mas de un rol de staff aca (ej. admin Y doctor), hace
+      // falta saber cual de los dos se esta editando -- sin eso, un
+      // update "a ciegas" cambiaria AMBAS filas al mismo rol nuevo y
+      // chocaria contra la restriccion unica (dos filas identicas).
+      const filasStaff = await pool.query(
+        "select rol from usuarios_empresas_rol where usuario_id = $1 and empresa_id = $2 and rol <> 'paciente'",
+        [req.params.id, req.empresaId]
       );
+      if (filasStaff.rows.length > 1 && !rol_actual) {
+        return res.status(400).json({ mensaje: 'Este usuario tiene mas de un rol de staff en esta clinica -- especifica cual rol estas editando (rol_actual).' });
+      }
+      const rolObjetivo = rol_actual || filasStaff.rows[0]?.rol;
+      if (rolObjetivo && rolObjetivo !== rol) {
+        await pool.query(
+          'update usuarios_empresas_rol set rol = $1 where usuario_id = $2 and empresa_id = $3 and rol = $4',
+          [rol, req.params.id, req.empresaId, rolObjetivo]
+        );
+      }
     }
 
+    // Si tiene mas de un rol de staff, se devuelve puntualmente la fila que
+    // se acaba de editar (el nuevo valor de "rol") en vez de una fila
+    // arbitraria entre las que tenga.
     const { rows } = await pool.query(
       `select u.id, u.nombre, u.email, u.telefono, u.acepta_whatsapp, u.activo, u.avatar, u.es_super_admin, uer.rol, u.created_at
        from usuarios u
        join usuarios_empresas_rol uer on uer.usuario_id = u.id
-       where u.id = $1 and uer.empresa_id = $2 and uer.rol <> 'paciente'`,
-      [req.params.id, req.empresaId]
+       where u.id = $1 and uer.empresa_id = $2 and uer.rol <> 'paciente' ${rol ? 'and uer.rol = $3' : ''}`,
+      rol ? [req.params.id, req.empresaId, rol] : [req.params.id, req.empresaId]
     );
     res.json(rows[0]);
   } catch (err) { next(err); }
 }
 
-// DELETE /api/usuarios/:id  -> quita al usuario del STAFF de la clinica
-// activa. Si ademas es paciente de esta clinica, ese acceso NO se toca
-// (son cosas independientes -- dejar de trabajar ahi no le quita su
-// portal de paciente).
+// DELETE /api/usuarios/:id?rol=admin -> quita al usuario del STAFF de la
+// clinica activa. Si ademas es paciente de esta clinica, ese acceso NO se
+// toca (son cosas independientes -- dejar de trabajar ahi no le quita su
+// portal de paciente). ?rol= indica cual rol de staff quitar -- solo hace
+// falta si tiene mas de uno (ej. admin Y doctor); sin eso se quitarian
+// TODOS sus roles de staff de un tiron.
 async function eliminar(req, res, next) {
   try {
-    const { rowCount } = await pool.query(
-      "delete from usuarios_empresas_rol where usuario_id = $1 and empresa_id = $2 and rol <> 'paciente'",
+    const rolAQuitar = req.query.rol;
+    const filasStaff = await pool.query(
+      "select rol from usuarios_empresas_rol where usuario_id = $1 and empresa_id = $2 and rol <> 'paciente'",
       [req.params.id, req.empresaId]
+    );
+    if (filasStaff.rows.length > 1 && !rolAQuitar) {
+      return res.status(400).json({ mensaje: 'Este usuario tiene mas de un rol de staff en esta clinica -- especifica cual rol estas quitando (?rol=).' });
+    }
+
+    const condicion = rolAQuitar ? 'and rol = $3' : "and rol <> 'paciente'";
+    const valores = rolAQuitar ? [req.params.id, req.empresaId, rolAQuitar] : [req.params.id, req.empresaId];
+    const { rowCount } = await pool.query(
+      `delete from usuarios_empresas_rol where usuario_id = $1 and empresa_id = $2 ${condicion}`,
+      valores
     );
     if (!rowCount) return res.status(404).json({ mensaje: 'Usuario no encontrado en esta clinica' });
     res.status(204).send();

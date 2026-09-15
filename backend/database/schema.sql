@@ -312,6 +312,9 @@ create table if not exists doctores (
     -- pacientes.acepta_whatsapp.
     acepta_whatsapp     boolean not null default false,
     email               text,
+    -- Foto del doctor en base64 (data URI), igual que pacientes.foto
+    -- (migracion 008) y usuarios.avatar.
+    foto                text,
     created_at          timestamptz not null default now(),
     updated_at          timestamptz not null default now()
 );
@@ -705,8 +708,12 @@ create index if not exists idx_dos_factor_recovery_tokens_usuario on dos_factor_
 create index if not exists idx_dos_factor_recovery_tokens_token_activo on dos_factor_recovery_tokens(token) where usado = false;
 create index if not exists idx_usuarios_empresas_rol_usuario on usuarios_empresas_rol(usuario_id);
 create index if not exists idx_usuarios_empresas_rol_empresa on usuarios_empresas_rol(empresa_id);
+-- Permite mas de un rol de staff simultaneo por clinica (ej. admin Y
+-- doctor a la vez) -- solo bloquea repetir el MISMO rol dos veces (ver
+-- migracion 051). Nunca dos roles 'paciente' a la vez (ver el indice de
+-- abajo, sin cambios).
 create unique index if not exists uq_usuarios_empresas_rol_staff
-  on usuarios_empresas_rol(usuario_id, empresa_id) where rol <> 'paciente';
+  on usuarios_empresas_rol(usuario_id, empresa_id, rol) where rol <> 'paciente';
 create unique index if not exists uq_usuarios_empresas_rol_paciente
   on usuarios_empresas_rol(usuario_id, empresa_id) where rol = 'paciente';
 create index if not exists idx_pacientes_empresas_paciente on pacientes_empresas(paciente_id);

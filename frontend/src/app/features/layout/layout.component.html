@@ -24,6 +24,19 @@
           </span>
           <span class="nav-label">Mis Citas</span>
         </a>
+      } @else if (auth.usuario()?.rol === 'doctor') {
+        <a routerLink="/portal-doctor/perfil" routerLinkActive="active" title="Mi Perfil">
+          <span class="nav-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </span>
+          <span class="nav-label">Mi Perfil</span>
+        </a>
+        <a routerLink="/citas" routerLinkActive="active" title="Citas">
+          <span class="nav-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+          </span>
+          <span class="nav-label">Citas</span>
+        </a>
       } @else {
       <a routerLink="/dashboard" routerLinkActive="active" title="Resumen">
         <span class="nav-icon">

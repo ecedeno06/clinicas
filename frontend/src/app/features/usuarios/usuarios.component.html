@@ -21,7 +21,7 @@
       </tr>
     </thead>
     <tbody>
-      @for (u of usuariosFiltrados(); track u.id) {
+      @for (u of usuariosFiltrados(); track u.id + u.rol) {
         <tr>
           <td>{{ u.nombre }}</td>
           <td>{{ u.email }}</td>

@@ -1,0 +1,30 @@
+<div class="buscador-paciente">
+  <input
+    class="input"
+    type="text"
+    [ngModel]="texto"
+    (ngModelChange)="onInput($event)"
+    (focus)="onFocus()"
+    (blur)="onBlur()"
+    [disabled]="disabled"
+    autocomplete="off"
+    placeholder="Buscar paciente por nombre o cedula..." />
+
+  @if (abierto) {
+    <div class="buscador-paciente-lista">
+      @for (p of resultados; track p.id) {
+        <div class="buscador-paciente-item" (mousedown)="seleccionar(p)">
+          <div>{{ p.nombre }}</div>
+          @if (p.identificacion) {
+            <div class="text-muted text-sm">{{ p.identificacion }}</div>
+          }
+        </div>
+      } @empty {
+        <div class="buscador-paciente-vacio">Ningun paciente de esta clinica coincide.</div>
+      }
+      <!-- "+ Nuevo paciente" deshabilitado a pedido: este buscador ahora
+           solo sirve para encontrar pacientes ya vinculados a la clinica.
+           Para dar de alta uno nuevo se usa la pantalla de Pacientes. -->
+    </div>
+  }
+</div>

@@ -12,7 +12,11 @@ export class UsuariosService {
   listar(): Observable<Usuario[]> { return this.http.get<Usuario[]>(this.base); }
   crear(data: any): Observable<Usuario> { return this.http.post<Usuario>(this.base, data); }
   actualizar(id: string, data: any): Observable<Usuario> { return this.http.put<Usuario>(`${this.base}/${id}`, data); }
-  eliminar(id: string): Observable<void> { return this.http.delete<void>(`${this.base}/${id}`); }
+  // rol: cual de sus roles de staff en esta clinica quitar -- solo hace
+  // falta si tiene mas de uno (ej. admin Y doctor a la vez).
+  eliminar(id: string, rol?: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/${id}`, rol ? { params: { rol } } : undefined);
+  }
 
   buscarPorEmail(email: string): Observable<{ existe: boolean; nombre?: string }> {
     return this.http.get<{ existe: boolean; nombre?: string }>(`${this.base}/buscar`, { params: { email } });

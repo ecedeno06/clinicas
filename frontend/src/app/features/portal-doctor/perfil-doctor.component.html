@@ -1,0 +1,93 @@
+<div class="page-header">
+  <div>
+    <h1>Mi Perfil de Doctor</h1>
+    <div class="desc">Tus datos, tus clinicas y tu horario</div>
+  </div>
+</div>
+
+@if (perfil(); as p) {
+  <div class="card">
+    <h3 style="margin:0;">{{ p.doctor.nombre }}</h3>
+    <div class="text-muted text-sm">{{ p.doctor.especialidad_nombre || 'Sin especialidad' }}</div>
+    <div class="flex gap-16 mt-16">
+      <div class="form-group" style="flex:1;">
+        <label>Telefono</label>
+        <div>{{ p.doctor.telefono || '-' }}</div>
+      </div>
+      <div class="form-group" style="flex:1;">
+        <label>Email</label>
+        <div>{{ p.doctor.email || '-' }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mt-16">
+    <div class="text-muted text-sm" style="text-transform:uppercase; letter-spacing:.04em; font-weight:600;">
+      Clinicas donde tienes rol de doctor
+    </div>
+    <div class="table-wrap mt-16">
+      <table class="data-table">
+        <thead><tr><th>Clinica</th><th>Estado</th></tr></thead>
+        <tbody>
+          @for (e of p.empresas; track e.empresa_id) {
+            <tr>
+              <td>{{ e.empresa_nombre }}</td>
+              <td><span class="badge" [class.badge-green]="e.activo" [class.badge-slate]="!e.activo">{{ e.activo ? 'Activo' : 'Inactivo' }}</span></td>
+            </tr>
+          } @empty {
+            <tr><td colspan="2"><div class="empty-state">No tienes rol de doctor en ninguna clinica todavia.</div></td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card mt-16">
+    <div class="text-muted text-sm" style="text-transform:uppercase; letter-spacing:.04em; font-weight:600;">
+      Mi horario semanal (todas tus clinicas)
+    </div>
+    <div class="horario-week-grid mt-16">
+      @for (dia of diasSemana; track dia; let i = $index) {
+        <div class="horario-day-col">
+          <div class="horario-day-head">{{ dia.substring(0, 3) }}</div>
+          <div class="horario-day-body">
+            @for (h of horariosPorDia(i); track h.id) {
+              <div class="horario-slot-block"
+                [class.horario-slot-inactivo]="!h.activo"
+                [class.horario-slot-clinica-activa]="h.activo && esDeClinicaActiva(h)"
+                [class.horario-slot-otra-clinica]="h.activo && !esDeClinicaActiva(h)">
+                {{ formatoAmPm(h.hora_inicio) }}&ndash;{{ formatoAmPm(h.hora_fin) }}
+                <div class="text-muted text-sm">{{ h.sucursal_nombre }}</div>
+                <div class="horario-slot-empresa">{{ h.empresa_nombre }}</div>
+                @if (!h.activo) {
+                  <div class="text-muted text-sm">Deshabilitado</div>
+                }
+                <div class="horario-slot-acciones">
+                  <button
+                    type="button"
+                    class="horario-slot-icon"
+                    [title]="h.activo ? 'Deshabilitar (no contar en disponibilidad)' : 'Habilitar'"
+                    [attr.aria-label]="h.activo ? 'Deshabilitar' : 'Habilitar'"
+                    [disabled]="actualizandoId() === h.id"
+                    (click)="toggleActivo(h)">
+                    @if (h.activo) {
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                    } @else {
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                    }
+                  </button>
+                </div>
+              </div>
+            } @empty {
+              <span class="text-muted text-sm">No atiende</span>
+            }
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+} @else if (cargando()) {
+  <div class="empty-state">Cargando...</div>
+} @else if (error()) {
+  <div class="empty-state">{{ error() }}</div>
+}

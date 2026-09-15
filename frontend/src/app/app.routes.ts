@@ -2,6 +2,7 @@ import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
 import { superAdminGuard } from './core/guards/super-admin.guard';
 import { staffGuard } from './core/guards/staff.guard';
+import { citasGuard } from './core/guards/citas.guard';
 import { LayoutComponent } from './features/layout/layout.component';
 import { LoginComponent } from './features/login/login.component';
 import { RestablecerPasswordComponent } from './features/restablecer-password/restablecer-password.component';
@@ -22,6 +23,7 @@ import { ReporteCampanasComponent } from './features/reportes/reporte-campanas/r
 import { ReporteCitasComponent } from './features/reportes/reporte-citas/reporte-citas.component';
 import { PerfilPacienteComponent } from './features/portal-paciente/perfil-paciente.component';
 import { CitasPacienteComponent } from './features/portal-paciente/citas-paciente.component';
+import { PerfilDoctorComponent } from './features/portal-doctor/perfil-doctor.component';
 
 export const routes: Routes = [
   { path: 'login', component: LoginComponent },
@@ -34,7 +36,7 @@ export const routes: Routes = [
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
       { path: 'dashboard', component: DashboardComponent, canActivate: [staffGuard] },
-      { path: 'citas', component: CitasComponent, canActivate: [staffGuard] },
+      { path: 'citas', component: CitasComponent, canActivate: [citasGuard] },
       { path: 'pacientes', component: PacientesComponent, canActivate: [staffGuard] },
       { path: 'doctores', component: DoctoresComponent, canActivate: [staffGuard] },
       { path: 'especialidades', component: EspecialidadesComponent, canActivate: [staffGuard] },
@@ -49,6 +51,7 @@ export const routes: Routes = [
       { path: 'catalogo-examenes-laboratorio', component: CatalogoExamenesLaboratorioComponent, canActivate: [staffGuard] },
       { path: 'portal/perfil', component: PerfilPacienteComponent },
       { path: 'portal/citas', component: CitasPacienteComponent },
+      { path: 'portal-doctor/perfil', component: PerfilDoctorComponent },
     ],
   },
   { path: '**', redirectTo: '' },

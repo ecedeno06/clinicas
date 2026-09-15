@@ -102,7 +102,7 @@
               <table class="data-table">
                 <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th></th></tr></thead>
                 <tbody>
-                  @for (u of usuariosDeEmpresa(); track u.id) {
+                  @for (u of usuariosDeEmpresa(); track u.id + u.rol) {
                     <tr>
                       <td>{{ u.nombre }}</td>
                       <td>{{ u.email }}</td>

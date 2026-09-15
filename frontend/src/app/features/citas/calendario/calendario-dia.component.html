@@ -7,7 +7,11 @@
       <div class="cal-dia-esquina"></div>
       @for (col of columnas(); track col.doctor.id) {
         <div class="cal-dia-doctor-head">
-          <div class="cal-avatar-iniciales">{{ iniciales(col.doctor.nombre) }}</div>
+          @if (col.doctor.foto) {
+            <img class="cal-avatar-iniciales" [src]="col.doctor.foto" alt="" />
+          } @else {
+            <div class="cal-avatar-iniciales">{{ iniciales(col.doctor.nombre) }}</div>
+          }
           <div class="cal-dia-doctor-nombre">
             <div>{{ col.doctor.nombre }}</div>
             @if (col.doctor.especialidad_nombre) {
@@ -26,7 +30,14 @@
 
       <!-- Columnas por doctor -->
       @for (col of columnas(); track col.doctor.id) {
-        <div class="cal-dia-columna" [style.height.px]="alturaTotal()" (click)="onCeldaVaciaClick(col.doctor.id, $event)">
+        <div
+          class="cal-dia-columna"
+          [class.cal-dia-columna--activa]="citaArrastrada()?.doctor_id === col.doctor.id"
+          [style.height.px]="alturaTotal()"
+          (click)="onCeldaVaciaClick(col.doctor.id, $event)"
+          (dragover)="onColumnaDragOver(col.doctor.id, $event)"
+          (drop)="onColumnaDrop(col.doctor.id, $event)"
+        >
           @for (m of marcasHora(); track m) {
             <div class="cal-dia-linea-hora" [style.top.px]="topDeMarca(m)"></div>
           }
@@ -38,11 +49,15 @@
               type="button"
               class="cal-bloque-cita"
               [class]="'cal-bloque-cita--' + b.color"
+              [class.cal-bloque-cita--arrastrando]="citaArrastrada()?.id === b.cita.id"
+              draggable="true"
               [style.top.px]="b.top"
               [style.height.px]="b.height"
               [style.left.%]="b.leftPct"
               [style.width.%]="b.widthPct"
               (click)="onCitaClick(b.cita, $event)"
+              (dragstart)="onCitaDragStart(b.cita, $event)"
+              (dragend)="onCitaDragEnd()"
             >
               <div class="cal-bloque-hora">{{ formatoAmPm(b.cita.hora_inicio) }} - {{ formatoAmPm(b.cita.hora_fin) }}</div>
               <div class="cal-bloque-paciente">

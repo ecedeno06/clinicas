@@ -1,0 +1,49 @@
+<div class="overlay paciente-rapido-overlay">
+  <div class="card paciente-rapido-card">
+    <div class="drawer-header">
+      <h2>Nuevo paciente</h2>
+      <button class="close" (click)="cancelado.emit()">&times;</button>
+    </div>
+
+    @if (pacienteExistente(); as pe) {
+      <p class="text-muted text-sm">
+        Ya existe un paciente con esta identificacion en la red
+        (<strong>{{ pe.nombre }}</strong>) — se asociara a esta clinica
+        con sus datos actuales.
+      </p>
+    }
+
+    <form [formGroup]="form" (ngSubmit)="guardar()">
+      <div class="form-group" [class.mt-16]="pacienteExistente()">
+        <label>Nombre *</label>
+        <input class="input" formControlName="nombre" autocomplete="off" />
+      </div>
+      <div class="form-group mt-16">
+        <label>Identificacion (cedula)</label>
+        <input class="input" formControlName="identificacion" autocomplete="off" (blur)="onIdentificacionBlur()" />
+      </div>
+      <div class="form-group mt-16">
+        <label>Telefono</label>
+        <app-telefono-input formControlName="telefono"></app-telefono-input>
+      </div>
+      <div class="form-group mt-16">
+        <label>Correo</label>
+        <input class="input" type="email" formControlName="email" autocomplete="off" />
+        @if (form.get('email')?.touched && form.get('email')?.errors?.['email']) {
+          <div class="error-text">Correo invalido.</div>
+        }
+      </div>
+
+      @if (error()) {
+        <div class="error-text mt-16">{{ error() }}</div>
+      }
+
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary" [disabled]="form.invalid || guardando()">
+          {{ guardando() ? 'Guardando...' : (pacienteExistente() ? 'Vincular a esta clinica' : 'Crear y seleccionar') }}
+        </button>
+        <button type="button" class="btn btn-outline" (click)="cancelado.emit()">Cancelar</button>
+      </div>
+    </form>
+  </div>
+</div>

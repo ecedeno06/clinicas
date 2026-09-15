@@ -81,10 +81,13 @@ export class LoginComponent {
     });
   }
 
-  // El rol 'paciente' no tiene acceso a /dashboard (ver staff.guard.ts) --
-  // entra directo a su propio portal.
+  // Los roles 'paciente' y 'doctor' no tienen acceso a /dashboard (ver
+  // staff.guard.ts) -- cada uno entra directo a su propio portal.
   private destinoTrasLogin(): string[] {
-    return this.auth.usuario()?.rol === 'paciente' ? ['/portal/perfil'] : ['/dashboard'];
+    const rol = this.auth.usuario()?.rol;
+    if (rol === 'paciente') return ['/portal/perfil'];
+    if (rol === 'doctor') return ['/portal-doctor/perfil'];
+    return ['/dashboard'];
   }
 
   enviarCodigo2FA(): void {

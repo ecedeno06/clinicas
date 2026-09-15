@@ -245,6 +245,7 @@
   font-weight: 700;
   background: var(--tint-teal-bg);
   color: var(--text-on-tint-teal);
+  object-fit: cover;
 }
 
 /* En mobile/pantalla angosta el sidebar pasa a estar arriba (a lo ancho) y

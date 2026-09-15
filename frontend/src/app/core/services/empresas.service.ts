@@ -27,7 +27,9 @@ export class EmpresasService {
     return this.http.post<UsuarioDeEmpresa>(`${this.base}/${empresaId}/usuarios`, data);
   }
 
-  desasociarUsuario(empresaId: string, usuarioId: string): Observable<void> {
-    return this.http.delete<void>(`${this.base}/${empresaId}/usuarios/${usuarioId}`);
+  // rol: cual de sus roles de staff en esta clinica quitar -- solo hace
+  // falta si tiene mas de uno (ej. admin Y doctor a la vez).
+  desasociarUsuario(empresaId: string, usuarioId: string, rol?: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/${empresaId}/usuarios/${usuarioId}`, rol ? { params: { rol } } : undefined);
   }
 }

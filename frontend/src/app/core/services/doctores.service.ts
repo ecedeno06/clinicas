@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { Doctor, Disponibilidad, DoctorHorario } from '../models/models';
+import { Doctor, Disponibilidad, DoctorHorario, PerfilDoctor } from '../models/models';
 
 @Injectable({ providedIn: 'root' })
 export class DoctoresService {
@@ -33,5 +33,22 @@ export class DoctoresService {
 
   disponibilidad(doctorId: string, fecha: string): Observable<Disponibilidad> {
     return this.http.get<Disponibilidad>(`${this.base}/${doctorId}/disponibilidad`, { params: { fecha } });
+  }
+
+  // Da/quita acceso al sistema (rol 'doctor' en la clinica activa) y
+  // resetea la contrasena -- solo admin (ver doctores.routes.js).
+  invitar(id: string): Observable<Doctor> {
+    return this.http.post<Doctor>(`${this.base}/${id}/invitar`, {});
+  }
+  desinvitar(id: string): Observable<Doctor> {
+    return this.http.delete<Doctor>(`${this.base}/${id}/invitar`);
+  }
+  resetearPassword(id: string): Observable<{ mensaje: string }> {
+    return this.http.post<{ mensaje: string }>(`${this.base}/${id}/resetear-password`, {});
+  }
+
+  // Portal del doctor: sus datos + en que clinicas tiene rol 'doctor'.
+  miPerfil(): Observable<PerfilDoctor> {
+    return this.http.get<PerfilDoctor>(`${this.base}/mi-perfil`);
   }
 }
