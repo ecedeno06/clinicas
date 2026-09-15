@@ -213,6 +213,10 @@ export class CitasComponent implements OnInit {
   // dia (ver seccion 4/5 del plan) -- el calendario nunca deja de mostrar
   // "todos" solo porque se agrego un doctor nuevo despues.
   filtroCalSucursal = signal('');
+  // Solo filtra que doctores se muestran como columna (client-side, igual
+  // que filtroCalDoctorIds) -- no es un parametro de GET /citas, la
+  // especialidad de una cita puntual puede diferir de con cual la agendaron.
+  filtroCalEspecialidad = signal('');
   filtroCalDoctorIds = signal<Set<string>>(new Set());
   filtroCalEstados = signal<Set<EstadoCita>>(new Set(this.estadosCita));
 
@@ -238,7 +242,10 @@ export class CitasComponent implements OnInit {
   // tocar el filtro); ver toggleFiltroCalDoctor().
   doctoresVisiblesCalendario = computed(() => {
     const seleccionados = this.filtroCalDoctorIds();
-    return seleccionados.size === 0 ? this.doctoresActivos() : this.doctoresActivos().filter((d) => seleccionados.has(d.id));
+    const especialidadId = this.filtroCalEspecialidad();
+    let lista = seleccionados.size === 0 ? this.doctoresActivos() : this.doctoresActivos().filter((d) => seleccionados.has(d.id));
+    if (especialidadId) lista = lista.filter((d) => d.especialidades.some((e) => e.especialidad_id === especialidadId));
+    return lista;
   });
 
   citasCalendarioFiltradas = computed(() => {
@@ -275,6 +282,15 @@ export class CitasComponent implements OnInit {
     const doctores = this.doctoresActivos();
     if (doctores.length === 0) { this.disponibilidadCalendarioPorDoctor.set(new Map()); return; }
     const fecha = this.fechaCalendario();
+    // El endpoint de disponibilidad es del doctor (entidad global) y
+    // devuelve TODAS las sucursales donde tiene horario, sin importar de
+    // que clinica sean -- correcto para "ocupados" (choque de horario
+    // cruzado entre clinicas), pero incorrecto para decidir si el doctor
+    // "atiende" en el calendario de ESTA clinica: sin filtrar, una franja
+    // libre en la sucursal de OTRA clinica se mostraba como disponible
+    // aqui, y al hacer clic quedaba precargada una sucursal que ni
+    // siquiera aparece en el <select> de esta clinica (queda en blanco).
+    const sucursalesEmpresa = new Set(this.sucursales().map((s) => s.id));
     forkJoin(
       doctores.map((d) =>
         this.doctoresSrv.disponibilidad(d.id, fecha).pipe(
@@ -285,7 +301,7 @@ export class CitasComponent implements OnInit {
     ).subscribe((resultados) => {
       const mapa = new Map<string, Disponibilidad>();
       for (const [doctorId, disp] of resultados) {
-        if (disp) mapa.set(doctorId, disp);
+        if (disp) mapa.set(doctorId, { ...disp, sucursales: disp.sucursales.filter((s) => sucursalesEmpresa.has(s.sucursal_id)) });
       }
       this.disponibilidadCalendarioPorDoctor.set(mapa);
     });
@@ -353,7 +369,14 @@ export class CitasComponent implements OnInit {
     // emitEvent:false por el mismo motivo que en abrirNuevo(): evitar que
     // doctor_id y fecha disparen actualizarDisponibilidad() por separado,
     // uno con el otro campo todavia sin el valor nuevo.
-    this.form.patchValue({ doctor_id: c.doctorId, fecha: this.fechaCalendario(), hora_inicio: c.hora_inicio, hora_fin: c.hora_fin }, { emitEvent: false });
+    // sucursal_id: solo se pisa el default de abrirNuevo() (sucursales()[0])
+    // si el clic cayo en una franja libre con sucursal identificada -- de lo
+    // contrario un doctor que atiende en varias sucursales terminaba con la
+    // sucursal equivocada precargada (la primera de la lista, no
+    // necesariamente donde tiene horario ese dia a esa hora).
+    const cambios: Record<string, any> = { doctor_id: c.doctorId, fecha: this.fechaCalendario(), hora_inicio: c.hora_inicio, hora_fin: c.hora_fin };
+    if (c.sucursalId) cambios['sucursal_id'] = c.sucursalId;
+    this.form.patchValue(cambios, { emitEvent: false });
     this.actualizarDisponibilidad();
   }
 

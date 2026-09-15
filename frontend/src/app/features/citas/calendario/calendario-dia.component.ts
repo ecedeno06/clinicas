@@ -21,6 +21,14 @@ export interface CeldaVaciaClick {
   doctorId: string;
   hora_inicio: string;
   hora_fin: string;
+  // Sucursal donde el doctor tiene ESA franja libre -- undefined solo si
+  // el doctor todavia no tiene ningun horario configurado (ver
+  // rangosLibresPorDoctor), caso en el que no hay de donde inferirla.
+  sucursalId?: string;
+}
+
+interface RangoConSucursal extends RangoMin {
+  sucursal_id: string;
 }
 
 // Alto de cada hora en la regla vertical -- a mas alto, mas legible cada
@@ -106,8 +114,13 @@ export class CalendarioDiaComponent implements AfterViewInit {
   // (mismo criterio que sinDisponibilidad() en citas.component.ts: un
   // doctor que todavia no tiene ningun horario configurado sigue pudiendo
   // recibir citas libremente, en cualquier hora).
+  // Cada rango recuerda de que sucursal viene (sucursal_id) -- un doctor
+  // puede tener franjas libres en varias sucursales el mismo dia, y al
+  // hacer clic en una celda vacia hace falta saber en CUAL de ellas cae
+  // ese horario para precargar el formulario con la sucursal correcta
+  // (ver onCeldaVaciaClick), no solo con this.sucursales()[0] por defecto.
   private rangosLibresPorDoctor = computed(() => {
-    const mapa = new Map<string, RangoMin[] | null>();
+    const mapa = new Map<string, RangoConSucursal[] | null>();
     const disponibilidad = this._disponibilidad();
     const sucursalFiltro = this._sucursalFiltro();
     for (const doctor of this._doctores()) {
@@ -116,8 +129,11 @@ export class CalendarioDiaComponent implements AfterViewInit {
       const sucursales = sucursalFiltro ? disp.sucursales.filter((s) => s.sucursal_id === sucursalFiltro) : disp.sucursales;
       const libres = sucursales
         .filter((s) => s.atiende)
-        .flatMap((s) => s.libres)
-        .map((f) => ({ inicio: minutosDesdeMedianoche(f.hora_inicio), fin: minutosDesdeMedianoche(f.hora_fin) }));
+        .flatMap((s) => s.libres.map((f) => ({
+          inicio: minutosDesdeMedianoche(f.hora_inicio),
+          fin: minutosDesdeMedianoche(f.hora_fin),
+          sucursal_id: s.sucursal_id,
+        })));
       mapa.set(doctor.id, libres);
     }
     return mapa;
@@ -173,7 +189,11 @@ export class CalendarioDiaComponent implements AfterViewInit {
       return;
     }
 
-    this.celdaClick.emit({ doctorId, hora_inicio: minutosAHora(inicioRedondeado), hora_fin: minutosAHora(fin) });
+    // libres === null es "sin restriccion" (doctor sin horario configurado
+    // todavia) -- ahi no hay sucursal que inferir, se deja que el
+    // formulario use su default habitual.
+    const rango = libres?.find((r) => inicioRedondeado >= r.inicio && inicioRedondeado < r.fin);
+    this.celdaClick.emit({ doctorId, sucursalId: rango?.sucursal_id, hora_inicio: minutosAHora(inicioRedondeado), hora_fin: minutosAHora(fin) });
   }
 
   @HostListener('window:resize')
