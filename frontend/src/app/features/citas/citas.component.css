@@ -10,14 +10,14 @@
 .paciente-foto-popup-grande {
   z-index: 50;
   padding: 10px;
-  background: var(--white);
+  background: rgb(177, 219, 164);
   border: 1px solid var(--slate-100);
   border-radius: var(--radius);
   box-shadow: var(--shadow-md);
 }
 .paciente-foto-grande-img {
-  width: 300px;
-  height: 300px;
+  width: 200px;
+  height: 200px;
   object-fit: cover;
   border-radius: 8%;
   display: block;
@@ -34,6 +34,21 @@
   font-family: var(--font-display);
   font-weight: 700;
   font-size: 72px;
+}
+.paciente-foto-grande-nombre {
+  margin-top: 8px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 14px;
+  color: #3b82f6;
+  text-shadow: 0 0 6px rgba(59, 130, 246, 0.65), 0 0 12px rgba(59, 130, 246, 0.35);
+}
+.paciente-foto-grande-cedula {
+  margin-top: 2px;
+  text-align: center;
+  font-size: 12px;
+  color: #e43da4;
+  text-shadow: 0 0 6px rgba(228, 113, 113, 0.65), 0 0 12px rgba(243, 20, 20, 0.35);
 }
 
 .consulta-layout {

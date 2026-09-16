@@ -178,6 +178,10 @@
                 } @else {
                   <div class="paciente-foto-grande-iniciales">{{ inicialesPaciente(c.paciente_nombre) }}</div>
                 }
+                <div class="paciente-foto-grande-nombre">{{ c.paciente_nombre }}</div>
+                @if (c.paciente_identificacion) {
+                  <div class="paciente-foto-grande-cedula">{{ c.paciente_identificacion }}</div>
+                }
               </div>
             }
             @if (c.es_urgencia) {
