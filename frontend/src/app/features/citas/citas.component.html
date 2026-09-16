@@ -166,7 +166,20 @@
           <td>{{ c.fecha | date:'dd/MM/yyyy':'UTC' }}</td>
           <td>{{ formatoAmPm(c.hora_inicio) }} - {{ formatoAmPm(c.hora_fin) }}</td>
           <td>
+            <button type="button" class="btn-icon" title="Ver foto del paciente" aria-label="Ver foto del paciente" (click)="toggleFotoPaciente(c, $event)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg>
+            </button>
             <span [class.nombre-urgencia]="c.es_urgencia && c.estado !== 'atendida' && c.estado !== 'cancelada'">{{ c.paciente_nombre }}</span>
+            @if (pacienteFotoAbierta()?.id === c.id) {
+              <div class="dropdown-backdrop" (click)="cerrarFotoPaciente()"></div>
+              <div class="paciente-foto-popup-grande" style="position:fixed;" [style.top.px]="pacienteFotoPos()?.top" [style.left.px]="pacienteFotoPos()?.left">
+                @if (c.paciente_foto) {
+                  <img [src]="c.paciente_foto" alt="" class="paciente-foto-grande-img" />
+                } @else {
+                  <div class="paciente-foto-grande-iniciales">{{ inicialesPaciente(c.paciente_nombre) }}</div>
+                }
+              </div>
+            }
             @if (c.es_urgencia) {
               <span class="icono-urgencia" title="Cita de urgencia" aria-label="Cita de urgencia">
                 <svg width="16" height="16" viewBox="0 0 24 24">

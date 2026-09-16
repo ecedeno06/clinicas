@@ -74,6 +74,7 @@ async function listar(req, res, next) {
 
     const { rows } = await pool.query(
       `select c.*, p.nombre as paciente_nombre, p.telefono as paciente_telefono, p.acepta_whatsapp as paciente_acepta_whatsapp,
+              p.foto as paciente_foto,
               d.nombre as doctor_nombre,
               coalesce(
                 (select esp.nombre from especialidades esp where esp.id = c.especialidad_id),

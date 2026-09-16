@@ -462,7 +462,14 @@
         <button class="close" (click)="cerrarHistorial()">&times;</button>
       </div>
 
-      <div class="card">
+      <div class="card" style="position: relative;">
+        <app-selector-foto
+          [foto]="p.foto"
+          [nombre]="p.nombre"
+          [soloLectura]="true"
+          titulo="Foto del paciente"
+          style="position: absolute; top: 18px; right: 18px;"
+        ></app-selector-foto>
         <div class="tabs">
           <button type="button" class="tab-btn" [class.active]="tabSuperior() === 'consultas'" (click)="tabSuperior.set('consultas')">Consultas</button>
           <button type="button" class="tab-btn" [class.active]="tabSuperior() === 'antecedentes'" (click)="tabSuperior.set('antecedentes')">

@@ -5,6 +5,37 @@
   width: min(1100px, 95vw);
 }
 
+/* Popup con la foto del paciente (300x300) al hacer clic en el icono junto
+   a su nombre en la tabla Lista -- ver toggleFotoPaciente() en el .ts. */
+.paciente-foto-popup-grande {
+  z-index: 50;
+  padding: 10px;
+  background: var(--white);
+  border: 1px solid var(--slate-100);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+}
+.paciente-foto-grande-img {
+  width: 300px;
+  height: 300px;
+  object-fit: cover;
+  border-radius: 8%;
+  display: block;
+}
+.paciente-foto-grande-iniciales {
+  width: 300px;
+  height: 300px;
+  border-radius: 50%;
+  background: var(--tint-teal-bg);
+  color: var(--text-on-tint-teal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 72px;
+}
+
 .consulta-layout {
   display: flex;
   gap: 24px;

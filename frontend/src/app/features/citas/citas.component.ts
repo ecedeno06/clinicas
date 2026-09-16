@@ -54,6 +54,38 @@ import { colorEstadoCita, iniciales } from './calendario/calendario.util';
 })
 export class CitasComponent implements OnInit {
   citas = signal<Cita[]>([]);
+
+  // Popup con la foto del paciente (300x300) al hacer clic en el icono
+  // junto a su nombre en la tabla (Lista). "fixed" con posicion calculada
+  // en JS (no un simple CSS :hover/absolute) porque la tabla vive dentro
+  // de .table-wrap { overflow: auto }, que recortaria un popup
+  // posicionado "absolute" -- mismo problema y misma solucion que el menu
+  // de WhatsApp en pacientes.component.ts.
+  pacienteFotoAbierta = signal<Cita | null>(null);
+  pacienteFotoPos = signal<{ top: number; left: number } | null>(null);
+
+  toggleFotoPaciente(c: Cita, event: MouseEvent): void {
+    if (this.pacienteFotoAbierta()?.id === c.id) {
+      this.pacienteFotoAbierta.set(null);
+      return;
+    }
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    // 300px de foto + 10px de padding a cada lado (ver .paciente-foto-popup-grande).
+    const ladoPopup = 320;
+    // Si no cabe hacia abajo (fila cerca del borde inferior de la pantalla),
+    // se abre hacia arriba en su lugar -- igual que un tooltip/dropdown que
+    // se "voltea" cuando no hay espacio.
+    const espacioAbajo = window.innerHeight - rect.bottom;
+    const top = espacioAbajo >= ladoPopup + 6 ? rect.bottom + 6 : Math.max(8, rect.top - ladoPopup - 6);
+    const left = Math.max(8, Math.min(rect.left, window.innerWidth - ladoPopup - 8));
+    this.pacienteFotoPos.set({ top, left });
+    this.pacienteFotoAbierta.set(c);
+  }
+
+  cerrarFotoPaciente(): void {
+    this.pacienteFotoAbierta.set(null);
+  }
+
   pacientes = signal<Paciente[]>([]);
   // Mini-formulario de creacion rapida de paciente (ver
   // abrirPacienteRapido()), disparado desde app-buscador-paciente cuando

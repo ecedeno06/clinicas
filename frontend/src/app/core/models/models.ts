@@ -350,6 +350,7 @@ export interface Cita {
   paciente_edad?: number | null;
   paciente_telefono?: string | null;
   paciente_acepta_whatsapp?: boolean;
+  paciente_foto?: string | null;
   doctor_id: string;
   doctor_nombre?: string;
   // Especialidad elegida como filtro al agendar (dato informativo, no una
