@@ -7,10 +7,12 @@
     @if (vista() === 'lista') {
       <select class="input" style="width:auto;" [ngModel]="filtroFechaModo()" (ngModelChange)="filtroFechaModo.set($event)">
         <option value="todas">Todas las fechas</option>
-        <option value="seleccionada">Fecha seleccionada</option>
+        <option value="seleccionada">Rango de fechas</option>
       </select>
       @if (filtroFechaModo() === 'seleccionada') {
-        <input class="input" style="width:auto;" type="date" [ngModel]="fechaListaFiltro()" (ngModelChange)="fechaListaFiltro.set($event)" />
+        <input class="input" style="width:auto;" type="date" title="Desde" [ngModel]="fechaListaDesde()" (ngModelChange)="fechaListaDesde.set($event)" />
+        <span class="text-muted">-</span>
+        <input class="input" style="width:auto;" type="date" title="Hasta" [ngModel]="fechaListaHasta()" (ngModelChange)="fechaListaHasta.set($event)" />
       }
     }
     <div class="vista-toggle">

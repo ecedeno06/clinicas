@@ -231,12 +231,13 @@ export class CitasComponent implements OnInit {
   filtroEstado = signal('');
 
   // Selector rapido en el encabezado de la Lista: "Todas" (default, sin
-  // acotar por fecha) o "Fecha seleccionada" (una sola fecha elegida con
-  // el date picker de al lado). Independiente del filtro de texto de la
-  // columna Fecha (filtroFecha), que sigue sirviendo para busquedas por
-  // substring.
+  // acotar por fecha) o "Rango de fechas" (desde/hasta, ambos inclusive --
+  // un solo dia se logra poniendo la misma fecha en los dos). Independiente
+  // del filtro de texto de la columna Fecha (filtroFecha), que sigue
+  // sirviendo para busquedas por substring.
   filtroFechaModo = signal<'todas' | 'seleccionada'>('todas');
-  fechaListaFiltro = signal(hoyISO());
+  fechaListaDesde = signal(hoyISO());
+  fechaListaHasta = signal(hoyISO());
 
   // Un usuario con rol 'doctor' solo puede ver SUS propias citas -- no es
   // un simple filtro de conveniencia que se pueda quitar, sino el alcance
@@ -462,10 +463,14 @@ export class CitasComponent implements OnInit {
     const campana = this.filtroCampana().trim().toLowerCase();
     const estado = this.filtroEstado().trim().toLowerCase();
     const modoFecha = this.filtroFechaModo();
-    const fechaSeleccionada = this.fechaListaFiltro();
+    const desde = this.fechaListaDesde();
+    const hasta = this.fechaListaHasta();
 
     return this.citas().filter((c) => {
-      if (modoFecha === 'seleccionada' && c.fecha.substring(0, 10) !== fechaSeleccionada) return false;
+      if (modoFecha === 'seleccionada') {
+        const fechaCita = c.fecha.substring(0, 10);
+        if (fechaCita < desde || fechaCita > hasta) return false;
+      }
       if (fecha && !formatearFecha(c.fecha).includes(fecha)) return false;
       if (paciente && !(c.paciente_nombre ?? '').toLowerCase().includes(paciente)) return false;
       if (doctor && !(c.doctor_nombre ?? '').toLowerCase().includes(doctor)) return false;
