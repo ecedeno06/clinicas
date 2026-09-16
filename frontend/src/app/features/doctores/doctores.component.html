@@ -107,7 +107,7 @@
           <input class="input" formControlName="identificacion" autocomplete="off" (blur)="onIdentificacionBlur()" />
         </div>
         <div formArrayName="especialidades">
-          @for (e of especialidadesArray.controls; track $index; let i = $index) {
+          @for (e of especialidadesArray.controls; track e; let i = $index) {
             <div class="card mt-16" [formGroupName]="i">
               <div class="flex items-center" style="justify-content: space-between;">
                 <h3 style="margin:0;">Especialidad {{ i + 1 }}</h3>

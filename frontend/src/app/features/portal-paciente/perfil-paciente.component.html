@@ -98,7 +98,7 @@
     <div class="card mt-16">
       <div class="text-muted text-sm">Direcciones</div>
       <div formArrayName="direcciones">
-        @for (grupo of direccionesArray.controls; track $index; let i = $index) {
+        @for (grupo of direccionesArray.controls; track grupo; let i = $index) {
           <div class="card mt-16" [formGroupName]="i">
             <div class="flex items-center" style="justify-content: space-between;">
               <h3 style="margin:0;">

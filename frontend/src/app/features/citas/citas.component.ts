@@ -377,10 +377,17 @@ export class CitasComponent implements OnInit {
   // precargados (mismo patron que elegirFranja()).
   abrirNuevoDesdeCelda(c: CeldaVaciaClick): void {
     this.abrirNuevo();
+    // Precarga tambien la especialidad del doctor (si tiene alguna) junto
+    // con el resto -- sin esto quedaba en "Todas", y si el usuario la
+    // elegia a mano despues, onCambioEspecialidad() borraba el doctor que
+    // se acababa de precargar (obligando a volver a elegirlo). Al venir
+    // en el mismo patchValue con emitEvent:false, no dispara ese efecto.
+    const doctor = this.doctores().find((d) => d.id === c.doctorId);
+    const especialidadId = doctor?.especialidades[0]?.especialidad_id ?? '';
     // emitEvent:false por el mismo motivo que en abrirNuevo(): evitar que
     // doctor_id y fecha disparen actualizarDisponibilidad() por separado,
     // uno con el otro campo todavia sin el valor nuevo.
-    this.form.patchValue({ doctor_id: c.doctorId, fecha: this.fechaCalendario(), hora_inicio: c.hora_inicio, hora_fin: c.hora_fin }, { emitEvent: false });
+    this.form.patchValue({ especialidad_id: especialidadId, doctor_id: c.doctorId, fecha: this.fechaCalendario(), hora_inicio: c.hora_inicio, hora_fin: c.hora_fin }, { emitEvent: false });
     this.actualizarDisponibilidad();
   }
 
@@ -823,7 +830,7 @@ export class CitasComponent implements OnInit {
       `Hola ${c.paciente_nombre}, te confirmamos los datos de tu cita en ${empresa}:`,
       '',
       `Fecha: ${formatearFecha(c.fecha)}`,
-      `Hora: ${formatoAmPm(c.hora_inicio)} - ${formatoAmPm(c.hora_fin)}`,
+      `Hora: ${formatoAmPm(c.hora_inicio)}`,
       `Doctor: ${c.doctor_nombre} (${c.especialidad_nombre})`,
       `Sucursal: ${c.sucursal_nombre}${c.sucursal_direccion ? ' - ' + c.sucursal_direccion : ''}`,
     ];
