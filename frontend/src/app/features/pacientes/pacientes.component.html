@@ -477,14 +477,13 @@
           <div class="table-wrap">
             <table class="data-table">
               <thead>
-                <tr><th>Fecha</th><th>Hora</th><th>Doctor</th><th>Sucursal</th><th>Estado</th><th>Diagnostico</th><th></th></tr>
+                <tr><th>Fecha</th><th>Hora</th><th>Doctor</th><th>Sucursal</th><th>Estado</th><th></th></tr>
                 <tr class="filter-row">
                   <th><input class="input" type="text" placeholder="dd/mm/aaaa" [ngModel]="filtroHistorialFecha()" (ngModelChange)="filtroHistorialFecha.set($event)" /></th>
                   <th></th>
                   <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroHistorialDoctor()" (ngModelChange)="filtroHistorialDoctor.set($event)" /></th>
                   <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroHistorialSucursal()" (ngModelChange)="filtroHistorialSucursal.set($event)" /></th>
                   <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroHistorialEstado()" (ngModelChange)="filtroHistorialEstado.set($event)" /></th>
-                  <th></th>
                   <th>
                     @if (hayFiltrosHistorial()) { <button type="button" class="btn btn-outline btn-sm" (click)="limpiarFiltrosHistorial()">Limpiar</button> }
                   </th>
@@ -492,7 +491,7 @@
               </thead>
               <tbody>
                 @if (cargandoHistorial()) {
-                  <tr><td colspan="7"><div class="empty-state">Cargando historial...</div></td></tr>
+                  <tr><td colspan="6"><div class="empty-state">Cargando historial...</div></td></tr>
                 } @else {
                   @for (h of historialFiltrado(); track h.id) {
                     <tr class="row-clickable" [class.row-selected]="historialSeleccionado()?.id === h.id" (click)="seleccionarHistorial(h)">
@@ -514,11 +513,6 @@
                           [class.badge-violet]="h.estado === 'reagendar'">
                           {{ estadoEtiquetaHistorial(h.estado) }}
                         </span>
-                      </td>
-                      <td>
-                        <div>{{ h.diagnostico || '-' }}</div>
-                        @if (h.tratamiento) { <div class="text-muted text-sm">Tratamiento: {{ h.tratamiento }}</div> }
-                        @if (h.notas) { <div class="text-muted text-sm">{{ h.notas }}</div> }
                       </td>
                       <td class="table-actions">
                         @if (puedeCompartirUbicacionDoctor(h)) {
@@ -542,7 +536,7 @@
                       </td>
                     </tr>
                   } @empty {
-                    <tr><td colspan="7"><div class="empty-state">Este paciente todavia no tiene historial clinico.</div></td></tr>
+                    <tr><td colspan="6"><div class="empty-state">Este paciente todavia no tiene historial clinico.</div></td></tr>
                   }
                 }
               </tbody>
@@ -553,11 +547,12 @@
             <div class="tabs">
               <button type="button" class="tab-btn" [class.active]="tabInferior() === 'signos'" (click)="tabInferior.set('signos')">Signos vitales</button>
               <button type="button" class="tab-btn" [class.active]="tabInferior() === 'receta'" (click)="tabInferior.set('receta')">
-                Receta {{recetasSeleccionadas().length > 0 ? '(' + recetasSeleccionadas().length + ')' : '' }}                      
+                Receta {{recetasSeleccionadas().length > 0 ? '(' + recetasSeleccionadas().length + ')' : '' }}
               </button>
               <button type="button" class="tab-btn" [class.active]="tabInferior() === 'laboratorio'" (click)="tabInferior.set('laboratorio')">
                 Laboratorio{{ ordenesLaboratorioSeleccionadas().length > 0 ? '(' + ordenesLaboratorioSeleccionadas().length + ')' : '' }}
               </button>
+              <button type="button" class="tab-btn" [class.active]="tabInferior() === 'diagnostico'" (click)="tabInferior.set('diagnostico')">Diagnostico</button>
             </div>
 
             @if (!historialSeleccionado()) {
@@ -658,7 +653,7 @@
                     <div class="empty-state">No se registraron recetas para esta consulta.</div>
                   }
                 }
-              } @else {
+              } @else if (tabInferior() === 'laboratorio') {
                 @if (sinPermisoLaboratorio()) {
                   <div class="cintillo-confidencial">Confidencial - ver con el doctor / Administrador</div>
                 } @else if (cargandoLaboratorioSeleccionado()) {
@@ -698,6 +693,41 @@
                     <div class="empty-state">No se registraron ordenes de laboratorio para esta consulta.</div>
                   }
                 }
+              } @else {
+                <div class="eval-flow">
+                  <div class="card eval-card">
+                    <div class="eval-label">Motivo de la cita</div>
+                    <div class="eval-value">{{ historialSeleccionado()!.motivo_cita || 'No especificado' }}</div>
+                  </div>
+                  <div class="eval-arrow">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v16M6 14l6 6 6-6"/></svg>
+                  </div>
+                  <div class="card eval-card">
+                    <div class="eval-label">Motivo de la consulta</div>
+                    <div class="eval-value">{{ historialSeleccionado()!.motivo_consulta || 'No especificado' }}</div>
+                  </div>
+                  <div class="eval-arrow">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v16M6 14l6 6 6-6"/></svg>
+                  </div>
+                  <div class="card eval-card">
+                    <div class="eval-label">Diagnostico</div>
+                    <div class="eval-value">{{ historialSeleccionado()!.diagnostico || 'No especificado' }}</div>
+                  </div>
+                  <div class="eval-arrow">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v16M6 14l6 6 6-6"/></svg>
+                  </div>
+                  <div class="card eval-card">
+                    <div class="eval-label">Tratamiento</div>
+                    <div class="eval-value">{{ historialSeleccionado()!.tratamiento || 'No especificado' }}</div>
+                  </div>
+                  <div class="eval-arrow">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v16M6 14l6 6 6-6"/></svg>
+                  </div>
+                  <div class="card eval-card">
+                    <div class="eval-label">Observaciones</div>
+                    <div class="eval-value">{{ historialSeleccionado()!.notas || 'Sin observaciones' }}</div>
+                  </div>
+                </div>
               }
             }
           </div>

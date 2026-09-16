@@ -367,7 +367,9 @@ export class CitasComponent implements OnInit {
     const cita = this.citaPopover();
     if (!cita) return;
     this.srv.actualizar(cita.id, { estado }).subscribe({
-      next: (actualizada) => { this.citaPopover.set(actualizada); this.cargarCalendario(); },
+      // cargar() (no cargarCalendario() directo) para que la vista Lista
+      // tambien quede al dia -- ver el comentario en cargar().
+      next: (actualizada) => { this.citaPopover.set(actualizada); this.cargar(); },
       error: (err) => alert(err?.error?.mensaje || 'No se pudo actualizar el estado'),
     });
   }
@@ -396,7 +398,9 @@ export class CitasComponent implements OnInit {
   // que el formulario de edicion normal.
   moverCita(ev: { cita: Cita; hora_inicio: string; hora_fin: string }): void {
     this.srv.actualizar(ev.cita.id, { hora_inicio: ev.hora_inicio, hora_fin: ev.hora_fin }).subscribe({
-      next: () => this.cargarCalendario(),
+      // cargar() (no cargarCalendario() directo) para que la vista Lista
+      // tambien quede al dia -- ver el comentario en cargar().
+      next: () => this.cargar(),
       error: (err) => alert(err?.error?.mensaje || 'No se pudo reagendar la cita'),
     });
   }

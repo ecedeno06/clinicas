@@ -91,7 +91,7 @@ export class PacientesComponent implements OnInit {
   // Dos grupos de tabs independientes: arriba (lista/antecedentes del
   // paciente) y abajo (detalle de la consulta seleccionada).
   tabSuperior = signal<'consultas' | 'antecedentes'>('consultas');
-  tabInferior = signal<'signos' | 'receta' | 'laboratorio'>('signos');
+  tabInferior = signal<'signos' | 'receta' | 'laboratorio' | 'diagnostico'>('signos');
   // Tabs del formulario de nuevo/editar paciente.
   tabFormulario = signal<'generales' | 'familiares' | 'antecedentes'>('generales');
 
