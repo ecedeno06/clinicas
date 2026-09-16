@@ -126,6 +126,7 @@ export interface FamiliarPaciente {
   nombre: string;
   telefono?: string | null;
   parentesco?: string | null;
+  acepta_whatsapp?: boolean;
 }
 
 // Antecedente patologico que presenta el paciente, tomado del catalogo

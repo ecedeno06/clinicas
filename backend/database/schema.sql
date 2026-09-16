@@ -265,13 +265,15 @@ create table if not exists direcciones_paciente (
 -- "contacto de emergencia"). Se reemplaza como conjunto en cada guardado
 -- del paciente -- ver reemplazarFamiliares en pacientes.controller.js.
 create table if not exists familiares_paciente (
-    id          uuid primary key default gen_random_uuid(),
-    paciente_id uuid not null references pacientes(id) on delete cascade,
-    nombre      text not null,
-    telefono    text,
-    parentesco  text,
-    created_at  timestamptz not null default now(),
-    updated_at  timestamptz not null default now()
+    id              uuid primary key default gen_random_uuid(),
+    paciente_id     uuid not null references pacientes(id) on delete cascade,
+    nombre          text not null,
+    telefono        text,
+    parentesco      text,
+    -- mismo patron que pacientes.acepta_whatsapp (migracion 052).
+    acepta_whatsapp boolean not null default false,
+    created_at      timestamptz not null default now(),
+    updated_at      timestamptz not null default now()
 );
 
 -- ---------------------------------------------------------

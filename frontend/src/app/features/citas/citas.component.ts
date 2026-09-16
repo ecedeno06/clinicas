@@ -114,7 +114,7 @@ export class CitasComponent implements OnInit {
   citaHistoria = signal<Cita | null>(null);
   historia = signal<HistoriaClinica | null>(null);
   cargandoHistoria = signal(false);
-  tabHistoria = signal<'consulta' | 'signos' | 'antecedentes' | 'recetas' | 'laboratorios'>('consulta');
+  tabHistoria = signal<'consulta' | 'signos' | 'antecedentes' | 'recetas' | 'laboratorios' | 'familiares'>('consulta');
   pacienteDeHistoria = signal<Paciente | null>(null);
   antecedenteSeleccionado = signal<PacienteAntecedente | null>(null);
 
@@ -1548,6 +1548,10 @@ export class CitasComponent implements OnInit {
       },
       error: (err) => alert(err?.error?.mensaje || 'No se pudo eliminar la orden de laboratorio'),
     });
+  }
+
+  soloDigitos(telefono: string | null | undefined): string {
+    return (telefono || '').replace(/\D/g, '');
   }
 }
 

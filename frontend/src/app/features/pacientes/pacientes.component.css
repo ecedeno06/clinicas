@@ -25,3 +25,10 @@
   top: 0;
   z-index: 1;
 }
+
+/* Popup de familiares (icono junto al telefono en la tabla de Pacientes) */
+.familiar-item + .familiar-item {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--slate-100);
+}

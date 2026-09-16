@@ -167,6 +167,7 @@ export class PacientesComponent implements OnInit {
     nombre: ['', Validators.required],
     telefono: [''],
     parentesco: [''],
+    acepta_whatsapp: [false],
   });
 
   // ---------- Antecedentes patologicos: a diferencia de Familiares, cada
@@ -311,7 +312,7 @@ export class PacientesComponent implements OnInit {
 
   abrirNuevoFamiliar(): void {
     this.familiarEditandoIndex.set(null);
-    this.familiarForm.reset({ nombre: '', telefono: '', parentesco: '' });
+    this.familiarForm.reset({ nombre: '', telefono: '', parentesco: '', acepta_whatsapp: false });
     this.mostrarFormFamiliar.set(true);
   }
 
@@ -336,7 +337,7 @@ export class PacientesComponent implements OnInit {
   cerrarFormFamiliar(): void {
     this.mostrarFormFamiliar.set(false);
     this.familiarEditandoIndex.set(null);
-    this.familiarForm.reset({ nombre: '', telefono: '', parentesco: '' });
+    this.familiarForm.reset({ nombre: '', telefono: '', parentesco: '', acepta_whatsapp: false });
   }
 
   eliminarFamiliar(i: number): void {
@@ -526,6 +527,35 @@ export class PacientesComponent implements OnInit {
   cerrarSelectorWhatsapp(): void {
     this.pacienteWhatsappAbierto.set(null);
     this.whatsappMenuPos.set(null);
+  }
+
+  // Popup con los familiares del paciente (nombre, telefono, parentesco) al
+  // hacer clic en el icono de la fila -- mismo motivo que whatsappMenuPos
+  // para usar "fixed" calculado en JS en vez de "absolute".
+  familiaresAbierto = signal<Paciente | null>(null);
+  familiaresPos = signal<{ top: number; left: number } | null>(null);
+
+  toggleFamiliares(p: Paciente, event: MouseEvent): void {
+    if (this.familiaresAbierto()?.id === p.id) {
+      this.familiaresAbierto.set(null);
+      return;
+    }
+    if (!p.familiares?.length) return;
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    const anchoPopup = 260;
+    this.familiaresPos.set({
+      top: rect.bottom + 6,
+      left: Math.max(8, Math.min(rect.left, window.innerWidth - anchoPopup - 8)),
+    });
+    this.familiaresAbierto.set(p);
+  }
+
+  cerrarFamiliares(): void {
+    this.familiaresAbierto.set(null);
+  }
+
+  soloDigitos(telefono: string | null | undefined): string {
+    return (telefono || '').replace(/\D/g, '');
   }
 
   enviarWhatsapp(p: Paciente): void {

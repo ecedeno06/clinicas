@@ -37,7 +37,8 @@ const SELECT_DIRECCIONES = `
 const SELECT_FAMILIARES = `
   coalesce((
     select json_agg(json_build_object(
-      'id', fp.id, 'nombre', fp.nombre, 'telefono', fp.telefono, 'parentesco', fp.parentesco
+      'id', fp.id, 'nombre', fp.nombre, 'telefono', fp.telefono, 'parentesco', fp.parentesco,
+      'acepta_whatsapp', fp.acepta_whatsapp
     ) order by fp.created_at)
     from familiares_paciente fp
     where fp.paciente_id = p.id
@@ -141,8 +142,8 @@ async function reemplazarFamiliares(ejecutor, pacienteId, familiares) {
   for (const f of familiares) {
     if (!f.nombre) continue;
     await ejecutor.query(
-      'insert into familiares_paciente (paciente_id, nombre, telefono, parentesco) values ($1,$2,$3,$4)',
-      [pacienteId, f.nombre, f.telefono || null, f.parentesco || null]
+      'insert into familiares_paciente (paciente_id, nombre, telefono, parentesco, acepta_whatsapp) values ($1,$2,$3,$4,$5)',
+      [pacienteId, f.nombre, f.telefono || null, f.parentesco || null, !!f.acepta_whatsapp]
     );
   }
 }
