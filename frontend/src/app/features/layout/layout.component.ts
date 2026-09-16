@@ -1,7 +1,8 @@
 import { Component, OnDestroy, OnInit, computed, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
+import { Router, NavigationEnd, RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
+import { filter } from 'rxjs/operators';
 import { AuthService } from '../../core/services/auth.service';
 import { ThemeService } from '../../core/services/theme.service';
 import { SessionService } from '../../core/services/session.service';
@@ -36,6 +37,12 @@ export class LayoutComponent implements OnInit, OnDestroy {
   cambioPasswordObligatorio = computed(() => !!this.auth.usuario()?.debe_cambiar_password);
   reportesAbierto = signal(false);
   sidebarColapsado = signal(localStorage.getItem(SIDEBAR_STORAGE_KEY) === '1');
+  // Menu off-canvas para pantallas angostas -- independiente de
+  // sidebarColapsado (ese es el modo "solo iconos" de escritorio; en
+  // mobile no tiene sentido, ahi el menu esta oculto por completo o
+  // abierto a ancho completo). Se cierra solo al navegar (ver
+  // ngOnInit) o al tocar el fondo/la "X".
+  sidebarMobileAbierto = signal(false);
 
   // Cronometro de tiempo conectado (HH:MM:SS desde que se emitio el JWT
   // final), mostrado en el header. Puramente informativo -- no tiene
@@ -62,11 +69,20 @@ export class LayoutComponent implements OnInit, OnDestroy {
     public theme: ThemeService,
     public sessionService: SessionService,
     private fb: FormBuilder,
-    private politicaPasswordSrv: PoliticaPasswordService
+    private politicaPasswordSrv: PoliticaPasswordService,
+    private router: Router
   ) {}
 
   ngOnInit(): void {
     this.sessionService.init();
+
+    // Cierra el menu off-canvas de mobile al navegar -- por evento de
+    // router en vez de un (click) en cada link, para no cerrarlo tambien
+    // al tocar el toggle de "Reportes" (que solo despliega un submenu,
+    // no navega).
+    this.router.events.pipe(filter((e) => e instanceof NavigationEnd)).subscribe(() => {
+      this.sidebarMobileAbierto.set(false);
+    });
 
     const inicio = this.auth.sessionStart ?? Date.now();
     this.actualizarTiempoConectado(inicio);
@@ -107,6 +123,10 @@ export class LayoutComponent implements OnInit, OnDestroy {
     const nuevo = !this.sidebarColapsado();
     this.sidebarColapsado.set(nuevo);
     localStorage.setItem(SIDEBAR_STORAGE_KEY, nuevo ? '1' : '0');
+  }
+
+  toggleSidebarMobile(): void {
+    this.sidebarMobileAbierto.set(!this.sidebarMobileAbierto());
   }
 
   iniciales(): string {
