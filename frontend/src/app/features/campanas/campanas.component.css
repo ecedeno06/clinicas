@@ -1,0 +1,8 @@
+.time12 {
+  display: flex;
+  gap: 6px;
+}
+.time12 select { min-width: 0; }
+.time12 select:nth-child(1) { flex: 1.1; }
+.time12 select:nth-child(2) { flex: 1.1; }
+.time12 select:nth-child(3) { flex: 1.3; }

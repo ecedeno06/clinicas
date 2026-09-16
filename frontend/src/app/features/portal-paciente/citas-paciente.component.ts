@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { PortalPacienteService } from '../../core/services/portalPaciente.service';
 import { EstadoCita, HistoriaClinica, OrdenLaboratorio, PacienteAntecedente, Receta, SignosVitales } from '../../core/models/models';
 import { formatoFechaCorta } from '../../core/utils/pdf.util';
+import { formatoAmPm } from '../../core/utils/hora12.util';
 import { clasificarImc } from '../../core/utils/imc.util';
 import { clasificarPresion } from '../../core/utils/presion.util';
 import { clasificarGlucosa } from '../../core/utils/glucosa.util';
@@ -25,6 +26,8 @@ import { clasificarGlucosa } from '../../core/utils/glucosa.util';
   templateUrl: './citas-paciente.component.html',
 })
 export class CitasPacienteComponent implements OnInit {
+  formatoAmPm = formatoAmPm;
+
   tabSuperior = signal<'consultas' | 'antecedentes'>('consultas');
   // 'evaluacion' (motivo/diagnostico/observaciones) no pide ninguna
   // llamada aparte -- ya viene en la fila de historialSeleccionado().

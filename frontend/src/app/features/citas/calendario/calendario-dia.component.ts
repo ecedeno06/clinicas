@@ -230,7 +230,12 @@ export class CalendarioDiaComponent implements AfterViewInit {
     const libres = this.rangosLibresPorDoctor().get(doctorId) ?? null;
     const inicioRedondeado = redondearInicioDisponible(minutosSoltado, duracionMin, libres, PASO_SLOT_MIN);
     if (inicioRedondeado === null) {
-      alert('Este doctor no atiende en este horario segun su horario configurado.');
+      // setTimeout: un alert() disparado en sincrono dentro del handler
+      // nativo de "drop" puede quedar silenciado por el navegador (nunca se
+      // muestra) porque todavia esta cerrando la operacion de drag-and-drop
+      // -- diferirlo al siguiente tick asegura que si se vea, en vez de que
+      // la cita solo "regrese" a su lugar sin ninguna explicacion.
+      setTimeout(() => alert('Este doctor no atiende en este horario segun su horario configurado.'));
       return;
     }
 

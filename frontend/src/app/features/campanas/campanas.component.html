@@ -156,11 +156,39 @@
         <div class="flex gap-16 mt-16">
           <div class="form-group" style="flex:1">
             <label>Hora de inicio</label>
-            <input class="input" type="time" formControlName="hora_inicio" />
+            <div class="time12">
+              <select class="input" [ngModel]="partesHoraCampana('hora_inicio').h" [ngModelOptions]="{standalone: true}" (ngModelChange)="actualizarHoraCampana12('hora_inicio', 'h', $event)">
+                <option [ngValue]="null" disabled>--</option>
+                @for (h of horas12; track h) { <option [ngValue]="h">{{ h }}</option> }
+              </select>
+              <select class="input" [ngModel]="partesHoraCampana('hora_inicio').m" [ngModelOptions]="{standalone: true}" (ngModelChange)="actualizarHoraCampana12('hora_inicio', 'm', $event)">
+                <option [ngValue]="null" disabled>--</option>
+                @for (m of minutos60; track m) { <option [ngValue]="m">{{ m }}</option> }
+              </select>
+              <select class="input" [ngModel]="partesHoraCampana('hora_inicio').periodo" [ngModelOptions]="{standalone: true}" (ngModelChange)="actualizarHoraCampana12('hora_inicio', 'periodo', $event)">
+                <option [ngValue]="null" disabled>--</option>
+                <option ngValue="a.m.">a.m.</option>
+                <option ngValue="p.m.">p.m.</option>
+              </select>
+            </div>
           </div>
           <div class="form-group" style="flex:1">
             <label>Hora de fin</label>
-            <input class="input" type="time" formControlName="hora_fin" />
+            <div class="time12">
+              <select class="input" [ngModel]="partesHoraCampana('hora_fin').h" [ngModelOptions]="{standalone: true}" (ngModelChange)="actualizarHoraCampana12('hora_fin', 'h', $event)">
+                <option [ngValue]="null" disabled>--</option>
+                @for (h of horas12; track h) { <option [ngValue]="h">{{ h }}</option> }
+              </select>
+              <select class="input" [ngModel]="partesHoraCampana('hora_fin').m" [ngModelOptions]="{standalone: true}" (ngModelChange)="actualizarHoraCampana12('hora_fin', 'm', $event)">
+                <option [ngValue]="null" disabled>--</option>
+                @for (m of minutos60; track m) { <option [ngValue]="m">{{ m }}</option> }
+              </select>
+              <select class="input" [ngModel]="partesHoraCampana('hora_fin').periodo" [ngModelOptions]="{standalone: true}" (ngModelChange)="actualizarHoraCampana12('hora_fin', 'periodo', $event)">
+                <option [ngValue]="null" disabled>--</option>
+                <option ngValue="a.m.">a.m.</option>
+                <option ngValue="p.m.">p.m.</option>
+              </select>
+            </div>
           </div>
         </div>
         <div class="form-group mt-16">

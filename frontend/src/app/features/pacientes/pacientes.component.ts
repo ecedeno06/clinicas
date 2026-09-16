@@ -490,6 +490,7 @@ export class PacientesComponent implements OnInit {
   }
 
   direccionPrincipal = direccionPrincipal;
+  formatoAmPm = formatoAmPm;
 
   // Para que el medico pueda navegar hacia una visita a domicilio con la
   // app que prefiera, igual que en Sucursales.

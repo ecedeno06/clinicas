@@ -7,7 +7,7 @@ import { DoctoresService } from '../../core/services/doctores.service';
 import { CitasService } from '../../core/services/citas.service';
 import { AuthService } from '../../core/services/auth.service';
 import { Campana, CampanaDoctor, Cita, Doctor, EstadoCampana, EventoCitaLog, Sucursal } from '../../core/models/models';
-import { formatoAmPm } from '../../core/utils/hora12.util';
+import { HORAS_12, MINUTOS_60, combinar12, combinarHoraFin12, formatoAmPm, partes12 } from '../../core/utils/hora12.util';
 import { hoyISO } from '../../core/utils/fecha.util';
 import { MapaSelectorComponent, UbicacionSeleccionada, extraerLatLng } from '../../core/components/mapa-selector/mapa-selector.component';
 
@@ -137,6 +137,27 @@ export class CampanasComponent implements OnInit {
     const c = this.editando();
     if (!c) return [];
     return TRANSICIONES[c.estado] ?? [];
+  }
+
+  readonly horas12 = HORAS_12;
+  readonly minutos60 = MINUTOS_60;
+
+  partesHoraCampana(campo: 'hora_inicio' | 'hora_fin'): { h: number | null; m: string | null; periodo: 'a.m.' | 'p.m.' | null } {
+    const valor = this.form.get(campo)?.value;
+    if (!valor) return { h: null, m: null, periodo: null };
+    return partes12(valor);
+  }
+
+  // "Hasta" usa combinarHoraFin12(): "12:00 a.m." solo tiene sentido como
+  // fin del dia (24:00, ver hora12.util.ts), nunca como su inicio (00:00).
+  actualizarHoraCampana12(campo: 'hora_inicio' | 'hora_fin', parte: 'h' | 'm' | 'periodo', valor: number | string): void {
+    const actual = this.partesHoraCampana(campo);
+    const h12 = parte === 'h' ? Number(valor) : actual.h ?? 12;
+    const m = parte === 'm' ? String(valor) : actual.m ?? '00';
+    const periodo = (parte === 'periodo' ? valor : actual.periodo ?? 'a.m.') as 'a.m.' | 'p.m.';
+    const hora24 = campo === 'hora_fin' ? combinarHoraFin12(h12, m, periodo) : combinar12(h12, m, periodo);
+    if (campo === 'hora_inicio') this.form.patchValue({ hora_inicio: hora24 });
+    else this.form.patchValue({ hora_fin: hora24 });
   }
 
   abrirNuevo(): void {

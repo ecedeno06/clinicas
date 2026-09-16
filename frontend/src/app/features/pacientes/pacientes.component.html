@@ -497,7 +497,7 @@
                   @for (h of historialFiltrado(); track h.id) {
                     <tr class="row-clickable" [class.row-selected]="historialSeleccionado()?.id === h.id" (click)="seleccionarHistorial(h)">
                       <td style="white-space: nowrap;">{{ h.fecha_cita | date:'dd/MM/yyyy':'UTC' }}</td>
-                      <td style="white-space: nowrap;">{{ h.hora_cita?.substring(0, 5) || '-' }}</td>
+                      <td style="white-space: nowrap;">{{ h.hora_cita ? formatoAmPm(h.hora_cita) : '-' }}</td>
                       <td>{{ h.doctor_nombre }} <div class="text-muted text-sm">{{ h.especialidad_nombre }}</div></td>
                       <td>
                         {{ h.sucursal_nombre || '-' }}
