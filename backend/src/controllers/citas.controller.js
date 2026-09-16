@@ -83,6 +83,7 @@ async function listar(req, res, next) {
                  where de2.doctor_id = d.id)
               ) as especialidad_nombre,
               s.nombre as sucursal_nombre, s.direccion as sucursal_direccion, s.google_maps_url as sucursal_google_maps_url,
+              s.telefono as sucursal_telefono,
               s.hora_apertura as sucursal_hora_apertura, s.hora_cierre as sucursal_hora_cierre,
               camp.nombre as campana_nombre,
               (hc.id is not null) as tiene_historia,
@@ -122,6 +123,7 @@ async function obtener(req, res, next) {
                  where de2.doctor_id = d.id)
               ) as especialidad_nombre,
               s.nombre as sucursal_nombre, s.direccion as sucursal_direccion, s.google_maps_url as sucursal_google_maps_url,
+              s.telefono as sucursal_telefono,
               s.hora_apertura as sucursal_hora_apertura, s.hora_cierre as sucursal_hora_cierre,
               camp.nombre as campana_nombre
        from citas c

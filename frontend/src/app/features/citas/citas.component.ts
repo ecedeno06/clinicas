@@ -15,7 +15,7 @@ import { AntecedentesPatologicosService } from '../../core/services/antecedentes
 import { PacienteAntecedentesService } from '../../core/services/pacienteAntecedentes.service';
 import { CategoriasExamenesLaboratorioService } from '../../core/services/categoriasExamenesLaboratorio.service';
 import { ExamenesLaboratorioCatalogoService } from '../../core/services/examenesLaboratorioCatalogo.service';
-import { Campana, CampanaDoctor, Cita, Disponibilidad, Doctor, Especialidad, EstadoCita, EstadoLaboratorio, ExamenLaboratorio, FranjaHoraria, HistoriaClinica, OrdenLaboratorio, Paciente, PacienteAntecedente, Receta, SignosVitales, Sucursal, CategoriaAntecedente, AntecedentePatologico, CategoriaExamenLaboratorio, ExamenLaboratorioCatalogo } from '../../core/models/models';
+import { Campana, CampanaDoctor, Cita, Disponibilidad, Doctor, Especialidad, EstadoCita, EstadoLaboratorio, ExamenLaboratorio, FamiliarPaciente, FranjaHoraria, HistoriaClinica, OrdenLaboratorio, Paciente, PacienteAntecedente, Receta, SignosVitales, Sucursal, CategoriaAntecedente, AntecedentePatologico, CategoriaExamenLaboratorio, ExamenLaboratorioCatalogo } from '../../core/models/models';
 import { clasificarImc } from '../../core/utils/imc.util';
 import { clasificarPresion } from '../../core/utils/presion.util';
 import { clasificarGlucosa } from '../../core/utils/glucosa.util';
@@ -1552,6 +1552,31 @@ export class CitasComponent implements OnInit {
 
   soloDigitos(telefono: string | null | undefined): string {
     return (telefono || '').replace(/\D/g, '');
+  }
+
+  // Mensaje de WhatsApp para un familiar (tab Familiares de Consulta
+  // Medica): cabecera con el contexto de la consulta abierta -- a
+  // diferencia del paciente (que puede tener citas con varios doctores
+  // en varias sucursales), aqui SI hay una cita puntual de referencia
+  // (citaHistoria), asi que no hace falta pedir nada aparte.
+  whatsappUrlFamiliar(f: FamiliarPaciente): string {
+    const c = this.citaHistoria();
+    const empresa = this.auth.empresaActiva()?.empresa_nombre || '';
+    const idCorto = (c?.paciente_id || '').split('-')[0];
+    const lineas = [
+      `Clinica: ${empresa}`,
+      `Sucursal: ${c?.sucursal_nombre || ''}`,
+      `Doctor: ${c?.doctor_nombre || ''}`,
+      `Paciente: ${c?.paciente_nombre || ''}`,
+      `ID: ${idCorto}`,
+    ];
+    if (c?.sucursal_telefono) lineas.push(`Telefono sucursal: ${c.sucursal_telefono}`);
+    if (c?.sucursal_google_maps_url) {
+      lineas.push('', `Ubicacion (Google Maps): ${c.sucursal_google_maps_url}`);
+      const coords = extraerLatLng(c.sucursal_google_maps_url);
+      if (coords) lineas.push(`Abrir con Waze: https://waze.com/ul?ll=${coords[0]},${coords[1]}&navigate=yes`);
+    }
+    return `https://wa.me/${this.soloDigitos(f.telefono)}?text=${encodeURIComponent(lineas.join('\n'))}`;
   }
 }
 

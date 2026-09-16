@@ -342,6 +342,7 @@ export interface Cita {
   sucursal_nombre?: string;
   sucursal_direccion?: string | null;
   sucursal_google_maps_url?: string | null;
+  sucursal_telefono?: string | null;
   sucursal_hora_apertura?: string | null;
   sucursal_hora_cierre?: string | null;
   campana_id?: string | null;
