@@ -5,6 +5,15 @@
   width: min(1100px, 95vw);
 }
 
+/* Texto mas compacto solo en la tabla principal de Citas (Lista) -- una
+   clase propia (no .data-table a secas) para no afectar las otras tablas
+   de este mismo componente (log de la cita, signos vitales, recetas,
+   laboratorio, antecedentes). */
+.tabla-citas-lista th,
+.tabla-citas-lista td {
+  font-size: 11px;
+}
+
 /* Popup con la foto del paciente (300x300) al hacer clic en el icono junto
    a su nombre en la tabla Lista -- ver toggleFotoPaciente() en el .ts. */
 .paciente-foto-popup-grande {
