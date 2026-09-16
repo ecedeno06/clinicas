@@ -29,6 +29,38 @@
   font-size: 15px;
   font-weight: 700;
   color: var(--slate-950);
+  cursor: pointer;
+  display: inline-block;
+}
+
+.cita-popover-header-right {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* Foto del paciente en la esquina del popover -- se duplica de tamano al
+   pasar el mouse sobre el nombre, mismo criterio que en el bloque del
+   calendario (calendario-dia.component.css). transform-origin en la
+   esquina superior derecha para que crezca hacia abajo/izquierda, ya
+   que .cita-popover puede scrollear (overflow-y:auto) y recortaria el
+   zoom si creciera hacia arriba. */
+.cita-popover-foto {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  transform-origin: top right;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-radius 0.15s ease;
+  position: relative;
+}
+.cita-popover-header:has(.cita-popover-paciente:hover) .cita-popover-foto {
+  transform: scale(2);
+  border-radius: 10px;
+  z-index: 5;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45), 0 0 0 3px var(--white);
 }
 
 .cita-popover-header .close {

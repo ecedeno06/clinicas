@@ -9,7 +9,12 @@
           @if (c.especialidad_nombre) { &middot; {{ c.especialidad_nombre }} }
         </div>
       </div>
-      <button type="button" class="close" (click)="cerrar.emit()" aria-label="Cerrar">&times;</button>
+      <div class="cita-popover-header-right">
+        @if (c.paciente_foto) {
+          <img class="cita-popover-foto" [src]="c.paciente_foto" alt="" />
+        }
+        <button type="button" class="close" (click)="cerrar.emit()" aria-label="Cerrar">&times;</button>
+      </div>
     </div>
 
     <div class="cita-popover-datos">
