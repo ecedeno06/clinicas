@@ -221,11 +221,22 @@ export class PacientesComponent implements OnInit {
   // un formulario que ya se reseteo -- ver onIdentificacionBlur().
   private tokenBusquedaIdentificacion = 0;
 
+  // Un paciente ya existente solo lo puede editar el propio paciente (desde
+  // su portal, flujo aparte) o el super admin -- el staff normal (admin/
+  // recepcionista) puede seguir creando pacientes nuevos libremente, pero
+  // al abrir uno ya guardado el formulario queda en solo lectura. El
+  // backend aplica la misma regla en PUT /api/pacientes/:id (ver
+  // pacientes.routes.js).
+  soloLecturaPaciente(): boolean {
+    return !!this.editando() && !this.auth.esSuperAdmin();
+  }
+
   abrirNuevo(): void {
     this.tokenBusquedaIdentificacion++;
     this.editando.set(null);
     this.pacienteExistente.set(null);
     this.tabFormulario.set('generales');
+    this.form.enable();
     this.form.reset({ activo: true });
     this.direccionesArray.clear();
     this.direccionesArray.push(this.crearDireccionGroup());
@@ -253,7 +264,12 @@ export class PacientesComponent implements OnInit {
     this.cerrarFormFamiliar();
     this.antecedentes.set(p.antecedentes ?? []);
     this.cerrarFormAntecedente();
-    this.habilitarCamposIdentidad();
+    if (this.soloLecturaPaciente()) {
+      this.form.disable();
+    } else {
+      this.form.enable();
+      this.habilitarCamposIdentidad();
+    }
     this.panelAbierto.set(true);
   }
 
