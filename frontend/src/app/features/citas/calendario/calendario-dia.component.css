@@ -54,6 +54,13 @@
   background: var(--tint-teal-bg);
   color: var(--text-on-tint-teal);
   object-fit: cover;
+  position: relative;
+  transition: transform 0.15s ease;
+}
+
+.cal-avatar-iniciales:hover {
+  transform: scale(2);
+  z-index: 3;
 }
 
 .cal-dia-doctor-nombre {
