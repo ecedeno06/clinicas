@@ -39,8 +39,17 @@
               </button>
             }
             @if (puedeQuitar(e)) {
-              <button type="button" class="btn-icon btn-icon-danger" title="Quitar" aria-label="Quitar" (click)="eliminar(e)">
+              <button type="button" class="btn-icon btn-icon-danger" title="Quitar de mi clinica" aria-label="Quitar de mi clinica" (click)="eliminar(e)">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+              </button>
+            }
+            <!-- Deshabilitado por el momento (pedido explicito): borrar del
+                 catalogo global de raiz es una accion riesgosa (afecta toda
+                 la red) -- se deja el metodo/endpoint listos para cuando se
+                 quiera reactivar este boton. -->
+            @if (false && !e.empresa_id && auth.esSuperAdmin()) {
+              <button type="button" class="btn-icon btn-icon-danger" title="Eliminar del catalogo global (toda la red)" aria-label="Eliminar del catalogo global" (click)="eliminarCatalogoGlobal(e)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></svg>
               </button>
             }
           </td>
@@ -96,7 +105,12 @@
           <textarea class="input" rows="3" formControlName="descripcion"></textarea>
         </div>
         <div class="form-group mt-16">
-          <label class="flex items-center gap-8"><input type="checkbox" formControlName="activo" /> Especialidad activa</label>
+          @if (editando() && !editando()!.empresa_id) {
+            <label class="flex items-center gap-8"><input type="checkbox" formControlName="activo" /> Activa en mi clinica</label>
+            <div class="text-muted text-sm mt-8">Esto solo pausa/activa la especialidad en tu clinica -- el nombre y la descripcion, en cambio, se editan para toda la red.</div>
+          } @else {
+            <label class="flex items-center gap-8"><input type="checkbox" formControlName="activo" /> Especialidad activa</label>
+          }
         </div>
         <div class="form-actions">
           <button type="submit" class="btn btn-primary" [disabled]="form.invalid">Guardar</button>

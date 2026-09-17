@@ -96,21 +96,42 @@ async function actualizar(req, res, next) {
     const empresaId = actual.rows[0].empresa_id;
 
     if (empresaId === null) {
-      // Global: solo un super admin puede renombrar/editar el catalogo
-      // de raiz -- un admin normal no puede editar algo global (solo
-      // activarlo/quitarlo, ver crear/eliminar).
-      if (!req.usuario.es_super_admin) {
-        return res.status(403).json({ mensaje: 'Esta especialidad es global, solo un super administrador puede modificarla.' });
-      }
       const { nombre, descripcion, activo } = req.body;
+
+      // Renombrar/editar la descripcion es tocar el catalogo GLOBAL de
+      // raiz -- solo un super admin puede hacerlo (mismo criterio de
+      // siempre). "activo", en cambio, NUNCA es esto: ver mas abajo.
+      if ((nombre !== undefined || descripcion !== undefined) && !req.usuario.es_super_admin) {
+        return res.status(403).json({ mensaje: 'Esta especialidad es global, solo un super administrador puede modificar su nombre o descripcion.' });
+      }
+      if (nombre !== undefined || descripcion !== undefined) {
+        await pool.query(
+          `update especialidades set nombre = coalesce($1, nombre), descripcion = coalesce($2, descripcion) where id = $3`,
+          [nombre, descripcion, req.params.id]
+        );
+      }
+
+      // El "activo" de una fila global en MI lista es mi propia
+      // activacion (especialidades_empresas), nunca el catalogo global de
+      // raiz -- mismo criterio que ya se aplico a eliminar()/eliminarGlobal().
+      // Sin este cambio, un super admin "pausando" la especialidad para su
+      // propia clinica la desactivaba para TODA la red por error.
+      if (activo !== undefined) {
+        const { rowCount } = await pool.query(
+          'update especialidades_empresas set activo = $1 where especialidad_id = $2 and empresa_id = $3',
+          [activo, req.params.id, req.empresaId]
+        );
+        if (!rowCount) return res.status(404).json({ mensaje: 'Especialidad no encontrada' });
+      }
+
       const { rows } = await pool.query(
-        `update especialidades set
-           nombre = coalesce($1, nombre),
-           descripcion = coalesce($2, descripcion),
-           activo = coalesce($3, activo)
-         where id = $4 returning *`,
-        [nombre, descripcion, activo, req.params.id]
+        `select e.id, e.nombre, e.descripcion, e.empresa_id, ee.activo, e.created_at
+         from especialidades e
+         join especialidades_empresas ee on ee.especialidad_id = e.id
+         where e.id = $1 and ee.empresa_id = $2`,
+        [req.params.id, req.empresaId]
       );
+      if (!rows[0]) return res.status(404).json({ mensaje: 'Especialidad no encontrada' });
       return res.json(rows[0]);
     }
 
@@ -134,6 +155,14 @@ async function actualizar(req, res, next) {
   }
 }
 
+// DELETE /api/especialidades/:id -- "Quitar de mi clinica". Para una
+// especialidad global esto SIEMPRE es la operacion segura (solo borra
+// especialidades_empresas, el catalogo global sigue intacto para las
+// demas clinicas), sin importar si quien la pide es super admin -- un
+// super admin normalmente tambien administra una clinica puntual (misma
+// cuenta), y antes esta accion le borraba la especialidad de TODA LA RED
+// por error, sin ninguna forma de solo quitarla de su propia clinica. El
+// borrado global de raiz vive aparte, en eliminarGlobal().
 async function eliminar(req, res, next) {
   try {
     const actual = await pool.query('select empresa_id from especialidades where id = $1', [req.params.id]);
@@ -141,14 +170,6 @@ async function eliminar(req, res, next) {
     const empresaId = actual.rows[0].empresa_id;
 
     if (empresaId === null) {
-      if (req.usuario.es_super_admin) {
-        // Borra la especialidad global de raiz (cascada a
-        // especialidades_empresas y doctor_especialidades).
-        await pool.query('delete from especialidades where id = $1', [req.params.id]);
-        return res.status(204).send();
-      }
-      // Admin normal: solo quita SU activacion, el catalogo global
-      // sigue intacto para las demas clinicas.
       const { rowCount } = await pool.query(
         'delete from especialidades_empresas where especialidad_id = $1 and empresa_id = $2',
         [req.params.id, req.empresaId]
@@ -167,4 +188,20 @@ async function eliminar(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { listar, listarCatalogoGlobal, obtener, crear, actualizar, eliminar };
+// DELETE /api/especialidades/:id/global -- borra la especialidad del
+// catalogo GLOBAL de raiz (cascada a especialidades_empresas y
+// doctor_especialidades en TODA la red). Accion aparte y explicita, solo
+// para super admin, distinta de "quitar de mi clinica" (eliminar()).
+async function eliminarGlobal(req, res, next) {
+  try {
+    const actual = await pool.query('select empresa_id from especialidades where id = $1', [req.params.id]);
+    if (!actual.rows[0]) return res.status(404).json({ mensaje: 'Especialidad no encontrada' });
+    if (actual.rows[0].empresa_id !== null) {
+      return res.status(400).json({ mensaje: 'Esta especialidad no es global.' });
+    }
+    await pool.query('delete from especialidades where id = $1', [req.params.id]);
+    res.status(204).send();
+  } catch (err) { next(err); }
+}
+
+module.exports = { listar, listarCatalogoGlobal, obtener, crear, actualizar, eliminar, eliminarGlobal };

@@ -15,4 +15,5 @@ export class EspecialidadesService {
   crear(data: any): Observable<Especialidad> { return this.http.post<Especialidad>(this.base, data); }
   actualizar(id: string, data: any): Observable<Especialidad> { return this.http.put<Especialidad>(`${this.base}/${id}`, data); }
   eliminar(id: string): Observable<void> { return this.http.delete<void>(`${this.base}/${id}`); }
+  eliminarGlobal(id: string): Observable<void> { return this.http.delete<void>(`${this.base}/${id}/global`); }
 }

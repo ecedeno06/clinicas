@@ -133,14 +133,26 @@ export class EspecialidadesComponent implements OnInit {
     });
   }
 
+  // Quitar de MI clinica -- para una especialidad global, esto solo
+  // borra mi activacion (especialidades_empresas), el catalogo global
+  // sigue intacto para las demas clinicas. Ver eliminarCatalogoGlobal()
+  // para el borrado de raiz (accion aparte, solo super admin).
   eliminar(e: Especialidad): void {
-    const mensaje = !e.empresa_id && this.auth.esSuperAdmin()
-      ? `"${e.nombre}" es una especialidad global -- esto la eliminara para TODA la red, no solo tu clinica. Continuar?`
-      : `Quitar "${e.nombre}" de tu clinica?`;
-    if (!confirm(mensaje)) return;
+    if (!confirm(`Quitar "${e.nombre}" de tu clinica?`)) return;
     this.srv.eliminar(e.id).subscribe({
       next: () => this.cargar(),
-      error: (err) => alert(err?.error?.mensaje || 'No se pudo eliminar la especialidad'),
+      error: (err) => alert(err?.error?.mensaje || 'No se pudo quitar la especialidad'),
+    });
+  }
+
+  // Solo super admin, solo para una especialidad global: la borra del
+  // catalogo de raiz, afectando a TODA la red (todas las clinicas que la
+  // tenian activada, y a los doctores con esa especialidad asignada).
+  eliminarCatalogoGlobal(e: Especialidad): void {
+    if (!confirm(`"${e.nombre}" es una especialidad global -- esto la eliminara para TODA la red (todas las clinicas y doctores que la usan), no solo la tuya. Continuar?`)) return;
+    this.srv.eliminarGlobal(e.id).subscribe({
+      next: () => { this.cargar(); this.srv.listarCatalogoGlobal().subscribe((d) => this.catalogoGlobal.set(d)); },
+      error: (err) => alert(err?.error?.mensaje || 'No se pudo eliminar la especialidad del catalogo global'),
     });
   }
 }
