@@ -26,6 +26,17 @@ export class SelectorFotoComponent implements OnDestroy {
   // modal) -- para cuando otro elemento de la pantalla (ej. un item de
   // menu) es quien debe abrir el selector via abrirSelector().
   @Input() ocultarDisparador = false;
+  // Cuando es true, muestra el avatar de iniciales (sin foto) con esquinas
+  // redondeadas (8px) en vez de circular -- para logos/marcas, donde un
+  // circulo no encaja con la forma final que tendra la foto real (ver
+  // .selector-foto-img, que ya usa esquinas redondeadas para cualquier
+  // foto real independientemente de este input).
+  @Input() cuadrado = false;
+  // Tamano en px del avatar/foto (boton cuadrado que lo contiene) --
+  // 100 por defecto (el usado en todos los formularios existentes); una
+  // ficha compacta como el encabezado de un drawer necesita algo mas
+  // chico.
+  @Input() tamano = 100;
   @Output() fotoCambiada = new EventEmitter<string>();
   @Output() fotoEliminada = new EventEmitter<void>();
 

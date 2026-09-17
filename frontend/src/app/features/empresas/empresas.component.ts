@@ -4,12 +4,13 @@ import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angu
 import { EmpresasService } from '../../core/services/empresas.service';
 import { AuthService } from '../../core/services/auth.service';
 import { Empresa, UsuarioGlobal, UsuarioDeEmpresa, Rol } from '../../core/models/models';
-import { redimensionarImagen } from '../../core/utils/imagen.util';
+import { TelefonoInputComponent } from '../../core/components/telefono-input/telefono-input.component';
+import { SelectorFotoComponent } from '../../core/components/selector-foto/selector-foto.component';
 
 @Component({
   selector: 'app-empresas',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, TelefonoInputComponent, SelectorFotoComponent],
   templateUrl: './empresas.component.html',
   styleUrl: './empresas.component.css',
 })
@@ -115,24 +116,11 @@ export class EmpresasComponent implements OnInit {
 
   cerrarPanel(): void { this.panelAbierto.set(false); }
 
-  onLogoSeleccionado(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    const archivo = input.files?.[0];
-    if (!archivo) return;
-
-    if (!archivo.type.startsWith('image/')) {
-      alert('Selecciona un archivo de imagen valido.');
-      return;
-    }
-
-    redimensionarImagen(archivo, 300).then((base64) => {
-      this.form.get('logo')?.setValue(base64);
-    });
-
-    input.value = '';
+  onLogoCambiado(base64: string): void {
+    this.form.get('logo')?.setValue(base64);
   }
 
-  quitarLogo(): void {
+  onLogoEliminado(): void {
     this.form.get('logo')?.setValue(null);
   }
 

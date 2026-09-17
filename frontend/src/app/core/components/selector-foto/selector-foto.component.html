@@ -1,9 +1,9 @@
 @if (!ocultarDisparador) {
-  <button type="button" class="selector-foto-btn" [class.selector-foto-btn-static]="soloLectura" [title]="soloLectura ? nombre : titulo" (click)="abrirSelector()">
+  <button type="button" class="selector-foto-btn" [class.selector-foto-btn-static]="soloLectura" [title]="soloLectura ? nombre : titulo" [style.width.px]="tamano" [style.height.px]="tamano" (click)="abrirSelector()">
     @if (foto) {
-      <img [src]="foto" class="selector-foto-img" [alt]="titulo" />
+      <img [src]="foto" class="selector-foto-img" [alt]="titulo" [style.width.px]="tamano" [style.height.px]="tamano" />
     } @else {
-      <div class="selector-foto-avatar">{{ iniciales() }}</div>
+      <div class="selector-foto-avatar" [class.selector-foto-avatar--cuadrado]="cuadrado" [style.width.px]="tamano" [style.height.px]="tamano" [style.font-size.px]="tamano * 0.28">{{ iniciales() }}</div>
     }
     @if (!soloLectura) {
       <span class="selector-foto-camera">

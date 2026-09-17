@@ -33,6 +33,9 @@
   font-weight: 700;
   font-size: 28px;
 }
+.selector-foto-avatar--cuadrado {
+  border-radius: 8px;
+}
 
 .selector-foto-img {
   width: 100px;

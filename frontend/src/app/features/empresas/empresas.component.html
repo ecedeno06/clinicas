@@ -54,7 +54,18 @@
     <div class="drawer">
       <div class="drawer-header">
         <h2>{{ editando() ? 'Editar clinica' : 'Nueva clinica' }}</h2>
-        <button class="close" (click)="cerrarPanel()">&times;</button>
+        <div class="flex items-center gap-8">
+          <app-selector-foto
+            [foto]="form.get('logo')?.value"
+            [nombre]="form.get('nombre')?.value || ''"
+            [cuadrado]="true"
+            [tamano]="44"
+            titulo="Logo de la clinica"
+            (fotoCambiada)="onLogoCambiado($event)"
+            (fotoEliminada)="onLogoEliminado()"
+          ></app-selector-foto>
+          <button class="close" (click)="cerrarPanel()">&times;</button>
+        </div>
       </div>
       <form [formGroup]="form" (ngSubmit)="guardar()">
         <div class="form-group">
@@ -71,27 +82,11 @@
         </div>
         <div class="form-group mt-16">
           <label>Telefono</label>
-          <input class="input" formControlName="telefono" />
+          <app-telefono-input formControlName="telefono"></app-telefono-input>
         </div>
         <div class="form-group mt-16">
           <label>Direccion</label>
           <input class="input" formControlName="direccion" />
-        </div>
-
-        <div class="form-group mt-16">
-          <label>Logo</label>
-          <div class="flex items-center gap-12">
-            @if (form.get('logo')?.value) {
-              <img [src]="form.get('logo')?.value" alt="Logo" style="width:56px;height:56px;border-radius:8px;object-fit:contain;" />
-            }
-            <button type="button" class="btn btn-outline btn-sm" (click)="logoInput.click()">
-              {{ form.get('logo')?.value ? 'Cambiar logo' : 'Subir logo' }}
-            </button>
-            @if (form.get('logo')?.value) {
-              <button type="button" class="btn btn-outline btn-sm" (click)="quitarLogo()">Quitar</button>
-            }
-          </div>
-          <input #logoInput type="file" accept="image/*" style="display:none" (change)="onLogoSeleccionado($event)" />
         </div>
 
         @if (editando(); as e) {
