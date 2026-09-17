@@ -207,7 +207,17 @@ async function hayChoqueDePaciente({ empresaId, pacienteId, fecha, horaInicio, h
 // POST /api/citas
 async function crear(req, res, next) {
   try {
-    const { paciente_id, doctor_id, fecha, hora_inicio, hora_fin, motivo, observaciones, estado, sucursal_id, campana_id, especialidad_id, es_domicilio, es_urgencia } = req.body;
+    const { paciente_id, fecha, hora_inicio, hora_fin, motivo, observaciones, estado, sucursal_id, campana_id, especialidad_id, es_domicilio, es_urgencia } = req.body;
+    let { doctor_id } = req.body;
+
+    // Un doctor solo puede crear citas para SI MISMO -- se ignora
+    // cualquier doctor_id que venga en el body y se fuerza al propio,
+    // igual que ya hace actualizar() al editar (ver miDoctorId()).
+    if (req.usuario.rol === 'doctor') {
+      const propioId = await miDoctorId(req.usuario.id);
+      if (!propioId) return res.status(403).json({ mensaje: 'Tu cuenta no esta vinculada a un doctor.' });
+      doctor_id = propioId;
+    }
 
     if (!paciente_id || !doctor_id || !fecha || !hora_inicio || !hora_fin) {
       return res.status(400).json({ mensaje: 'paciente, doctor, fecha y horario son requeridos' });
@@ -386,8 +396,10 @@ async function actualizar(req, res, next) {
       }
     }
 
+    // Un doctor no puede cambiar la sucursal de su cita (el formulario ya
+    // la deja bloqueada, esto es la validacion real en el servidor).
     let sucursalId = null;
-    if (sucursal_id) {
+    if (sucursal_id && req.usuario.rol !== 'doctor') {
       sucursalId = await resolverSucursal(sucursal_id, req.empresaId);
       if (!sucursalId) return res.status(400).json({ mensaje: 'La sucursal indicada no existe o no pertenece a esta clinica.' });
     }

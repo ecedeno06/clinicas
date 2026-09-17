@@ -11,7 +11,9 @@ router.use(requireAuth, requireEmpresa, requireRol('admin', 'doctor', 'recepcion
 
 router.get('/', ctrl.listar);
 router.get('/:id', ctrl.obtener);
-router.post('/', requireRol('admin', 'recepcionista'), ctrl.crear);
+// 'doctor' puede crear -- el controller (crear()) fuerza doctor_id al
+// propio, ignorando cualquier otro que venga en el body.
+router.post('/', requireRol('admin', 'recepcionista', 'doctor'), ctrl.crear);
 // 'doctor' puede actualizar -- el controller (actualizar()) restringe a
 // que solo sea una cita propia.
 router.put('/:id', requireRol('admin', 'recepcionista', 'doctor'), ctrl.actualizar);

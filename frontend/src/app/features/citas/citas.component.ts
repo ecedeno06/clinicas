@@ -807,6 +807,15 @@ export class CitasComponent implements OnInit {
     return this.auth.usuario()?.rol === 'doctor' && c.doctor_id === this.miDoctorId();
   }
 
+  // Mismo criterio que puedeEditarCita(), pero para el boton "+ Nueva
+  // cita" (todavia no hay una cita puntual que revisar). El formulario
+  // bloquea Sucursal/Especialidad/Doctor para un doctor (ver
+  // abrirNuevo()/plantilla), y el backend fuerza doctor_id al propio de
+  // todos modos (crear()).
+  puedeCrearCita(): boolean {
+    return this.auth.puedeEditar() || this.auth.usuario()?.rol === 'doctor';
+  }
+
   // La cita no se llego a atender: no tiene sentido esperar que aparezca
   // un registro de signos/consulta/receta, asi que se marca con una X en
   // vez de dejar el icono en blanco.
@@ -932,16 +941,41 @@ export class CitasComponent implements OnInit {
     this.editando.set(null);
     this.disponibilidad.set(null);
     this.tabCita.set('cita');
+    // Un doctor no elige a mano doctor_id/especialidad_id (el formulario
+    // los deja bloqueados, ver plantilla) -- se precargan con los suyos,
+    // igual que ya hace abrirNuevoDesdeCelda() al hacer clic en una celda.
+    const miId = this.miDoctorId();
+    const miDoctor = miId ? this.doctores().find((d) => d.id === miId) : null;
+    const doctorId = miId ?? '';
+    const especialidadId = miDoctor?.especialidades[0]?.especialidad_id ?? '';
     // emitEvent:false para no disparar actualizarDisponibilidad() a mitad del
     // reset (doctor_id y fecha cambiarian en dos eventos separados, el
     // primero con el otro campo todavia con el valor viejo) -- se llama una
     // sola vez, ya con el formulario completo, justo debajo.
-    this.form.reset({ sucursal_id: this.sucursales()[0]?.id ?? '', especialidad_id: '', campana_id: '', es_domicilio: false, es_urgencia: false, enviar_whatsapp: false, fecha: hoyISO(), estado: 'pendiente' }, { emitEvent: false });
+    this.form.reset({ sucursal_id: this.sucursales()[0]?.id ?? '', especialidad_id: especialidadId, doctor_id: doctorId, campana_id: '', es_domicilio: false, es_urgencia: false, enviar_whatsapp: false, fecha: hoyISO(), estado: 'pendiente' }, { emitEvent: false });
+    this.aplicarBloqueoCamposDoctor();
     this.errorGuardar.set(null);
     this.panelAbierto.set(true);
     this.actualizarDisponibilidad();
     this.cargarDoctoresCampana(null);
     this.actualizarBloqueoFecha(null);
+  }
+
+  // Un doctor no puede cambiar Especialidad/Doctor/Sucursal (ni al crear
+  // ni al editar) -- [attr.disabled] en la plantilla no alcanza porque el
+  // ControlValueAccessor de <select> reactivo lo ignora; hay que
+  // deshabilitar el FormControl en si. form.reset() no toca el estado
+  // disabled de un control (solo su valor), asi que esto se llama aparte
+  // cada vez que se abre el formulario. getRawValue() (usado en
+  // guardar()) SI incluye el valor de un control deshabilitado, asi que
+  // el valor precargado se sigue enviando igual.
+  private aplicarBloqueoCamposDoctor(): void {
+    const bloqueado = this.filtroDoctorBloqueado();
+    for (const nombre of ['especialidad_id', 'doctor_id', 'sucursal_id']) {
+      const control = this.form.get(nombre);
+      if (bloqueado) control?.disable({ emitEvent: false });
+      else control?.enable({ emitEvent: false });
+    }
   }
 
   abrirEditar(c: Cita): void {
@@ -964,6 +998,7 @@ export class CitasComponent implements OnInit {
       observaciones: c.observaciones ?? '',
       estado: c.estado,
     }, { emitEvent: false });
+    this.aplicarBloqueoCamposDoctor();
     this.errorGuardar.set(null);
     this.panelAbierto.set(true);
     this.actualizarDisponibilidad();
