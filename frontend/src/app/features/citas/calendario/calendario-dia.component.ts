@@ -193,7 +193,18 @@ export class CalendarioDiaComponent implements AfterViewInit {
     this.celdaClick.emit({ doctorId, hora_inicio: minutosAHora(inicioRedondeado), hora_fin: minutosAHora(fin) });
   }
 
+  // Solo tiene sentido reagendar arrastrando una cita que todavia esta por
+  // suceder -- una ya atendida/cancelada/no_asistio es historial, no se
+  // deberia poder "mover" (el formulario de Editar completo es aparte y
+  // no pasa por aca). El [attr.draggable] del template ya usa esto para
+  // que el navegador ni siquiera inicie el drag; este chequeo es defensa
+  // en profundidad por si acaso.
+  esMovible(cita: Cita): boolean {
+    return cita.estado === 'pendiente' || cita.estado === 'reagendar';
+  }
+
   onCitaDragStart(cita: Cita, event: DragEvent): void {
+    if (!this.esMovible(cita)) { event.preventDefault(); return; }
     this.citaArrastrada.set(cita);
     event.dataTransfer?.setData('text/plain', cita.id);
     if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';

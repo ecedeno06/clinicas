@@ -143,6 +143,12 @@
   cursor: grabbing;
 }
 
+/* Atendida/cancelada/no_asistio: se puede abrir (sigue siendo clic normal),
+   pero no arrastrar -- "grab" invitaria a mover algo que ya paso. */
+.cal-bloque-cita[draggable="false"] {
+  cursor: pointer;
+}
+
 .cal-bloque-hora {
   font-size: 10px;
   font-weight: 700;

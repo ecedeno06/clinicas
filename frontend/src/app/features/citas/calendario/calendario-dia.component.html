@@ -50,7 +50,7 @@
               class="cal-bloque-cita"
               [class]="'cal-bloque-cita--' + b.color"
               [class.cal-bloque-cita--arrastrando]="citaArrastrada()?.id === b.cita.id"
-              draggable="true"
+              [attr.draggable]="esMovible(b.cita)"
               [style.top.px]="b.top"
               [style.height.px]="b.height"
               [style.left.%]="b.leftPct"
