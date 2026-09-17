@@ -821,7 +821,23 @@ table.data-table {
 .data-table tbody tr.row-selected { background: var(--slate-100); }
 .data-table tbody tr.row-selected:hover { background: var(--slate-100); }
 
-.table-actions { display: flex; gap: 6px; justify-content: flex-end; }
+/* display:flex en un <td> saca a esa celda del layout normal de tabla:
+   el navegador ya no la iguala en alto con sus hermanas cuando otra
+   celda de la misma fila crece (ej. un badge de 2 lineas), y su
+   borde-inferior (la linea que separa filas) queda unos pixeles mas
+   arriba que el resto -- se ve como una linea "flotando"/asimetrica.
+   text-align + margin-left en los hijos logra el mismo agrupado a la
+   derecha con espaciado sin tocar el display de la celda. */
+.table-actions {
+  text-align: right;
+  white-space: nowrap;
+}
+.table-actions > * {
+  vertical-align: middle;
+}
+.table-actions > * + * {
+  margin-left: 6px;
+}
 
 .empty-state {
   text-align: center;
