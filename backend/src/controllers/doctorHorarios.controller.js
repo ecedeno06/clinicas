@@ -40,6 +40,44 @@ async function verificarDoctorDeLaEmpresa(doctorId, empresaId) {
   return !!rows[0];
 }
 
+// Un doctor desactivado en esta clinica (doctores_empresas.activo = false,
+// ver doctores.controller.js#actualizar) no deberia poder sumar horario
+// nuevo aca -- solo aplica a crear(), no a listar/disponibilidad (esos se
+// dejan tal cual para no romper vistas de solo lectura/historicas).
+async function doctorActivoEnEmpresa(doctorId, empresaId) {
+  const { rows } = await pool.query(
+    'select activo from doctores_empresas where doctor_id = $1 and empresa_id = $2',
+    [doctorId, empresaId]
+  );
+  return !!rows[0]?.activo;
+}
+
+// El doctor puede tener varias especialidades, y una clinica solo usa las
+// que tiene "activadas" (globales via especialidades_empresas, o alguna
+// privada legado con empresa_id propio -- mismo criterio hibrido que
+// especialidades.controller.js#listar). No tiene sentido agregarle un
+// bloque de horario en una clinica donde ninguna de sus especialidades
+// esta disponible para agendar (Citas/Campanas nunca lo ofreceria ahi).
+async function tieneEspecialidadValidaEnEmpresa(doctorId, empresaId) {
+  const { rows } = await pool.query(
+    `select exists(
+       select 1
+       from doctor_especialidades de
+       join especialidades e on e.id = de.especialidad_id
+       where de.doctor_id = $1
+         and (
+           e.empresa_id = $2
+           or exists(
+             select 1 from especialidades_empresas ee
+             where ee.especialidad_id = e.id and ee.empresa_id = $2 and ee.activo = true
+           )
+         )
+     ) as existe`,
+    [doctorId, empresaId]
+  );
+  return rows[0].existe;
+}
+
 // Resuelve el doctor_id vinculado a la cuenta logueada (si es una cuenta
 // de doctor con acceso al sistema, ver doctores.usuario_id) -- null si no
 // aplica (staff que no es tambien doctor, o doctor sin cuenta vinculada).
@@ -121,6 +159,24 @@ async function crear(req, res, next) {
     }
     if (!(await verificarDoctorDeLaEmpresa(req.params.doctorId, req.empresaId))) {
       return res.status(404).json({ mensaje: 'Doctor no encontrado' });
+    }
+
+    if (!(await doctorActivoEnEmpresa(req.params.doctorId, req.empresaId))) {
+      return res.status(400).json({ mensaje: 'El doctor esta inactivo en esta clinica -- activalo antes de agregar el horario.' });
+    }
+
+    // Un doctor (a diferencia de un admin) solo puede agregarse bloques a
+    // si mismo -- mismo criterio que puedeGestionarHorario() para
+    // actualizar/eliminar.
+    if (req.usuario.rol === 'doctor') {
+      const propioId = await miDoctorId(req.usuario.id);
+      if (propioId !== req.params.doctorId) {
+        return res.status(403).json({ mensaje: 'Solo puedes agregar bloques de horario a tu propia agenda.' });
+      }
+    }
+
+    if (!(await tieneEspecialidadValidaEnEmpresa(req.params.doctorId, req.empresaId))) {
+      return res.status(400).json({ mensaje: 'El doctor no tiene ninguna especialidad activa en esta clinica -- activa la especialidad correspondiente antes de agregar el horario.' });
     }
 
     // El choque se compara por doctor_id + dia_semana a traves de TODAS sus

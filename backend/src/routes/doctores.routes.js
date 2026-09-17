@@ -25,8 +25,10 @@ router.post('/:id/resetear-password', requireRol('admin'), ctrl.resetearPassword
 // Disponibilidad calculada (horario semanal - citas ya agendadas ese dia).
 router.get('/:id/disponibilidad', horariosCtrl.disponibilidad);
 
-// Horario semanal recurrente del doctor (tablero de turnos).
+// Horario semanal recurrente del doctor (tablero de turnos). 'doctor' puede
+// crear bloques -- el controller (crear()) restringe a que solo sean para
+// su propia agenda, igual que ya hace con actualizar/eliminar.
 router.get('/:doctorId/horarios', horariosCtrl.listarPorDoctor);
-router.post('/:doctorId/horarios', requireRol('admin'), horariosCtrl.crear);
+router.post('/:doctorId/horarios', requireRol('admin', 'doctor'), horariosCtrl.crear);
 
 module.exports = router;

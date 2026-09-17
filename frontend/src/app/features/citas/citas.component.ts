@@ -301,6 +301,12 @@ export class CitasComponent implements OnInit {
   // Conjunto vacio = "todos" (asi un doctor nuevo aparece sin tener que
   // tocar el filtro); ver toggleFiltroCalDoctor().
   doctoresVisiblesCalendario = computed(() => {
+    // Un doctor solo ve su propia columna -- ni el resto de sus colegas
+    // aparecen en el calendario (mismo alcance que ya aplica al dato via
+    // cargarCalendario(), aca ademas se refleja en las columnas mostradas).
+    if (this.filtroDoctorBloqueado()) {
+      return this.doctoresActivos().filter((d) => d.id === this.miDoctorId());
+    }
     const seleccionados = this.filtroCalDoctorIds();
     const especialidadId = this.filtroCalEspecialidad();
     let lista = seleccionados.size === 0 ? this.doctoresActivos() : this.doctoresActivos().filter((d) => seleccionados.has(d.id));
@@ -785,6 +791,22 @@ export class CitasComponent implements OnInit {
     return this.auth.esSuperAdmin() || rol === 'admin' || rol === 'doctor';
   }
 
+  // auth.puedeEditar() (admin/recepcionista/super admin) no incluye
+  // 'doctor' a proposito -- es el gate generico que tambien usan Pacientes
+  // y Catalogo de examenes de laboratorio, donde un doctor no deberia
+  // poder editar. Aca, en Citas, un doctor SI puede editar (y cambiar
+  // estado), pero solo de SUS PROPIAS citas. cargar()/cargarCalendario()
+  // ya piden al backend solo sus propias citas, asi que en la practica
+  // c.doctor_id siempre es el suyo -- este chequeo por fila es la misma
+  // regla aplicada donde se decide mostrar el boton, en vez de confiar en
+  // que el dato que llego ya viene filtrado (la validacion real, que evita
+  // que alguien edite otra cita llamando la API directo, vive en el
+  // backend -- ver citas.controller.js#actualizar).
+  puedeEditarCita(c: Cita): boolean {
+    if (this.auth.puedeEditar()) return true;
+    return this.auth.usuario()?.rol === 'doctor' && c.doctor_id === this.miDoctorId();
+  }
+
   // La cita no se llego a atender: no tiene sentido esperar que aparezca
   // un registro de signos/consulta/receta, asi que se marca con una X en
   // vez de dejar el icono en blanco.
@@ -884,10 +906,14 @@ export class CitasComponent implements OnInit {
       `Fecha: ${formatearFecha(c.fecha)}`,
       `Hora: ${formatoAmPm(c.hora_inicio)}`,
       `Doctor: ${c.doctor_nombre} (${c.especialidad_nombre})`,
-      `Sucursal: ${c.sucursal_nombre}${c.sucursal_direccion ? ' - ' + c.sucursal_direccion : ''}`,
+      `Sucursal: ${c.sucursal_nombre}`,
     ];
+    if (c.sucursal_direccion) lineas.push(c.sucursal_direccion);
     if (c.sucursal_hora_apertura && c.sucursal_hora_cierre) {
       lineas.push(`Horario de atencion de la sucursal: ${formatoAmPm(c.sucursal_hora_apertura)} - ${formatoAmPm(c.sucursal_hora_cierre)}`);
+    }
+    if (c.sucursal_telefono) {
+      lineas.push(`Telefono: ${c.sucursal_telefono}${c.sucursal_acepta_whatsapp ? ' (WhatsApp)' : ''}`);
     }
     lineas.push('', `Ubicacion (Google Maps): ${c.sucursal_google_maps_url}`);
 
@@ -1570,7 +1596,7 @@ export class CitasComponent implements OnInit {
       `Paciente: ${c?.paciente_nombre || ''}`,
       `ID: ${idCorto}`,
     ];
-    if (c?.sucursal_telefono) lineas.push(`Telefono sucursal: ${c.sucursal_telefono}`);
+    if (c?.sucursal_telefono) lineas.push(`Telefono sucursal: ${c.sucursal_telefono}${c.sucursal_acepta_whatsapp ? ' (WhatsApp)' : ''}`);
     if (c?.sucursal_google_maps_url) {
       lineas.push('', `Ubicacion (Google Maps): ${c.sucursal_google_maps_url}`);
       const coords = extraerLatLng(c.sucursal_google_maps_url);

@@ -6,6 +6,14 @@ const { enviarCorreo } = require('../utils/correo');
 const { formatearFechaLarga, formatoAmPm } = require('../utils/formatoFecha');
 const { esFechaHoraPasada } = require('../utils/zonaHoraria');
 
+// Resuelve el doctor_id vinculado a la cuenta logueada (si es una cuenta de
+// doctor con acceso al sistema, ver doctores.usuario_id) -- null si no
+// aplica. Mismo criterio que doctorHorarios.controller.js#miDoctorId.
+async function miDoctorId(usuarioId) {
+  const { rows } = await pool.query('select id from doctores where usuario_id = $1', [usuarioId]);
+  return rows[0]?.id || null;
+}
+
 // Select con todo lo que necesitan la respuesta de crear() (para que el
 // frontend pueda abrir WhatsApp automaticamente con los datos correctos,
 // igual que en el listado) y el correo de confirmacion -- una sola
@@ -21,6 +29,7 @@ const SELECT_CITA_DETALLE = `
             where de2.doctor_id = d.id)
          ) as especialidad_nombre,
          s.nombre as sucursal_nombre, s.direccion as sucursal_direccion, s.google_maps_url as sucursal_google_maps_url,
+         s.telefono as sucursal_telefono, s.acepta_whatsapp as sucursal_acepta_whatsapp,
          s.hora_apertura as sucursal_hora_apertura, s.hora_cierre as sucursal_hora_cierre,
          e.nombre as empresa_nombre
   from citas c
@@ -46,6 +55,9 @@ async function enviarCorreoConfirmacionCita(info) {
     `Doctor: ${info.doctor_nombre}${info.especialidad_nombre ? ' (' + info.especialidad_nombre + ')' : ''}`,
     `Sucursal: ${info.sucursal_nombre}${info.sucursal_direccion ? ' - ' + info.sucursal_direccion : ''}`,
   ];
+  if (info.sucursal_telefono) {
+    lineas.push(`Telefono: ${info.sucursal_telefono}${info.sucursal_acepta_whatsapp ? ' (WhatsApp)' : ''}`);
+  }
   if (info.sucursal_google_maps_url) {
     lineas.push('', `Ubicacion (Google Maps): ${info.sucursal_google_maps_url}`);
   }
@@ -83,7 +95,7 @@ async function listar(req, res, next) {
                  where de2.doctor_id = d.id)
               ) as especialidad_nombre,
               s.nombre as sucursal_nombre, s.direccion as sucursal_direccion, s.google_maps_url as sucursal_google_maps_url,
-              s.telefono as sucursal_telefono,
+              s.telefono as sucursal_telefono, s.acepta_whatsapp as sucursal_acepta_whatsapp,
               s.hora_apertura as sucursal_hora_apertura, s.hora_cierre as sucursal_hora_cierre,
               camp.nombre as campana_nombre,
               (hc.id is not null) as tiene_historia,
@@ -123,7 +135,7 @@ async function obtener(req, res, next) {
                  where de2.doctor_id = d.id)
               ) as especialidad_nombre,
               s.nombre as sucursal_nombre, s.direccion as sucursal_direccion, s.google_maps_url as sucursal_google_maps_url,
-              s.telefono as sucursal_telefono,
+              s.telefono as sucursal_telefono, s.acepta_whatsapp as sucursal_acepta_whatsapp,
               s.hora_apertura as sucursal_hora_apertura, s.hora_cierre as sucursal_hora_cierre,
               camp.nombre as campana_nombre
        from citas c
@@ -323,6 +335,15 @@ async function actualizar(req, res, next) {
     const actual = await pool.query('select * from citas where id = $1 and empresa_id = $2', [req.params.id, req.empresaId]);
     if (!actual.rows[0]) return res.status(404).json({ mensaje: 'Cita no encontrada' });
     const cita = actual.rows[0];
+
+    // Un doctor solo puede editar/actualizar SUS PROPIAS citas -- nunca
+    // las de otro doctor de la misma clinica.
+    if (req.usuario.rol === 'doctor') {
+      const propioId = await miDoctorId(req.usuario.id);
+      if (propioId !== cita.doctor_id) {
+        return res.status(403).json({ mensaje: 'Solo puedes editar tus propias citas.' });
+      }
+    }
 
     const nuevaFecha = fecha || cita.fecha;
     const nuevaHoraInicio = hora_inicio || cita.hora_inicio;

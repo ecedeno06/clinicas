@@ -48,7 +48,12 @@
     </div>
     <div class="horario-week-grid mt-16">
       @for (dia of diasSemana; track dia; let i = $index) {
-        <div class="horario-day-col">
+        <div
+          class="horario-day-col"
+          [class.seleccionado]="horarioForm.get('dia_semana')?.value === i"
+          (click)="horarioForm.patchValue({ dia_semana: i })"
+          title="Elegir {{ dia }} en el formulario de abajo"
+        >
           <div class="horario-day-head">{{ dia.substring(0, 3) }}</div>
           <div class="horario-day-body">
             @for (h of horariosPorDia(i); track h.id) {
@@ -69,12 +74,15 @@
                     [title]="h.activo ? 'Deshabilitar (no contar en disponibilidad)' : 'Habilitar'"
                     [attr.aria-label]="h.activo ? 'Deshabilitar' : 'Habilitar'"
                     [disabled]="actualizandoId() === h.id"
-                    (click)="toggleActivo(h)">
+                    (click)="toggleActivo(h); $event.stopPropagation()">
                     @if (h.activo) {
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
                     } @else {
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
                     }
+                  </button>
+                  <button type="button" class="horario-slot-icon" title="Eliminar" aria-label="Eliminar" (click)="eliminarHorario(h); $event.stopPropagation()">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
                   </button>
                 </div>
               </div>
@@ -85,6 +93,63 @@
         </div>
       }
     </div>
+
+    <form class="horario-add-form" [formGroup]="horarioForm" (ngSubmit)="agregarHorario()">
+      <div class="horario-row">
+        <div class="form-group">
+          <label>Sucursal</label>
+          <select class="input" formControlName="sucursal_id">
+            @for (s of sucursales(); track s.id) { <option [value]="s.id">{{ s.nombre }}</option> }
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Dia</label>
+          <select class="input" formControlName="dia_semana">
+            @for (dia of diasSemana; track dia; let i = $index) { <option [value]="i">{{ dia }}</option> }
+          </select>
+        </div>
+      </div>
+      <div class="horario-row">
+        <div class="form-group">
+          <label>Desde</label>
+          <div class="time12">
+            <select class="input" [ngModel]="partesHoraHorario('hora_inicio').h" [ngModelOptions]="{standalone: true}" (ngModelChange)="actualizarHoraHorario12('hora_inicio', 'h', $event)">
+              <option [ngValue]="null" disabled>--</option>
+              @for (h of horas12; track h) { <option [ngValue]="h">{{ h }}</option> }
+            </select>
+            <select class="input" [ngModel]="partesHoraHorario('hora_inicio').m" [ngModelOptions]="{standalone: true}" (ngModelChange)="actualizarHoraHorario12('hora_inicio', 'm', $event)">
+              <option [ngValue]="null" disabled>--</option>
+              @for (m of minutos60; track m) { <option [ngValue]="m">{{ m }}</option> }
+            </select>
+            <select class="input" [ngModel]="partesHoraHorario('hora_inicio').periodo" [ngModelOptions]="{standalone: true}" (ngModelChange)="actualizarHoraHorario12('hora_inicio', 'periodo', $event)">
+              <option [ngValue]="null" disabled>--</option>
+              <option ngValue="a.m.">a.m.</option>
+              <option ngValue="p.m.">p.m.</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Hasta</label>
+          <div class="time12">
+            <select class="input" [ngModel]="partesHoraHorario('hora_fin').h" [ngModelOptions]="{standalone: true}" (ngModelChange)="actualizarHoraHorario12('hora_fin', 'h', $event)">
+              <option [ngValue]="null" disabled>--</option>
+              @for (h of horas12; track h) { <option [ngValue]="h">{{ h }}</option> }
+            </select>
+            <select class="input" [ngModel]="partesHoraHorario('hora_fin').m" [ngModelOptions]="{standalone: true}" (ngModelChange)="actualizarHoraHorario12('hora_fin', 'm', $event)">
+              <option [ngValue]="null" disabled>--</option>
+              @for (m of minutos60; track m) { <option [ngValue]="m">{{ m }}</option> }
+            </select>
+            <select class="input" [ngModel]="partesHoraHorario('hora_fin').periodo" [ngModelOptions]="{standalone: true}" (ngModelChange)="actualizarHoraHorario12('hora_fin', 'periodo', $event)">
+              <option [ngValue]="null" disabled>--</option>
+              <option ngValue="a.m.">a.m.</option>
+              <option ngValue="p.m.">p.m.</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="text-muted text-sm">El bloque se agrega en la clinica activa de tu sesion ({{ auth.empresaActiva()?.empresa_nombre }}). Para agregar en otra clinica, cambia de clinica activa primero.</div>
+      <button type="submit" class="btn btn-primary" [disabled]="horarioForm.invalid">+ Agregar bloque</button>
+    </form>
   </div>
 } @else if (cargando()) {
   <div class="empty-state">Cargando...</div>

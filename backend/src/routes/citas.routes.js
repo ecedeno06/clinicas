@@ -12,7 +12,9 @@ router.use(requireAuth, requireEmpresa, requireRol('admin', 'doctor', 'recepcion
 router.get('/', ctrl.listar);
 router.get('/:id', ctrl.obtener);
 router.post('/', requireRol('admin', 'recepcionista'), ctrl.crear);
-router.put('/:id', requireRol('admin', 'recepcionista'), ctrl.actualizar);
+// 'doctor' puede actualizar -- el controller (actualizar()) restringe a
+// que solo sea una cita propia.
+router.put('/:id', requireRol('admin', 'recepcionista', 'doctor'), ctrl.actualizar);
 router.delete('/:id', requireRol('admin'), ctrl.eliminar);
 
 // Historia clinica de una cita puntual: confidencial, solo admin y doctor.

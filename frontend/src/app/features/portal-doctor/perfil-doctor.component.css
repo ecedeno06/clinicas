@@ -12,6 +12,14 @@
   border-radius: 10px;
   overflow: hidden;
   background: var(--white);
+  cursor: pointer;
+}
+
+/* Dia elegido en el campo "Dia" del formulario de abajo -- clic en la
+   columna es un atajo para elegirlo ahi, en vez de usar el <select>. */
+.horario-day-col.seleccionado {
+  border-color: var(--teal-500);
+  box-shadow: 0 0 0 1px var(--teal-500);
 }
 
 .horario-day-head {
@@ -121,3 +129,31 @@
 }
 .horario-slot-icon:hover { opacity: 1; }
 .horario-slot-icon:disabled { opacity: 0.4; cursor: default; }
+
+.horario-add-form {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding-top: 16px;
+  margin-top: 16px;
+  border-top: 1px solid var(--slate-100);
+}
+.horario-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+.horario-add-form .form-group { margin: 0; flex: 1 1 0; min-width: 130px; }
+.horario-add-form .form-group:has(.time12) { min-width: 220px; }
+
+.time12 {
+  display: flex;
+  gap: 6px;
+}
+.time12 select { min-width: 0; }
+.time12 select:nth-child(1) { flex: 1.1; }
+.time12 select:nth-child(2) { flex: 1.1; }
+.time12 select:nth-child(3) { flex: 1.3; }

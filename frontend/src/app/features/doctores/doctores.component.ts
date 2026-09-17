@@ -257,7 +257,10 @@ export class DoctoresComponent implements OnInit {
 
   eliminar(d: Doctor): void {
     if (!confirm(`Eliminar al doctor "${d.nombre}"?`)) return;
-    this.srv.eliminar(d.id).subscribe(() => this.cargar());
+    this.srv.eliminar(d.id).subscribe({
+      next: () => this.cargar(),
+      error: (err) => alert(err?.error?.mensaje || 'No se pudo eliminar el doctor'),
+    });
   }
 
   // ---------- Horario semanal (tablero de turnos) ----------
