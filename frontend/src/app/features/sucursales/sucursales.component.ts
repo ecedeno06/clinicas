@@ -5,6 +5,7 @@ import { SucursalesService } from '../../core/services/sucursales.service';
 import { AuthService } from '../../core/services/auth.service';
 import { Sucursal } from '../../core/models/models';
 import { MapaSelectorComponent, UbicacionSeleccionada, extraerLatLng } from '../../core/components/mapa-selector/mapa-selector.component';
+import { TelefonoInputComponent } from '../../core/components/telefono-input/telefono-input.component';
 
 // Catalogo acotado de zonas horarias frecuentes en la region -- se guarda
 // como identificador IANA (America/Panama, etc.), no como offset fijo.
@@ -29,7 +30,7 @@ export const ZONAS_HORARIAS = [
 @Component({
   selector: 'app-sucursales',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule, MapaSelectorComponent],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, MapaSelectorComponent, TelefonoInputComponent],
   templateUrl: './sucursales.component.html',
   styleUrl: './sucursales.component.css',
 })
@@ -52,6 +53,7 @@ export class SucursalesComponent implements OnInit {
     nombre: ['', Validators.required],
     direccion: [''],
     telefono: [''],
+    acepta_whatsapp: [false],
     google_maps_url: [''],
     zona_horaria: ['America/Panama', Validators.required],
     hora_apertura: [''],

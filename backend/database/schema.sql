@@ -386,6 +386,8 @@ create table if not exists sucursales (
     nombre          text not null,
     direccion       text,
     telefono        text,
+    -- mismo patron que pacientes.acepta_whatsapp (migracion 053).
+    acepta_whatsapp boolean not null default false,
     google_maps_url text,
     zona_horaria    text not null default 'America/Panama',
     -- Horario general de atencion (limite superior, distinto del horario

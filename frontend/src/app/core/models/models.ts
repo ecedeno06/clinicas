@@ -44,6 +44,7 @@ export interface Sucursal {
   nombre: string;
   direccion?: string | null;
   telefono?: string | null;
+  acepta_whatsapp?: boolean;
   google_maps_url?: string | null;
   zona_horaria: string;
   hora_apertura?: string | null;
@@ -343,6 +344,7 @@ export interface Cita {
   sucursal_direccion?: string | null;
   sucursal_google_maps_url?: string | null;
   sucursal_telefono?: string | null;
+  sucursal_acepta_whatsapp?: boolean | null;
   sucursal_hora_apertura?: string | null;
   sucursal_hora_cierre?: string | null;
   campana_id?: string | null;
