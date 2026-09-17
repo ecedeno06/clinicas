@@ -49,6 +49,7 @@ export class PerfilPacienteComponent implements OnInit {
     nombre: ['', Validators.required],
     telefono: [''],
     parentesco: [''],
+    acepta_whatsapp: [false],
   });
 
   constructor(private fb: FormBuilder, private srv: PortalPacienteService, private geocodificacionSrv: GeocodificacionService) {}
@@ -156,7 +157,7 @@ export class PerfilPacienteComponent implements OnInit {
 
   abrirNuevoFamiliar(): void {
     this.familiarEditandoIndex.set(null);
-    this.familiarForm.reset({ nombre: '', telefono: '', parentesco: '' });
+    this.familiarForm.reset({ nombre: '', telefono: '', parentesco: '', acepta_whatsapp: false });
     this.mostrarFormFamiliar.set(true);
   }
 
@@ -181,7 +182,7 @@ export class PerfilPacienteComponent implements OnInit {
   cerrarFormFamiliar(): void {
     this.mostrarFormFamiliar.set(false);
     this.familiarEditandoIndex.set(null);
-    this.familiarForm.reset({ nombre: '', telefono: '', parentesco: '' });
+    this.familiarForm.reset({ nombre: '', telefono: '', parentesco: '', acepta_whatsapp: false });
   }
 
   eliminarFamiliar(i: number): void {
