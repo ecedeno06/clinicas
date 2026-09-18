@@ -8,7 +8,6 @@ import { formatoAmPm } from '../../core/utils/hora12.util';
 import { clasificarImc } from '../../core/utils/imc.util';
 import { clasificarPresion } from '../../core/utils/presion.util';
 import { clasificarGlucosa } from '../../core/utils/glucosa.util';
-import { SelectorFotoComponent } from '../../core/components/selector-foto/selector-foto.component';
 
 // "Mis Citas" del portal del paciente: mismo diseno que el "Historial
 // clinico" que ya usa el staff en pacientes.component.ts/.html (tabs
@@ -23,14 +22,12 @@ import { SelectorFotoComponent } from '../../core/components/selector-foto/selec
 @Component({
   selector: 'app-citas-paciente',
   standalone: true,
-  imports: [CommonModule, FormsModule, SelectorFotoComponent],
+  imports: [CommonModule, FormsModule],
   templateUrl: './citas-paciente.component.html',
+  styleUrl: './citas-paciente.component.css',
 })
 export class CitasPacienteComponent implements OnInit {
   formatoAmPm = formatoAmPm;
-
-  fotoPaciente = signal<string | null>(null);
-  nombrePaciente = signal('');
 
   tabSuperior = signal<'consultas' | 'antecedentes'>('consultas');
   // 'evaluacion' (motivo/diagnostico/observaciones) no pide ninguna
@@ -116,8 +113,6 @@ export class CitasPacienteComponent implements OnInit {
       next: (p) => {
         this.antecedentes.set(p.antecedentes ?? []);
         this.alergias.set(p.alergias ?? null);
-        this.fotoPaciente.set(p.foto ?? null);
-        this.nombrePaciente.set(p.nombre ?? '');
       },
       error: () => {},
     });

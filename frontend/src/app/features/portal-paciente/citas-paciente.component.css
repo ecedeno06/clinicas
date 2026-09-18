@@ -1,0 +1,13 @@
+/* Lista de consultas (tab Consultas): no mas de 5 filas visibles, el resto
+   con scroll. Alto medido con datos reales (encabezado+filtros ~82px, fila
+   ~55px por el subtitulo de especialidad debajo del doctor) -- mismo patron
+   que .tabla-antecedentes-scroll en pacientes/citas/perfil-paciente. */
+.tabla-consultas-scroll {
+  max-height: 358px;
+  overflow-y: auto;
+}
+.tabla-consultas-scroll thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}

@@ -5,14 +5,7 @@
   </div>
 </div>
 
-<div class="card" style="position: relative;">
-  <app-selector-foto
-    [foto]="fotoPaciente()"
-    [nombre]="nombrePaciente()"
-    [soloLectura]="true"
-    titulo="Foto de perfil"
-    style="position: absolute; top: 18px; right: 18px;"
-  ></app-selector-foto>
+<div class="card">
   <div class="tabs">
     <button type="button" class="tab-btn" [class.active]="tabSuperior() === 'consultas'" (click)="tabSuperior.set('consultas')">Consultas</button>
     <button type="button" class="tab-btn" [class.active]="tabSuperior() === 'antecedentes'" (click)="tabSuperior.set('antecedentes')">
@@ -24,7 +17,7 @@
   </div>
 
   @if (tabSuperior() === 'consultas') {
-    <div class="table-wrap">
+    <div class="table-wrap tabla-consultas-scroll">
       <table class="data-table">
         <thead>
           <tr><th>Clinica</th><th>Fecha</th><th>Hora</th><th>Doctor</th><th>Sucursal</th><th>Estado</th><th></th></tr>

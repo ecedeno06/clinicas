@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormArray, FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { PortalPacienteService } from '../../core/services/portalPaciente.service';
 import { GeocodificacionService } from '../../core/services/geocodificacion.service';
-import { DireccionPaciente, FamiliarPaciente, Paciente } from '../../core/models/models';
+import { DireccionPaciente, FamiliarPaciente, Paciente, PacienteAntecedente } from '../../core/models/models';
 import { formatoFechaCorta } from '../../core/utils/pdf.util';
 import { SelectorFotoComponent } from '../../core/components/selector-foto/selector-foto.component';
 import { TelefonoInputComponent } from '../../core/components/telefono-input/telefono-input.component';
@@ -18,8 +18,11 @@ import { MapaSelectorComponent, UbicacionSeleccionada, extraerLatLng } from '../
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, SelectorFotoComponent, TelefonoInputComponent, MapaSelectorComponent],
   templateUrl: './perfil-paciente.component.html',
+  styleUrl: './perfil-paciente.component.css',
 })
 export class PerfilPacienteComponent implements OnInit {
+  tabPerfil = signal<'perfil' | 'antecedentes'>('perfil');
+  antecedenteSeleccionado = signal<PacienteAntecedente | null>(null);
   paciente = signal<Paciente | null>(null);
   cargando = signal(true);
   guardando = signal(false);
