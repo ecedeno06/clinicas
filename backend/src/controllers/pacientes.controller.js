@@ -1,6 +1,6 @@
 const bcrypt = require('bcryptjs');
 const { pool } = require('../config/db');
-const { enviarCorreo } = require('../utils/correo');
+const { enviarCorreo, escaparHtml } = require('../utils/correo');
 const { obtenerPolitica, generarPasswordSegunPolitica, validarPassword } = require('../utils/politicaPassword');
 const { resolverUsuarioPortal, cambiarEmailAcceso } = require('../utils/resolverUsuarioPortal');
 
@@ -584,11 +584,13 @@ async function invitar(req, res, next) {
           destinatario: paciente.email,
           asunto: `Acceso a tu portal de paciente - ${empresaNombre}`,
           texto: `Hola ${paciente.nombre},\n\n${empresaNombre} te dio acceso a tu portal de paciente, donde puedes consultar tus datos y tus citas.\n\nUsuario: ${paciente.email}\nContrasena temporal: ${passwordTemporal}\n\nIngresa aqui: ${enlace}\n\nPor seguridad, se te pedira cambiar esta contrasena la primera vez que inicies sesion.`,
+          html: `<p>Hola ${escaparHtml(paciente.nombre)},</p><p>${escaparHtml(empresaNombre)} te dio acceso a tu portal de paciente, donde puedes consultar tus datos y tus citas.</p><p>Usuario: ${escaparHtml(paciente.email)}<br>Contrasena temporal: <code style="font-size:16px;font-weight:bold;">${escaparHtml(passwordTemporal)}</code></p><p>Ingresa aqui: <a href="${enlace}">${enlace}</a></p><p>Por seguridad, se te pedira cambiar esta contrasena la primera vez que inicies sesion.</p>`,
         }
       : {
           destinatario: paciente.email,
           asunto: `Acceso a tu portal de paciente - ${empresaNombre}`,
           texto: `Hola ${paciente.nombre},\n\n${empresaNombre} te dio acceso a tu portal de paciente, donde puedes consultar tus datos y tus citas.\n\nYa tenias una cuenta en el sistema (${paciente.email}): inicia sesion con tu contrasena habitual.\n\nIngresa aqui: ${enlace}`,
+          html: `<p>Hola ${escaparHtml(paciente.nombre)},</p><p>${escaparHtml(empresaNombre)} te dio acceso a tu portal de paciente, donde puedes consultar tus datos y tus citas.</p><p>Ya tenias una cuenta en el sistema (${escaparHtml(paciente.email)}): inicia sesion con tu contrasena habitual.</p><p>Ingresa aqui: <a href="${enlace}">${enlace}</a></p>`,
         };
     enviarCorreo(correo).catch((err) => console.error('Error enviando correo de invitacion a paciente:', err.message));
 
@@ -745,6 +747,7 @@ async function resetearPassword(req, res, next) {
         destinatario: paciente.email,
         asunto: `Tu contrasena fue restablecida - ${empresaNombre}`,
         texto: `Hola ${paciente.nombre},\n\n${empresaNombre} restablecio la contrasena de tu portal de paciente.\n\nUsuario: ${paciente.email}\nContrasena temporal: ${passwordTemporal}\n\nIngresa aqui: ${enlace}\n\nPor seguridad, se te pedira cambiar esta contrasena la primera vez que inicies sesion.`,
+        html: `<p>Hola ${escaparHtml(paciente.nombre)},</p><p>${escaparHtml(empresaNombre)} restablecio la contrasena de tu portal de paciente.</p><p>Usuario: ${escaparHtml(paciente.email)}<br>Contrasena temporal: <code style="font-size:16px;font-weight:bold;">${escaparHtml(passwordTemporal)}</code></p><p>Ingresa aqui: <a href="${enlace}">${enlace}</a></p><p>Por seguridad, se te pedira cambiar esta contrasena la primera vez que inicies sesion.</p>`,
       });
     } catch (err) {
       return res.status(502).json({ mensaje: 'No se pudo enviar el correo con la nueva contrasena. Intenta de nuevo.' });

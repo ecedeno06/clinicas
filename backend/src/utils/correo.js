@@ -34,4 +34,16 @@ async function enviarCorreo({ destinatario, asunto, texto, html }) {
   }
 }
 
-module.exports = { enviarCorreo };
+// Escapa texto que se va a insertar crudo en el HTML de un correo -- sin
+// esto, un caracter especial de una contrasena generada (GEN_ESPECIALES
+// incluye "&", ver politicaPassword.js) o del nombre de una clinica (ej.
+// "M&M Pediatrics") se puede interpretar como el inicio de una entidad
+// HTML en el cliente de correo, dejando el texto incompleto o distinto
+// del literal que se guardo -- justo lo que rompia el reseteo de
+// contrasena (ver resetearPassword en pacientes/doctores/usuarios
+// .controller.js).
+function escaparHtml(texto) {
+  return String(texto).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+module.exports = { enviarCorreo, escaparHtml };

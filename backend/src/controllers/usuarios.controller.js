@@ -1,7 +1,7 @@
 const bcrypt = require('bcryptjs');
 const { pool } = require('../config/db');
 const { obtenerPolitica, validarPassword, generarPasswordSegunPolitica } = require('../utils/politicaPassword');
-const { enviarCorreo } = require('../utils/correo');
+const { enviarCorreo, escaparHtml } = require('../utils/correo');
 
 // GET /api/usuarios  -> STAFF de la clinica activa, con su rol. El rol
 // 'paciente' nunca aparece aqui -- esta pantalla es de gestion de staff,
@@ -248,6 +248,7 @@ async function resetearPassword(req, res, next) {
         destinatario: usuario.email,
         asunto: `Tu contrasena fue restablecida - ${empresaNombre}`,
         texto: `Hola ${usuario.nombre},\n\nUn administrador de ${empresaNombre} restablecio tu contrasena.\n\nUsuario: ${usuario.email}\nContrasena temporal: ${passwordTemporal}\n\nIngresa aqui: ${enlace}\n\nPor seguridad, se te pedira cambiar esta contrasena la primera vez que inicies sesion.`,
+        html: `<p>Hola ${escaparHtml(usuario.nombre)},</p><p>Un administrador de ${escaparHtml(empresaNombre)} restablecio tu contrasena.</p><p>Usuario: ${escaparHtml(usuario.email)}<br>Contrasena temporal: <code style="font-size:16px;font-weight:bold;">${escaparHtml(passwordTemporal)}</code></p><p>Ingresa aqui: <a href="${enlace}">${enlace}</a></p><p>Por seguridad, se te pedira cambiar esta contrasena la primera vez que inicies sesion.</p>`,
       });
     } catch (err) {
       return res.status(502).json({ mensaje: 'No se pudo enviar el correo con la nueva contrasena. Intenta de nuevo.' });
