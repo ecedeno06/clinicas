@@ -760,16 +760,42 @@ export class PacientesComponent implements OnInit {
 
   reseteandoPasswordPaciente = signal<string | null>(null);
 
-  // El popup con opcion manual/autogenerar se deshabilito a pedido del
-  // usuario: el boton de accion ahora dispara el envio automatico
-  // (autogenerado) directo, sin ventana intermedia. Se deja comentado el
-  // codigo del popup (mas abajo y en el .html) por si se quiere reactivar
-  // el flujo con confirmacion/opcion manual mas adelante.
-  resetearPasswordDirecto(p: Paciente): void {
+  // Popup de confirmacion (mismo estilo ambar que el resto) -- a pedido
+  // del usuario, sin la opcion de escribir la contrasena a mano: solo
+  // confirma y envia la autogenerada. Esa version con toggle
+  // Autogenerar/Manual queda comentada mas abajo (y en el .html) por si
+  // se quiere reactivar mas adelante.
+  pacienteResetPasswordAbierto = signal<string | null>(null);
+  resetPasswordMenuPos = signal<{ top: number; left: number } | null>(null);
+
+  abrirResetPassword(p: Paciente, event: MouseEvent): void {
+    const boton = event.currentTarget as HTMLElement;
+    const rect = boton.getBoundingClientRect();
+    const anchoMenu = 260;
+    this.resetPasswordMenuPos.set({
+      top: rect.bottom + 6,
+      left: Math.max(8, Math.min(rect.right - anchoMenu, window.innerWidth - anchoMenu - 8)),
+    });
+    this.pacienteResetPasswordAbierto.set(p.id);
+  }
+
+  cerrarResetPassword(): void {
+    this.pacienteResetPasswordAbierto.set(null);
+    this.resetPasswordMenuPos.set(null);
+  }
+
+  confirmarResetPassword(p: Paciente): void {
     this.reseteandoPasswordPaciente.set(p.id);
     this.srv.resetearPassword(p.id).subscribe({
-      next: (res) => { this.reseteandoPasswordPaciente.set(null); alert(res.mensaje); },
-      error: (err) => { this.reseteandoPasswordPaciente.set(null); alert(err?.error?.mensaje || 'No se pudo resetear la contrasena'); },
+      next: (res) => {
+        this.reseteandoPasswordPaciente.set(null);
+        this.cerrarResetPassword();
+        alert(res.mensaje);
+      },
+      error: (err) => {
+        this.reseteandoPasswordPaciente.set(null);
+        alert(err?.error?.mensaje || 'No se pudo resetear la contrasena');
+      },
     });
   }
 
