@@ -20,6 +20,7 @@ router.delete('/:id', requireRol('admin'), ctrl.eliminar);
 // sobre otro (a diferencia de invitar-paciente, que si permite doctor).
 router.post('/:id/invitar', requireRol('admin'), ctrl.invitar);
 router.delete('/:id/invitar', requireRol('admin'), ctrl.desinvitar);
+router.put('/:id/correo-acceso', requireRol('admin'), ctrl.cambiarCorreoAcceso);
 router.post('/:id/resetear-password', requireRol('admin'), ctrl.resetearPassword);
 
 // Disponibilidad calculada (horario semanal - citas ya agendadas ese dia).

@@ -1,8 +1,8 @@
 const bcrypt = require('bcryptjs');
 const { pool } = require('../config/db');
-const { generarPasswordTemporal } = require('../utils/passwordTemporal');
 const { enviarCorreo } = require('../utils/correo');
 const { obtenerPolitica, generarPasswordSegunPolitica } = require('../utils/politicaPassword');
+const { resolverUsuarioPortal, cambiarEmailAcceso } = require('../utils/resolverUsuarioPortal');
 
 // true si la cuenta vinculada a este doctor (doctores.usuario_id) ya tiene
 // el rol 'doctor' en ESTA clinica puntual -- ver invitar()/desinvitar()
@@ -304,12 +304,13 @@ async function eliminar(req, res, next) {
 }
 
 // POST /api/doctores/:id/invitar (solo admin)
-// Crea (o reutiliza) una cuenta de acceso al sistema para el doctor, con
-// rol 'doctor' en ESTA clinica -- puede loguearse, elegir esta clinica al
-// entrar, y ver/gestionar sus propias citas y horarios (incluidos los de
-// otras clinicas donde trabaje, ver doctorHorarios.controller.js). Mismo
-// patron que pacientes.controller.js#invitar, pero dar acceso de STAFF es
-// mas sensible que dar acceso de portal de solo lectura -- por eso queda
+// Crea (o reutiliza, con confirmacion -- ver resolverUsuarioPortal()) una
+// cuenta de acceso al sistema para el doctor, con rol 'doctor' en ESTA
+// clinica -- puede loguearse, elegir esta clinica al entrar, y
+// ver/gestionar sus propias citas y horarios (incluidos los de otras
+// clinicas donde trabaje, ver doctorHorarios.controller.js). Mismo patron
+// que pacientes.controller.js#invitar, pero dar acceso de STAFF es mas
+// sensible que dar acceso de portal de solo lectura -- por eso queda
 // restringido a admin (ver doctores.routes.js), a diferencia de invitar
 // paciente que tambien permite doctor.
 async function invitar(req, res, next) {
@@ -332,20 +333,30 @@ async function invitar(req, res, next) {
     let passwordTemporal = null;
 
     if (!usuarioId) {
-      const existente = await client.query('select id from usuarios where email = $1', [doctor.email]);
-      if (existente.rows[0]) {
-        usuarioId = existente.rows[0].id;
-      } else {
-        const politica = await obtenerPolitica();
-        passwordTemporal = generarPasswordTemporal(Math.max(10, politica.longitud_minima));
-        const passwordHash = await bcrypt.hash(passwordTemporal, 10);
-        const nuevo = await client.query(
-          `insert into usuarios (nombre, email, password_hash, activo, debe_cambiar_password)
-           values ($1, $2, $3, true, true) returning id`,
-          [doctor.nombre, doctor.email, passwordHash]
-        );
-        usuarioId = nuevo.rows[0].id;
-        nuevaCuenta = true;
+      try {
+        const resuelto = await resolverUsuarioPortal({
+          client, nombre: doctor.nombre, email: doctor.email,
+          confirmarVincularExistente: req.body.confirmarVincularExistente === true,
+          tablaVinculo: 'doctores', etiquetaVinculo: 'doctor',
+        });
+        usuarioId = resuelto.usuarioId;
+        nuevaCuenta = resuelto.nuevaCuenta;
+        passwordTemporal = resuelto.passwordTemporal;
+      } catch (err) {
+        await client.query('rollback');
+        if (err.yaVinculadoAOtro) {
+          return res.status(409).json({
+            mensaje: `Ya existe una cuenta con el correo ${doctor.email}, pero ya esta vinculada a otro doctor ("${err.otroNombre}") -- una cuenta no puede representar a dos doctores distintos. Corrige el correo de este doctor antes de invitarlo.`,
+          });
+        }
+        if (err.requiereConfirmacion) {
+          return res.status(409).json({
+            mensaje: `Ya existe una cuenta con el correo ${doctor.email}, a nombre de "${err.cuentaExistente.nombre}". Si es la misma persona, confirma para vincularla -- si no, corrige el correo del doctor antes de invitarlo.`,
+            requiereConfirmacion: true,
+            cuenta_existente_nombre: err.cuentaExistente.nombre,
+          });
+        }
+        throw err;
       }
       await client.query('update doctores set usuario_id = $1 where id = $2', [usuarioId, doctor.id]);
     }
@@ -401,9 +412,14 @@ async function invitar(req, res, next) {
 // DELETE /api/doctores/:id/invitar (solo admin) -- revoca el acceso de
 // doctor en ESTA clinica puntual (borra solo la fila usuarios_empresas_rol
 // de esta clinica). No borra la cuenta ni toca su acceso en otras
-// clinicas donde tambien trabaje, ni doctores.usuario_id (el vinculo con
-// la cuenta es global y sigue siendo util si se le vuelve a invitar aqui
-// despues).
+// clinicas donde tambien trabaje. Si esta era la UNICA clinica donde
+// tenia rol 'doctor' con esa cuenta, ademas se limpia doctores.usuario_id
+// -- si no, una proxima invitacion reutilizaria para siempre la misma
+// cuenta (ver resolverUsuarioPortal()), incluso si quedo mal vinculada
+// por un correo mal escrito. El chequeo es "en NINGUNA clinica" porque
+// usuario_id es GLOBAL: limpiarlo mientras el doctor sigue con acceso
+// activo en otra clinica dejaria ese acceso "huerfano" (TIENE_ACCESO_ESTA_CLINICA
+// se calcula por join contra d.usuario_id).
 async function desinvitar(req, res, next) {
   try {
     const doctorRes = await pool.query(
@@ -421,6 +437,46 @@ async function desinvitar(req, res, next) {
       [doctor.usuario_id, req.empresaId]
     );
     if (!rowCount) return res.status(404).json({ mensaje: 'Este doctor no tiene acceso en esta clinica' });
+
+    const quedaAcceso = await pool.query(
+      "select 1 from usuarios_empresas_rol where usuario_id = $1 and rol = 'doctor'",
+      [doctor.usuario_id]
+    );
+    if (!quedaAcceso.rows[0]) {
+      await pool.query('update doctores set usuario_id = null where id = $1', [req.params.id]);
+    }
+
+    const doctorFinal = await obtenerDoctorConEspecialidades(pool, req.params.id, req.empresaId);
+    res.json(doctorFinal);
+  } catch (err) { next(err); }
+}
+
+// PUT /api/doctores/:id/correo-acceso (solo admin) -- corrige el correo de
+// LOGIN (usuarios.email) de un doctor ya invitado, sin tocar su correo de
+// contacto (doctores.email). Mismo motivo que pacientes.controller.js#cambiarCorreoAcceso.
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+async function cambiarCorreoAcceso(req, res, next) {
+  try {
+    const nuevoEmail = String(req.body.email || '').trim().toLowerCase();
+    if (!EMAIL_REGEX.test(nuevoEmail)) return res.status(400).json({ mensaje: 'Correo invalido' });
+
+    const doctorRes = await pool.query(
+      `select d.usuario_id from doctores d
+       join doctores_empresas de on de.doctor_id = d.id
+       where d.id = $1 and de.empresa_id = $2`,
+      [req.params.id, req.empresaId]
+    );
+    const doctor = doctorRes.rows[0];
+    if (!doctor) return res.status(404).json({ mensaje: 'Doctor no encontrado' });
+    if (!doctor.usuario_id) return res.status(400).json({ mensaje: 'Este doctor no tiene una cuenta de acceso vinculada' });
+
+    try {
+      await cambiarEmailAcceso({ pool, usuarioId: doctor.usuario_id, nuevoEmail });
+    } catch (err) {
+      if (err.correoOcupado) return res.status(409).json({ mensaje: 'Ese correo ya pertenece a otra cuenta.' });
+      throw err;
+    }
 
     const doctorFinal = await obtenerDoctorConEspecialidades(pool, req.params.id, req.empresaId);
     res.json(doctorFinal);
@@ -514,4 +570,4 @@ async function miPerfil(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { listar, obtener, buscarPorIdentificacion, crear, actualizar, eliminar, invitar, desinvitar, resetearPassword, miPerfil };
+module.exports = { listar, obtener, buscarPorIdentificacion, crear, actualizar, eliminar, invitar, desinvitar, cambiarCorreoAcceso, resetearPassword, miPerfil };

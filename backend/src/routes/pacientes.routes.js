@@ -28,6 +28,9 @@ router.put('/:id', requireSuperAdmin, ctrl.actualizar);
 router.delete('/:id', requireRol('admin'), ctrl.eliminar);
 router.post('/:id/invitar', requireRol('admin', 'doctor'), ctrl.invitar);
 router.delete('/:id/invitar', requireRol('admin', 'doctor'), ctrl.desinvitar);
+// Corregir el correo de LOGIN (no el de contacto) es mas sensible que
+// invitar/resetear password -- se restringe a admin.
+router.put('/:id/correo-acceso', requireRol('admin'), ctrl.cambiarCorreoAcceso);
 router.post('/:id/resetear-password', requireRol('admin', 'doctor'), ctrl.resetearPassword);
 
 module.exports = router;

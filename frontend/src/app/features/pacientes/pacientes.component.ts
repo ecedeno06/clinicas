@@ -725,11 +725,25 @@ export class PacientesComponent implements OnInit {
     return this.auth.esSuperAdmin() || rol === 'admin' || rol === 'doctor';
   }
 
-  invitarAcceso(p: Paciente): void {
-    if (!confirm(`Se enviara un correo a ${p.email} con sus credenciales de acceso. Continuar?`)) return;
-    this.srv.invitar(p.id).subscribe({
+  invitarAcceso(p: Paciente, confirmarVincularExistente = false): void {
+    if (!confirmarVincularExistente && !confirm(`Se enviara un correo a ${p.email} con sus credenciales de acceso. Continuar?`)) return;
+    this.srv.invitar(p.id, confirmarVincularExistente).subscribe({
       next: () => { alert('Invitacion enviada.'); this.cargar(); },
-      error: (err) => alert(err?.error?.mensaje || 'No se pudo enviar la invitacion'),
+      error: (err) => {
+        // Si el correo ya pertenece a una cuenta existente, el backend
+        // rechaza con 409 y pide confirmar explicitamente (ver
+        // resolverUsuarioPortal()) en vez de vincularla en silencio -- se
+        // le muestra al admin el nombre de esa cuenta para que decida si
+        // de verdad es la misma persona antes de reintentar.
+        if (err?.status === 409 && err?.error?.requiereConfirmacion) {
+          const nombreExistente = err.error.cuenta_existente_nombre;
+          if (confirm(`Ya existe una cuenta con ese correo, a nombre de "${nombreExistente}". ¿Es la misma persona? Confirma solo si estas seguro -- si no, cancela y corrige el correo primero.`)) {
+            this.invitarAcceso(p, true);
+          }
+          return;
+        }
+        alert(err?.error?.mensaje || 'No se pudo enviar la invitacion');
+      },
     });
   }
 
@@ -745,17 +759,90 @@ export class PacientesComponent implements OnInit {
 
   reseteandoPasswordPaciente = signal<string | null>(null);
 
-  resetearPasswordPaciente(p: Paciente): void {
-    if (!confirm(`Se generara una nueva contrasena para el portal de "${p.nombre}" y se enviara a ${p.email}. Continuar?`)) return;
+  // Popup de resetear contrasena (mismo patron "fixed + posicion por boton"
+  // que whatsappMenuPos, ver abrirSelectorWhatsapp) -- dos modos: autogenerar
+  // (como antes, sin ver la contrasena) o escribirla a mano, util cuando el
+  // correo del paciente tiene un error y de todas formas se le va a avisar
+  // por otro medio (telefono, en persona).
+  pacienteResetPasswordAbierto = signal<string | null>(null);
+  resetPasswordMenuPos = signal<{ top: number; left: number } | null>(null);
+  modoPasswordManual = signal(false);
+  passwordManualValor = signal('');
+
+  abrirResetPassword(p: Paciente, event: MouseEvent): void {
+    const boton = event.currentTarget as HTMLElement;
+    const rect = boton.getBoundingClientRect();
+    const anchoMenu = 260;
+    this.resetPasswordMenuPos.set({
+      top: rect.bottom + 6,
+      left: Math.max(8, Math.min(rect.right - anchoMenu, window.innerWidth - anchoMenu - 8)),
+    });
+    this.pacienteResetPasswordAbierto.set(p.id);
+    this.modoPasswordManual.set(false);
+    this.passwordManualValor.set('');
+  }
+
+  cerrarResetPassword(): void {
+    this.pacienteResetPasswordAbierto.set(null);
+    this.resetPasswordMenuPos.set(null);
+  }
+
+  confirmarResetPassword(p: Paciente): void {
+    const password = this.modoPasswordManual() ? this.passwordManualValor() : undefined;
     this.reseteandoPasswordPaciente.set(p.id);
-    this.srv.resetearPassword(p.id).subscribe({
+    this.srv.resetearPassword(p.id, password).subscribe({
       next: (res) => {
         this.reseteandoPasswordPaciente.set(null);
+        this.cerrarResetPassword();
         alert(res.mensaje);
       },
       error: (err) => {
         this.reseteandoPasswordPaciente.set(null);
         alert(err?.error?.mensaje || 'No se pudo resetear la contrasena');
+      },
+    });
+  }
+
+  // Popup de "Cambiar correo de acceso" (mismo patron fixed+posicion por
+  // boton que el de arriba) -- corrige usuarios.email (el identificador de
+  // login), no el correo de contacto del paciente. Pensado para cuando el
+  // paciente perdio acceso a esa bandeja, o quedo mal escrito al invitarlo.
+  cambiandoCorreoAcceso = signal<string | null>(null);
+  pacienteCorreoAccesoAbierto = signal<string | null>(null);
+  correoAccesoMenuPos = signal<{ top: number; left: number } | null>(null);
+  correoAccesoValor = signal('');
+
+  abrirCorreoAcceso(p: Paciente, event: MouseEvent): void {
+    const boton = event.currentTarget as HTMLElement;
+    const rect = boton.getBoundingClientRect();
+    const anchoMenu = 260;
+    this.correoAccesoMenuPos.set({
+      top: rect.bottom + 6,
+      left: Math.max(8, Math.min(rect.right - anchoMenu, window.innerWidth - anchoMenu - 8)),
+    });
+    this.pacienteCorreoAccesoAbierto.set(p.id);
+    this.correoAccesoValor.set('');
+  }
+
+  cerrarCorreoAcceso(): void {
+    this.pacienteCorreoAccesoAbierto.set(null);
+    this.correoAccesoMenuPos.set(null);
+  }
+
+  guardarCorreoAcceso(p: Paciente): void {
+    const email = this.correoAccesoValor().trim();
+    if (!email) return;
+    this.cambiandoCorreoAcceso.set(p.id);
+    this.srv.cambiarCorreoAcceso(p.id, email).subscribe({
+      next: () => {
+        this.cambiandoCorreoAcceso.set(null);
+        this.cerrarCorreoAcceso();
+        alert('Correo de acceso actualizado.');
+        this.cargar();
+      },
+      error: (err) => {
+        this.cambiandoCorreoAcceso.set(null);
+        alert(err?.error?.mensaje || 'No se pudo cambiar el correo de acceso');
       },
     });
   }

@@ -39,8 +39,8 @@ export class PacientesService {
 
   // Crea/reutiliza una cuenta de acceso de solo lectura para el paciente
   // (rol 'paciente') y le envia el correo con las credenciales.
-  invitar(id: string): Observable<Paciente> {
-    return this.http.post<Paciente>(`${this.base}/${id}/invitar`, {});
+  invitar(id: string, confirmarVincularExistente = false): Observable<Paciente> {
+    return this.http.post<Paciente>(`${this.base}/${id}/invitar`, confirmarVincularExistente ? { confirmarVincularExistente: true } : {});
   }
 
   // Revoca el acceso de paciente en ESTA clinica (no borra la cuenta ni
@@ -49,7 +49,13 @@ export class PacientesService {
     return this.http.delete<Paciente>(`${this.base}/${id}/invitar`);
   }
 
-  resetearPassword(id: string): Observable<{ mensaje: string }> {
-    return this.http.post<{ mensaje: string }>(`${this.base}/${id}/resetear-password`, {});
+  resetearPassword(id: string, password?: string): Observable<{ mensaje: string }> {
+    return this.http.post<{ mensaje: string }>(`${this.base}/${id}/resetear-password`, password ? { password } : {});
+  }
+
+  // Corrige el correo de LOGIN de la cuenta ya vinculada (usuarios.email) --
+  // distinto de "actualizar", que edita el correo de contacto del paciente.
+  cambiarCorreoAcceso(id: string, email: string): Observable<Paciente> {
+    return this.http.put<Paciente>(`${this.base}/${id}/correo-acceso`, { email });
   }
 }

@@ -37,14 +37,20 @@ export class DoctoresService {
 
   // Da/quita acceso al sistema (rol 'doctor' en la clinica activa) y
   // resetea la contrasena -- solo admin (ver doctores.routes.js).
-  invitar(id: string): Observable<Doctor> {
-    return this.http.post<Doctor>(`${this.base}/${id}/invitar`, {});
+  invitar(id: string, confirmarVincularExistente = false): Observable<Doctor> {
+    return this.http.post<Doctor>(`${this.base}/${id}/invitar`, confirmarVincularExistente ? { confirmarVincularExistente: true } : {});
   }
   desinvitar(id: string): Observable<Doctor> {
     return this.http.delete<Doctor>(`${this.base}/${id}/invitar`);
   }
   resetearPassword(id: string): Observable<{ mensaje: string }> {
     return this.http.post<{ mensaje: string }>(`${this.base}/${id}/resetear-password`, {});
+  }
+
+  // Corrige el correo de LOGIN de la cuenta ya vinculada (usuarios.email) --
+  // distinto de "actualizar", que edita el correo de contacto del doctor.
+  cambiarCorreoAcceso(id: string, email: string): Observable<Doctor> {
+    return this.http.put<Doctor>(`${this.base}/${id}/correo-acceso`, { email });
   }
 
   // Portal del doctor: sus datos + en que clinicas tiene rol 'doctor'.

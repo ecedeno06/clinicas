@@ -110,11 +110,23 @@ export class DoctoresComponent implements OnInit {
     return this.esAdmin();
   }
 
-  invitarAcceso(d: Doctor): void {
-    if (!confirm(`Se enviara un correo a ${d.email} con sus credenciales de acceso al sistema. Continuar?`)) return;
-    this.srv.invitar(d.id).subscribe({
+  invitarAcceso(d: Doctor, confirmarVincularExistente = false): void {
+    if (!confirmarVincularExistente && !confirm(`Se enviara un correo a ${d.email} con sus credenciales de acceso al sistema. Continuar?`)) return;
+    this.srv.invitar(d.id, confirmarVincularExistente).subscribe({
       next: () => { alert('Invitacion enviada.'); this.cargar(); },
-      error: (err) => alert(err?.error?.mensaje || 'No se pudo enviar la invitacion'),
+      error: (err) => {
+        // Si el correo ya pertenece a una cuenta existente, el backend
+        // rechaza con 409 y pide confirmar explicitamente (ver
+        // resolverUsuarioPortal()) en vez de vincularla en silencio.
+        if (err?.status === 409 && err?.error?.requiereConfirmacion) {
+          const nombreExistente = err.error.cuenta_existente_nombre;
+          if (confirm(`Ya existe una cuenta con ese correo, a nombre de "${nombreExistente}". ¿Es la misma persona? Confirma solo si estas seguro -- si no, cancela y corrige el correo primero.`)) {
+            this.invitarAcceso(d, true);
+          }
+          return;
+        }
+        alert(err?.error?.mensaje || 'No se pudo enviar la invitacion');
+      },
     });
   }
 
@@ -136,6 +148,19 @@ export class DoctoresComponent implements OnInit {
     this.srv.resetearPassword(d.id).subscribe({
       next: (res) => { this.reseteandoPasswordDoctor.set(null); alert(res.mensaje); },
       error: (err) => { this.reseteandoPasswordDoctor.set(null); alert(err?.error?.mensaje || 'No se pudo resetear la contrasena'); },
+    });
+  }
+
+  // Corrige el correo de LOGIN de la cuenta ya vinculada (usuarios.email) --
+  // distinto del correo de contacto del doctor (d.email). Pensado para
+  // cuando el doctor perdio acceso a esa bandeja, o quedo mal escrito al
+  // invitarlo (ver resolverUsuarioPortal()).
+  cambiarCorreoAccesoDoctor(d: Doctor): void {
+    const nuevoEmail = prompt(`Nuevo correo de acceso (login) para "${d.nombre}" -- distinto de su correo de contacto (${d.email}):`);
+    if (!nuevoEmail) return;
+    this.srv.cambiarCorreoAcceso(d.id, nuevoEmail).subscribe({
+      next: () => { alert('Correo de acceso actualizado.'); this.cargar(); },
+      error: (err) => alert(err?.error?.mensaje || 'No se pudo cambiar el correo de acceso'),
     });
   }
 

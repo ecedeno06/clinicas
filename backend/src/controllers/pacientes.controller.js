@@ -1,8 +1,8 @@
 const bcrypt = require('bcryptjs');
 const { pool } = require('../config/db');
-const { generarPasswordTemporal } = require('../utils/passwordTemporal');
 const { enviarCorreo } = require('../utils/correo');
-const { obtenerPolitica, generarPasswordSegunPolitica } = require('../utils/politicaPassword');
+const { obtenerPolitica, generarPasswordSegunPolitica, validarPassword } = require('../utils/politicaPassword');
+const { resolverUsuarioPortal, cambiarEmailAcceso } = require('../utils/resolverUsuarioPortal');
 
 // tipo_trabajo/lugar_trabajo solo tienen sentido si estado_laboral es
 // 'trabaja' -- si no, se limpian para no dejar datos laborales viejos
@@ -497,12 +497,14 @@ async function recetasHistorial(req, res, next) {
 }
 
 // POST /api/pacientes/:id/invitar
-// Crea (o reutiliza) una cuenta de acceso de solo lectura para el paciente
-// (rol 'paciente' en usuarios_empresas_rol, solo ve su propio perfil y sus
-// citas -- ver portalPaciente.controller.js). Si el correo del paciente ya
-// es una cuenta existente (ej. tambien es doctor/admin en otra clinica), se
-// reutiliza esa misma cuenta en vez de crear una segunda -- pero nunca se le
-// pisa el rol que ya tenga en una clinica donde ya trabaja.
+// Crea (o reutiliza, con confirmacion -- ver resolverUsuarioPortal()) una
+// cuenta de acceso de solo lectura para el paciente (rol 'paciente' en
+// usuarios_empresas_rol, solo ve su propio perfil y sus citas -- ver
+// portalPaciente.controller.js). Si el correo del paciente ya es una
+// cuenta existente (ej. tambien es doctor/admin en otra clinica, o el
+// mismo paciente ya fue invitado antes desde otra clinica), se reutiliza
+// esa misma cuenta en vez de crear una segunda -- pero nunca se le pisa el
+// rol que ya tenga en una clinica donde ya trabaja.
 async function invitar(req, res, next) {
   const client = await pool.connect();
   try {
@@ -523,23 +525,30 @@ async function invitar(req, res, next) {
     let passwordTemporal = null;
 
     if (!usuarioId) {
-      const existente = await client.query('select id from usuarios where email = $1', [paciente.email]);
-      if (existente.rows[0]) {
-        usuarioId = existente.rows[0].id;
-      } else {
-        // No se valida contra la politica de password (es aleatoria y se
-        // fuerza su cambio en el primer login), pero respeta el minimo
-        // configurado en vez de un largo fijo.
-        const politica = await obtenerPolitica();
-        passwordTemporal = generarPasswordTemporal(Math.max(10, politica.longitud_minima));
-        const passwordHash = await bcrypt.hash(passwordTemporal, 10);
-        const nuevo = await client.query(
-          `insert into usuarios (nombre, email, password_hash, activo, debe_cambiar_password)
-           values ($1, $2, $3, true, true) returning id`,
-          [paciente.nombre, paciente.email, passwordHash]
-        );
-        usuarioId = nuevo.rows[0].id;
-        nuevaCuenta = true;
+      try {
+        const resuelto = await resolverUsuarioPortal({
+          client, nombre: paciente.nombre, email: paciente.email,
+          confirmarVincularExistente: req.body.confirmarVincularExistente === true,
+          tablaVinculo: 'pacientes', etiquetaVinculo: 'paciente',
+        });
+        usuarioId = resuelto.usuarioId;
+        nuevaCuenta = resuelto.nuevaCuenta;
+        passwordTemporal = resuelto.passwordTemporal;
+      } catch (err) {
+        await client.query('rollback');
+        if (err.yaVinculadoAOtro) {
+          return res.status(409).json({
+            mensaje: `Ya existe una cuenta con el correo ${paciente.email}, pero ya esta vinculada a otro paciente ("${err.otroNombre}") -- una cuenta no puede representar a dos pacientes distintos. Corrige el correo de este paciente antes de invitarlo.`,
+          });
+        }
+        if (err.requiereConfirmacion) {
+          return res.status(409).json({
+            mensaje: `Ya existe una cuenta con el correo ${paciente.email}, a nombre de "${err.cuentaExistente.nombre}". Si es la misma persona, confirma para vincularla -- si no, corrige el correo del paciente antes de invitarlo.`,
+            requiereConfirmacion: true,
+            cuenta_existente_nombre: err.cuentaExistente.nombre,
+          });
+        }
+        throw err;
       }
       await client.query('update pacientes set usuario_id = $1 where id = $2', [usuarioId, paciente.id]);
     }
@@ -604,6 +613,16 @@ async function invitar(req, res, next) {
 // clinicas -- si tenia varias, sigue entrando como paciente para las
 // demas. pacientes.usuario_id no se limpia: el vinculo con la cuenta es
 // global y sigue siendo util si se le vuelve a invitar aqui despues.
+// Al quitar el acceso, si esta era la UNICA clinica donde el paciente
+// tenia rol 'paciente' con esa cuenta, tambien se limpia pacientes.usuario_id
+// -- si no, una proxima invitacion reutilizaria para siempre la misma
+// cuenta (ver resolverUsuarioPortal()), incluso si esa cuenta quedo mal
+// vinculada por un correo mal escrito. usuario_id es GLOBAL (una sola
+// cuenta para toda la red), por eso el chequeo es "en NINGUNA clinica",
+// no solo esta -- limpiarlo mientras el paciente sigue teniendo acceso
+// activo en otra clinica dejaria ese acceso "huerfano" (tiene_acceso_esta_clinica
+// se calcula por join contra p.usuario_id, asi que pasaria a verse como
+// que nunca tuvo acceso ahi, sin borrar la fila real).
 async function desinvitar(req, res, next) {
   try {
     const pacienteRes = await pool.query(
@@ -621,6 +640,54 @@ async function desinvitar(req, res, next) {
       [paciente.usuario_id, req.empresaId]
     );
     if (!rowCount) return res.status(404).json({ mensaje: 'Este paciente no tiene acceso en esta clinica' });
+
+    const quedaAcceso = await pool.query(
+      "select 1 from usuarios_empresas_rol where usuario_id = $1 and rol = 'paciente'",
+      [paciente.usuario_id]
+    );
+    if (!quedaAcceso.rows[0]) {
+      await pool.query('update pacientes set usuario_id = null where id = $1', [req.params.id]);
+    }
+
+    const { rows: final } = await pool.query(
+      `select p.*, pe.activo, ${TIENE_ACCESO_ESTA_CLINICA}, ${SELECT_DIRECCIONES}, ${SELECT_FAMILIARES}, ${SELECT_ANTECEDENTES}
+       from pacientes p join pacientes_empresas pe on pe.paciente_id = p.id and pe.empresa_id = $2
+       where p.id = $1`,
+      [req.params.id, req.empresaId]
+    );
+    res.json(final[0]);
+  } catch (err) { next(err); }
+}
+
+// PUT /api/pacientes/:id/correo-acceso (solo admin) -- corrige el correo de
+// LOGIN (usuarios.email) de un paciente ya invitado, sin tocar su correo de
+// contacto (pacientes.email). Pensado para dos casos: el paciente perdio
+// acceso a la bandeja de su correo de login, o quedo mal escrito al
+// invitarlo (ver resolverUsuarioPortal()) -- antes de esto, la unica forma
+// de corregirlo era un UPDATE directo en la base de datos.
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+async function cambiarCorreoAcceso(req, res, next) {
+  try {
+    const nuevoEmail = String(req.body.email || '').trim().toLowerCase();
+    if (!EMAIL_REGEX.test(nuevoEmail)) return res.status(400).json({ mensaje: 'Correo invalido' });
+
+    const pacienteRes = await pool.query(
+      `select p.usuario_id from pacientes p
+       join pacientes_empresas pe on pe.paciente_id = p.id
+       where p.id = $1 and pe.empresa_id = $2`,
+      [req.params.id, req.empresaId]
+    );
+    const paciente = pacienteRes.rows[0];
+    if (!paciente) return res.status(404).json({ mensaje: 'Paciente no encontrado' });
+    if (!paciente.usuario_id) return res.status(400).json({ mensaje: 'Este paciente no tiene una cuenta de acceso vinculada' });
+
+    try {
+      await cambiarEmailAcceso({ pool, usuarioId: paciente.usuario_id, nuevoEmail });
+    } catch (err) {
+      if (err.correoOcupado) return res.status(409).json({ mensaje: 'Ese correo ya pertenece a otra cuenta.' });
+      throw err;
+    }
 
     const { rows: final } = await pool.query(
       `select p.*, pe.activo, ${TIENE_ACCESO_ESTA_CLINICA}, ${SELECT_DIRECCIONES}, ${SELECT_FAMILIARES}, ${SELECT_ANTECEDENTES}
@@ -655,7 +722,18 @@ async function resetearPassword(req, res, next) {
     }
 
     const politica = await obtenerPolitica();
-    const passwordTemporal = generarPasswordSegunPolitica(politica);
+    // Si el admin escribe una contrasena a mano (ej. el correo del paciente
+    // tiene un error y no le va a llegar el generado), se valida contra la
+    // politica igual que cualquier password nuevo -- la autogenerada no se
+    // valida porque su cambio ya se fuerza en el primer login.
+    const { password: passwordManual } = req.body;
+    let passwordTemporal = passwordManual;
+    if (passwordManual) {
+      const errores = validarPassword(passwordManual, politica);
+      if (errores.length) return res.status(400).json({ mensaje: errores.join(', ') });
+    } else {
+      passwordTemporal = generarPasswordSegunPolitica(politica);
+    }
     const password_hash = await bcrypt.hash(passwordTemporal, 10);
 
     const empresaRes = await pool.query('select nombre from empresas where id = $1', [req.empresaId]);
@@ -681,4 +759,4 @@ async function resetearPassword(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { listar, obtener, crear, actualizar, eliminar, historial, buscarPorIdentificacion, signosVitalesHistorial, laboratorioHistorial, recetasHistorial, invitar, desinvitar, resetearPassword };
+module.exports = { listar, obtener, crear, actualizar, eliminar, historial, buscarPorIdentificacion, signosVitalesHistorial, laboratorioHistorial, recetasHistorial, invitar, desinvitar, cambiarCorreoAcceso, resetearPassword };
