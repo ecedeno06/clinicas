@@ -107,7 +107,8 @@ async function listar(req, res, next) {
                 when exists(select 1 from ordenes_laboratorio ol where ol.cita_id = c.id and ol.estado = 'completada') then 'completada'
                 when exists(select 1 from ordenes_laboratorio ol where ol.cita_id = c.id and ol.estado = 'cancelada') then 'cancelada'
               end) as estado_laboratorio,
-              (case when p.fecha_nacimiento is not null then date_part('year', age(c.fecha, p.fecha_nacimiento))::int end) as paciente_edad
+              (case when p.fecha_nacimiento is not null then date_part('year', age(c.fecha, p.fecha_nacimiento))::int end) as paciente_edad,
+              (c.estado = 'pendiente' and (c.fecha + c.hora_fin) < (now() at time zone coalesce(s.zona_horaria, 'America/Panama'))) as vencida
        from citas c
        join pacientes p on p.id = c.paciente_id
        join doctores d on d.id = c.doctor_id
@@ -137,7 +138,8 @@ async function obtener(req, res, next) {
               s.nombre as sucursal_nombre, s.direccion as sucursal_direccion, s.google_maps_url as sucursal_google_maps_url,
               s.telefono as sucursal_telefono, s.acepta_whatsapp as sucursal_acepta_whatsapp,
               s.hora_apertura as sucursal_hora_apertura, s.hora_cierre as sucursal_hora_cierre,
-              camp.nombre as campana_nombre
+              camp.nombre as campana_nombre,
+              (c.estado = 'pendiente' and (c.fecha + c.hora_fin) < (now() at time zone coalesce(s.zona_horaria, 'America/Panama'))) as vencida
        from citas c
        join pacientes p on p.id = c.paciente_id
        join doctores d on d.id = c.doctor_id

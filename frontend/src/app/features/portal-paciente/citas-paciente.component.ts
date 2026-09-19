@@ -72,12 +72,13 @@ export class CitasPacienteComponent implements OnInit {
       if (fecha && !formatoFechaCorta(h.fecha_cita || '').includes(fecha)) return false;
       if (doctor && !(h.doctor_nombre ?? '').toLowerCase().includes(doctor)) return false;
       if (sucursal && !(h.sucursal_nombre ?? '').toLowerCase().includes(sucursal)) return false;
-      if (estado && !this.estadoEtiqueta(h.estado).toLowerCase().includes(estado)) return false;
+      if (estado && !this.estadoEtiqueta(h.estado, h.vencida).toLowerCase().includes(estado)) return false;
       return true;
     });
   });
 
-  estadoEtiqueta(estado: EstadoCita | undefined): string {
+  estadoEtiqueta(estado: EstadoCita | undefined, vencida?: boolean): string {
+    if (estado === 'pendiente' && vencida) return 'Vencida';
     const etiquetas: Record<string, string> = {
       pendiente: 'Pendiente',
       confirmada: 'Confirmada',

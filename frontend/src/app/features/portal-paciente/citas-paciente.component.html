@@ -53,12 +53,13 @@
                 </td>
                 <td>
                   <span class="badge"
-                    [class.badge-slate]="h.estado === 'pendiente'"
+                    [class.badge-slate]="h.estado === 'pendiente' && !h.vencida"
+                    [class.badge-orange]="h.estado === 'pendiente' && h.vencida"
                     [class.badge-amber]="h.estado === 'confirmada'"
                     [class.badge-green]="h.estado === 'atendida'"
                     [class.badge-red]="h.estado === 'cancelada' || h.estado === 'no_asistio'"
                     [class.badge-violet]="h.estado === 'reagendar'">
-                    {{ estadoEtiqueta(h.estado) }}
+                    {{ estadoEtiqueta(h.estado, h.vencida) }}
                   </span>
                 </td>
                 <td class="table-actions">

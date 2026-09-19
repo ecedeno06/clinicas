@@ -70,12 +70,13 @@ export class PacientesComponent implements OnInit {
       if (fecha && !formatoFechaCorta(h.fecha_cita || '').includes(fecha)) return false;
       if (doctor && !(h.doctor_nombre ?? '').toLowerCase().includes(doctor)) return false;
       if (sucursal && !(h.sucursal_nombre ?? '').toLowerCase().includes(sucursal)) return false;
-      if (estado && !this.estadoEtiquetaHistorial(h.estado).toLowerCase().includes(estado)) return false;
+      if (estado && !this.estadoEtiquetaHistorial(h.estado, h.vencida).toLowerCase().includes(estado)) return false;
       return true;
     });
   });
 
-  estadoEtiquetaHistorial(estado: EstadoCita | undefined): string {
+  estadoEtiquetaHistorial(estado: EstadoCita | undefined, vencida?: boolean): string {
+    if (estado === 'pendiente' && vencida) return 'Vencida';
     const etiquetas: Record<string, string> = {
       pendiente: 'Pendiente',
       confirmada: 'Confirmada',

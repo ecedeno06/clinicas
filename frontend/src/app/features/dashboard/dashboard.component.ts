@@ -11,6 +11,7 @@ import { AuthService } from '../../core/services/auth.service';
 import { Cita, Doctor, LaboratorioPendiente, Paciente, Sucursal } from '../../core/models/models';
 import { formatoAmPm } from '../../core/utils/hora12.util';
 import { hoyISO } from '../../core/utils/fecha.util';
+import { colorEstadoCita, estadoEfectivo } from '../citas/calendario/calendario.util';
 
 @Component({
   selector: 'app-dashboard',
@@ -33,6 +34,8 @@ export class DashboardComponent implements OnInit {
   // Filtro de sucursal para todo el tablero -- '' = "Todas" (vista agregada
   // por defecto, ver DISENO-ZONA-HORARIA-SUCURSALES.md seccion 4.3).
   sucursalFiltro = signal<string>('');
+  colorEstadoCita = colorEstadoCita;
+  estadoEfectivo = estadoEfectivo;
 
   citasFiltradas = computed(() => {
     const sucursalId = this.sucursalFiltro();

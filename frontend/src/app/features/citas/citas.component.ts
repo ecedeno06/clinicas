@@ -15,7 +15,7 @@ import { AntecedentesPatologicosService } from '../../core/services/antecedentes
 import { PacienteAntecedentesService } from '../../core/services/pacienteAntecedentes.service';
 import { CategoriasExamenesLaboratorioService } from '../../core/services/categoriasExamenesLaboratorio.service';
 import { ExamenesLaboratorioCatalogoService } from '../../core/services/examenesLaboratorioCatalogo.service';
-import { Campana, CampanaDoctor, Cita, Disponibilidad, Doctor, Especialidad, EstadoCita, EstadoLaboratorio, ExamenLaboratorio, FamiliarPaciente, FranjaHoraria, HistoriaClinica, OrdenLaboratorio, Paciente, PacienteAntecedente, Receta, SignosVitales, Sucursal, CategoriaAntecedente, AntecedentePatologico, CategoriaExamenLaboratorio, ExamenLaboratorioCatalogo } from '../../core/models/models';
+import { Campana, CampanaDoctor, Cita, Disponibilidad, Doctor, Especialidad, EstadoCita, EstadoCitaMostrado, EstadoLaboratorio, ExamenLaboratorio, FamiliarPaciente, FranjaHoraria, HistoriaClinica, OrdenLaboratorio, Paciente, PacienteAntecedente, Receta, SignosVitales, Sucursal, CategoriaAntecedente, AntecedentePatologico, CategoriaExamenLaboratorio, ExamenLaboratorioCatalogo } from '../../core/models/models';
 import { clasificarImc } from '../../core/utils/imc.util';
 import { clasificarPresion } from '../../core/utils/presion.util';
 import { clasificarGlucosa } from '../../core/utils/glucosa.util';
@@ -32,7 +32,7 @@ import { TDocumentDefinitions } from 'pdfmake/interfaces';
 import { MiniCalendarioMesComponent } from './calendario/mini-calendario-mes.component';
 import { CalendarioDiaComponent, CeldaVaciaClick } from './calendario/calendario-dia.component';
 import { CitaDetallePopoverComponent } from './calendario/cita-detalle-popover.component';
-import { colorEstadoCita, iniciales } from './calendario/calendario.util';
+import { colorEstadoCita, estadoEfectivo, iniciales } from './calendario/calendario.util';
 
 @Component({
   selector: 'app-citas',
@@ -261,9 +261,13 @@ export class CitasComponent implements OnInit {
 
   // ---------- Vista Calendario (dia, por doctor) ----------
   vista = signal<'lista' | 'calendario'>('lista');
-  readonly estadosCita: EstadoCita[] = ['pendiente', 'confirmada', 'atendida', 'cancelada', 'no_asistio', 'reagendar'];
+  // 'vencida' es un estado derivado (ver calendario.util.ts#estadoEfectivo),
+  // no una opcion real de estado -- se incluye aca solo para poder
+  // filtrar/mostrar en la leyenda del calendario, nunca para escribirla.
+  readonly estadosCita: EstadoCitaMostrado[] = ['pendiente', 'vencida', 'confirmada', 'atendida', 'cancelada', 'no_asistio', 'reagendar'];
   iniciales = iniciales;
   colorEstadoCita = colorEstadoCita;
+  estadoEfectivo = estadoEfectivo;
 
   fechaCalendario = signal(hoyISO());
   citasCalendario = signal<Cita[]>([]);
@@ -278,7 +282,7 @@ export class CitasComponent implements OnInit {
   // especialidad de una cita puntual puede diferir de con cual la agendaron.
   filtroCalEspecialidad = signal('');
   filtroCalDoctorIds = signal<Set<string>>(new Set());
-  filtroCalEstados = signal<Set<EstadoCita>>(new Set(this.estadosCita));
+  filtroCalEstados = signal<Set<EstadoCitaMostrado>>(new Set(this.estadosCita));
 
   citaPopover = signal<Cita | null>(null);
   origenPopover = signal<HTMLElement | null>(null);
@@ -319,7 +323,7 @@ export class CitasComponent implements OnInit {
     const estados = this.filtroCalEstados();
     return this.citasCalendario().filter((c) => {
       if (doctorIds.size > 0 && !doctorIds.has(c.doctor_id)) return false;
-      if (!estados.has(c.estado)) return false;
+      if (!estados.has(estadoEfectivo(c))) return false;
       return true;
     });
   });
@@ -392,7 +396,7 @@ export class CitasComponent implements OnInit {
     this.filtroCalDoctorIds.set(actuales.size === idsActivos.length ? new Set() : actuales);
   }
 
-  toggleFiltroCalEstado(estado: EstadoCita): void {
+  toggleFiltroCalEstado(estado: EstadoCitaMostrado): void {
     const actuales = new Set(this.filtroCalEstados());
     if (actuales.has(estado)) actuales.delete(estado); else actuales.add(estado);
     this.filtroCalEstados.set(actuales);
@@ -482,7 +486,7 @@ export class CitasComponent implements OnInit {
       if (doctor && !(c.doctor_nombre ?? '').toLowerCase().includes(doctor)) return false;
       if (sucursal && !(c.sucursal_nombre ?? '').toLowerCase().includes(sucursal)) return false;
       if (campana && !(c.campana_nombre || 'Normal').toLowerCase().includes(campana)) return false;
-      if (estado && !c.estado.toLowerCase().includes(estado)) return false;
+      if (estado && !estadoEfectivo(c).toLowerCase().includes(estado)) return false;
       return true;
     });
   });

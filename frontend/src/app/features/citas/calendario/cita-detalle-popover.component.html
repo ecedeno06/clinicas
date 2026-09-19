@@ -18,7 +18,12 @@
     </div>
 
     <div class="cita-popover-datos">
-      <div>{{ c.fecha | date:'dd/MM/yyyy':'UTC' }} &middot; {{ formatoAmPm(c.hora_inicio) }} - {{ formatoAmPm(c.hora_fin) }}</div>
+      <div>
+        {{ c.fecha | date:'dd/MM/yyyy':'UTC' }} &middot; {{ formatoAmPm(c.hora_inicio) }} - {{ formatoAmPm(c.hora_fin) }}
+        @if (c.estado === 'pendiente' && c.vencida) {
+          <span class="badge badge-orange">Vencida</span>
+        }
+      </div>
       <div class="text-muted text-sm">{{ c.sucursal_nombre }}</div>
       @if (c.paciente_telefono) {
         <div class="text-muted text-sm">{{ c.paciente_telefono }}</div>

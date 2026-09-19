@@ -327,6 +327,11 @@ export interface Disponibilidad {
 }
 
 export type EstadoCita = 'pendiente' | 'confirmada' | 'atendida' | 'cancelada' | 'no_asistio' | 'reagendar';
+// 'vencida' NO es un valor real de la columna estado (la cita sigue
+// 'pendiente' en la base de datos): es un estado derivado, solo para
+// mostrar, que calendario.util.ts#estadoEfectivo() calcula a partir de
+// Cita.vencida. Nunca se envia al backend.
+export type EstadoCitaMostrado = EstadoCita | 'vencida';
 
 export interface EventoCitaLog {
   fecha: string;
@@ -368,6 +373,9 @@ export interface Cita {
   hora_inicio: string;
   hora_fin: string;
   estado: EstadoCita;
+  // Calculado por el backend: true si estado='pendiente' y hora_fin ya
+  // paso segun la zona horaria de la sucursal. Ver calendario.util.ts#estadoEfectivo().
+  vencida?: boolean;
   motivo?: string;
   observaciones?: string;
   tiene_historia?: boolean;
@@ -399,6 +407,7 @@ export interface HistoriaClinica {
   hora_fin_cita?: string;
   motivo_cita?: string | null;
   estado?: EstadoCita;
+  vencida?: boolean;
   doctor_nombre?: string;
   doctor_telefono?: string | null;
   doctor_acepta_whatsapp?: boolean;

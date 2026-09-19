@@ -8,6 +8,7 @@ import {
   calcularEjeHoras,
   calcularRangosBloqueados,
   colorEstadoCita,
+  estadoEfectivo,
   etiquetaHora,
   horasDelEje,
   iniciales,
@@ -150,7 +151,7 @@ export class CalendarioDiaComponent implements AfterViewInit {
         const { top, height  } = posicionBloque(c.hora_inicio, c.hora_fin, eje, PX_POR_MINUTO);
         const asignada = columnasSolape.get(c.id)!;
         const widthPct = 100 / asignada.totalCols;
-        return { cita: c, top: top + PADDING_VERTICAL , height, leftPct: widthPct * asignada.col, widthPct, color: colorEstadoCita(c.estado) };
+        return { cita: c, top: top + PADDING_VERTICAL , height, leftPct: widthPct * asignada.col, widthPct, color: colorEstadoCita(estadoEfectivo(c)) };
       });
 
       const libres = rangosLibres.get(doctor.id) ?? null;

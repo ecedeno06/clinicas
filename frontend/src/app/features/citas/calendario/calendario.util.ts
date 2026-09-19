@@ -1,4 +1,4 @@
-import { EstadoCita } from '../../../core/models/models';
+import { EstadoCita, EstadoCitaMostrado } from '../../../core/models/models';
 
 // ---------- Eje de horas ----------
 
@@ -169,9 +169,9 @@ export function calcularRangosBloqueados(libres: RangoMin[], ejeInicioMin: numbe
 
 // ---------- Color por estado (mismo mapeo que los badges de la tabla) ----------
 
-export type ColorEstadoCita = 'slate' | 'amber' | 'green' | 'red' | 'violet';
+export type ColorEstadoCita = 'slate' | 'amber' | 'green' | 'red' | 'violet' | 'orange';
 
-export function colorEstadoCita(estado: EstadoCita): ColorEstadoCita {
+export function colorEstadoCita(estado: EstadoCitaMostrado): ColorEstadoCita {
   switch (estado) {
     case 'pendiente': return 'slate';
     case 'confirmada': return 'amber';
@@ -179,7 +179,18 @@ export function colorEstadoCita(estado: EstadoCita): ColorEstadoCita {
     case 'cancelada':
     case 'no_asistio': return 'red';
     case 'reagendar': return 'violet';
+    case 'vencida': return 'orange';
   }
+}
+
+// Estado 'pendiente' cuya hora_fin ya paso (Cita.vencida, calculado en el
+// backend con la zona horaria de la sucursal) se muestra como 'vencida'
+// en vez de 'pendiente' -- sin que el valor real guardado en estado
+// cambie. Usar esto en vez de leer cita.estado directamente en cualquier
+// lugar que muestre/filtre el estado al usuario (badges, colores,
+// leyendas, filtros de texto).
+export function estadoEfectivo(cita: { estado: EstadoCita; vencida?: boolean }): EstadoCitaMostrado {
+  return cita.estado === 'pendiente' && cita.vencida ? 'vencida' : cita.estado;
 }
 
 // ---------- Iniciales para avatar (mismo criterio que selector-foto/inicialesPaciente) ----------

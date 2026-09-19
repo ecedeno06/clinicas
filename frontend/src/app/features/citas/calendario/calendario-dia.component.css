@@ -177,5 +177,6 @@
 .cal-bloque-cita--green { background: var(--tint-green-bg); color: var(--text-on-tint-green); }
 .cal-bloque-cita--red { background: var(--tint-red-bg); color: var(--text-on-tint-red); }
 .cal-bloque-cita--violet { background: var(--tint-violet-bg); color: var(--text-on-tint-violet); }
+.cal-bloque-cita--orange { background: var(--tint-orange-bg); color: var(--text-on-tint-orange); }
 
 .cal-bloque-cita:hover { filter: brightness(0.96); }

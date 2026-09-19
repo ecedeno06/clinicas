@@ -217,13 +217,8 @@
             }
           </td>
           <td>
-            <span class="badge"
-              [class.badge-slate]="c.estado === 'pendiente'"
-              [class.badge-amber]="c.estado === 'confirmada'"
-              [class.badge-green]="c.estado === 'atendida'"
-              [class.badge-red]="c.estado === 'cancelada' || c.estado === 'no_asistio'"
-              [class.badge-violet]="c.estado === 'reagendar'">
-              {{ c.estado }}
+            <span class="badge" [class]="'badge-' + colorEstadoCita(estadoEfectivo(c))">
+              {{ estadoEfectivo(c) }}
             </span>
           </td>
           <td class="table-actions">

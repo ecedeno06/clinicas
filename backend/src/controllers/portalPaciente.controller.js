@@ -205,7 +205,8 @@ async function citas(req, res, next) {
                 when exists(select 1 from ordenes_laboratorio ol where ol.cita_id = c.id and ol.estado = 'pendiente') then 'pendiente'
                 when exists(select 1 from ordenes_laboratorio ol where ol.cita_id = c.id and ol.estado = 'completada') then 'completada'
                 when exists(select 1 from ordenes_laboratorio ol where ol.cita_id = c.id and ol.estado = 'cancelada') then 'cancelada'
-              end) as estado_laboratorio
+              end) as estado_laboratorio,
+              (c.estado = 'pendiente' and (c.fecha + c.hora_fin) < (now() at time zone coalesce(s.zona_horaria, 'America/Panama'))) as vencida
        from citas c
        join pacientes p on p.id = c.paciente_id
        join doctores d on d.id = c.doctor_id
