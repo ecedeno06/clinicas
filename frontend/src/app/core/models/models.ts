@@ -113,6 +113,29 @@ export interface UsuarioDeEmpresa extends UsuarioGlobal {
   rol: Rol;
 }
 
+// Fila del reporte de Auditoria (GET /api/auditoria/sesiones, solo
+// super-admin) -- motivo_salida ya viene resuelto por el backend segun
+// si la sesion esta cerrada, en curso, o quedo expirada sin cerrar (ver
+// auditoria.controller.js).
+export type MotivoSalidaSesion =
+  | 'logout_usuario' | 'inactividad' | 'reset_password' | 'cambio_email' | 'recuperacion_2fa'
+  | 'en_curso' | 'expirada_sin_cerrar';
+
+export interface SesionAuditoria {
+  id: string;
+  usuario_id: string;
+  usuario_nombre: string;
+  usuario_email: string;
+  empresa_nombre: string | null;
+  sucursal_nombre: string | null;
+  rol: string | null;
+  login_en: string;
+  logout_en: string | null;
+  duracion_segundos: number | null;
+  motivo_salida: MotivoSalidaSesion;
+  activo: boolean;
+}
+
 export type Sexo = 'M' | 'F' | 'Otro';
 export type EstadoCivil = 'soltero' | 'casado' | 'unido' | 'viudo';
 export type EstadoLaboral = 'trabaja' | 'jubilado' | 'pensionado' | 'no_aplica';

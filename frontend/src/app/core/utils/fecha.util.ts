@@ -13,3 +13,14 @@ export function hoyISO(): string {
   const dia = String(d.getDate()).padStart(2, '0');
   return `${anio}-${mes}-${dia}`;
 }
+
+// "Hace N dias" (fecha LOCAL, mismo criterio que hoyISO) -- para
+// defaults de filtros de rango como el de Auditoria.
+export function haceDiasISO(dias: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - dias);
+  const anio = d.getFullYear();
+  const mes = String(d.getMonth() + 1).padStart(2, '0');
+  const dia = String(d.getDate()).padStart(2, '0');
+  return `${anio}-${mes}-${dia}`;
+}

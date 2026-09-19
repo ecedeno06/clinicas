@@ -1,0 +1,72 @@
+<div class="page-header">
+  <div>
+    <h1>Auditoria de sesiones</h1>
+    <div class="desc">Historial de acceso al sistema, por usuario y rango de fechas</div>
+  </div>
+</div>
+
+<div class="flex gap-16" style="flex-wrap:wrap;">
+  <div class="form-group" style="min-width:220px;">
+    <label>Usuario</label>
+    <select class="input" [ngModel]="usuarioId()" (ngModelChange)="usuarioId.set($event)">
+      <option value="">Todos los usuarios</option>
+      @for (u of usuarios(); track u.id) { <option [value]="u.id">{{ u.nombre }}</option> }
+    </select>
+  </div>
+  <div class="form-group" style="min-width:160px;">
+    <label>Desde</label>
+    <input class="input" type="date" [ngModel]="desde()" (ngModelChange)="desde.set($event)" />
+  </div>
+  <div class="form-group" style="min-width:160px;">
+    <label>Hasta</label>
+    <input class="input" type="date" [ngModel]="hasta()" (ngModelChange)="hasta.set($event)" />
+  </div>
+  <div class="form-group" style="justify-content:flex-end; display:flex;">
+    <button type="button" class="btn btn-accent" (click)="buscar()">Buscar</button>
+  </div>
+</div>
+
+@if (buscado()) {
+  <div class="page-header mt-16">
+    <div>
+      <h2 style="margin:0;">Resultados ({{ sesiones().length }})</h2>
+      <p class="text-muted text-sm" style="margin:0;">{{ usuarioNombreFiltro() }} &middot; {{ desde() | date:'dd/MM/yyyy':'UTC' }} – {{ hasta() | date:'dd/MM/yyyy':'UTC' }}</p>
+    </div>
+    @if (sesiones().length > 0) {
+      <button type="button" class="btn btn-outline btn-sm" (click)="verPdf()">Ver PDF</button>
+    }
+  </div>
+
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead><tr><th>Fecha</th><th>Usuario</th><th>Clinica</th><th>Login</th><th>Logout</th><th>Tiempo en sesion</th><th>Motivo de salida</th></tr></thead>
+      <tbody>
+        @if (cargando()) {
+          <tr><td colspan="7"><div class="empty-state">Buscando...</div></td></tr>
+        } @else {
+          @for (s of sesiones(); track s.id) {
+            <tr>
+              <td>{{ s.login_en | date:'dd/MM/yyyy' }}</td>
+              <td>{{ s.usuario_nombre }} <div class="text-muted text-sm">{{ s.usuario_email }}</div></td>
+              <td>{{ s.empresa_nombre || '-' }} <div class="text-muted text-sm">{{ s.sucursal_nombre }}</div></td>
+              <td>{{ s.login_en | date:'dd/MM/yyyy HH:mm' }}</td>
+              <td>{{ s.logout_en ? (s.logout_en | date:'dd/MM/yyyy HH:mm') : '-' }}</td>
+              <td>{{ formatoDuracion(s.duracion_segundos) }}</td>
+              <td>
+                <span class="badge"
+                  [class.badge-green]="s.motivo_salida === 'en_curso'"
+                  [class.badge-slate]="s.motivo_salida === 'logout_usuario'"
+                  [class.badge-amber]="s.motivo_salida === 'inactividad' || s.motivo_salida === 'expirada_sin_cerrar'"
+                  [class.badge-violet]="s.motivo_salida === 'reset_password' || s.motivo_salida === 'cambio_email' || s.motivo_salida === 'recuperacion_2fa'">
+                  {{ motivoEtiqueta(s.motivo_salida) }}
+                </span>
+              </td>
+            </tr>
+          } @empty {
+            <tr><td colspan="7"><div class="empty-state">No hay sesiones para estos filtros.</div></td></tr>
+          }
+        }
+      </tbody>
+    </table>
+  </div>
+}
