@@ -139,10 +139,10 @@
                   </button>
                   @if (pacienteCorreoAccesoAbierto() === p.id) {
                     <div class="dropdown-backdrop" (click)="cerrarCorreoAcceso()"></div>
-                    <div class="dropdown-menu" style="position:fixed; padding:12px; width:260px;" [style.top.px]="correoAccesoMenuPos()?.top" [style.left.px]="correoAccesoMenuPos()?.left">
-                      <label class="text-sm text-muted" style="display:block; margin-bottom:8px;">Correo de acceso (login) de {{ p.nombre }}</label>
+                    <div class="dropdown-menu dropdown-menu-ambar" style="position:fixed; padding:12px; width:260px;" [style.top.px]="correoAccesoMenuPos()?.top" [style.left.px]="correoAccesoMenuPos()?.left">
+                      <label class="text-muted" style="display:block; margin-bottom:8px; text-align:center; font-weight:700; font-size:14px;">Correo de acceso (login) de {{ p.nombre }}</label>
                       <input class="input" type="email" placeholder="nuevo-correo@ejemplo.com" autocomplete="off" [ngModel]="correoAccesoValor()" (ngModelChange)="correoAccesoValor.set($event)" style="margin-bottom:8px;" />
-                      <div class="text-muted text-sm" style="margin-bottom:8px;">No es el correo de contacto del paciente ({{ p.email }}) -- es con el que inicia sesion en el portal.</div>
+                      <div class="text-muted text-sm" style="margin-bottom:8px; text-align:justify;">No es el correo de contacto del paciente ({{ p.email }}) -- es con el que inicia sesion en el portal.</div>
                       <button type="button" class="btn btn-accent btn-sm w-full" [disabled]="!correoAccesoValor()" (click)="guardarCorreoAcceso(p)">Guardar</button>
                     </div>
                   }
