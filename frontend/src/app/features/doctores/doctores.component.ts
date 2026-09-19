@@ -140,47 +140,61 @@ export class DoctoresComponent implements OnInit {
     });
   }
 
-  // Popup de "Resetear contrasena" -- mismo patron (posicion fija por
-  // boton, fondo ambar) que pacientes.component.ts.
   reseteandoPasswordDoctor = signal<string | null>(null);
-  doctorResetPasswordAbierto = signal<string | null>(null);
-  resetPasswordMenuPos = signal<{ top: number; left: number } | null>(null);
-  modoPasswordManual = signal(false);
-  passwordManualValor = signal('');
 
-  abrirResetPassword(d: Doctor, event: MouseEvent): void {
-    const boton = event.currentTarget as HTMLElement;
-    const rect = boton.getBoundingClientRect();
-    const anchoMenu = 260;
-    this.resetPasswordMenuPos.set({
-      top: rect.bottom + 6,
-      left: Math.max(8, Math.min(rect.right - anchoMenu, window.innerWidth - anchoMenu - 8)),
-    });
-    this.doctorResetPasswordAbierto.set(d.id);
-    this.modoPasswordManual.set(false);
-    this.passwordManualValor.set('');
-  }
-
-  cerrarResetPassword(): void {
-    this.doctorResetPasswordAbierto.set(null);
-    this.resetPasswordMenuPos.set(null);
-  }
-
-  confirmarResetPassword(d: Doctor): void {
-    const password = this.modoPasswordManual() ? this.passwordManualValor() : undefined;
+  // El popup con opcion manual/autogenerar se deshabilito a pedido del
+  // usuario: el boton de accion ahora dispara el envio automatico
+  // (autogenerado) directo, sin ventana intermedia. Se deja comentado el
+  // codigo del popup (mas abajo y en el .html) por si se quiere reactivar
+  // el flujo con confirmacion/opcion manual mas adelante.
+  resetearPasswordDirecto(d: Doctor): void {
     this.reseteandoPasswordDoctor.set(d.id);
-    this.srv.resetearPassword(d.id, password).subscribe({
-      next: (res) => {
-        this.reseteandoPasswordDoctor.set(null);
-        this.cerrarResetPassword();
-        alert(res.mensaje);
-      },
-      error: (err) => {
-        this.reseteandoPasswordDoctor.set(null);
-        alert(err?.error?.mensaje || 'No se pudo resetear la contrasena');
-      },
+    this.srv.resetearPassword(d.id).subscribe({
+      next: (res) => { this.reseteandoPasswordDoctor.set(null); alert(res.mensaje); },
+      error: (err) => { this.reseteandoPasswordDoctor.set(null); alert(err?.error?.mensaje || 'No se pudo resetear la contrasena'); },
     });
   }
+
+  // // Popup de "Resetear contrasena" -- mismo patron (posicion fija por
+  // // boton, fondo ambar) que pacientes.component.ts.
+  // doctorResetPasswordAbierto = signal<string | null>(null);
+  // resetPasswordMenuPos = signal<{ top: number; left: number } | null>(null);
+  // modoPasswordManual = signal(false);
+  // passwordManualValor = signal('');
+  //
+  // abrirResetPassword(d: Doctor, event: MouseEvent): void {
+  //   const boton = event.currentTarget as HTMLElement;
+  //   const rect = boton.getBoundingClientRect();
+  //   const anchoMenu = 260;
+  //   this.resetPasswordMenuPos.set({
+  //     top: rect.bottom + 6,
+  //     left: Math.max(8, Math.min(rect.right - anchoMenu, window.innerWidth - anchoMenu - 8)),
+  //   });
+  //   this.doctorResetPasswordAbierto.set(d.id);
+  //   this.modoPasswordManual.set(false);
+  //   this.passwordManualValor.set('');
+  // }
+  //
+  // cerrarResetPassword(): void {
+  //   this.doctorResetPasswordAbierto.set(null);
+  //   this.resetPasswordMenuPos.set(null);
+  // }
+  //
+  // confirmarResetPassword(d: Doctor): void {
+  //   const password = this.modoPasswordManual() ? this.passwordManualValor() : undefined;
+  //   this.reseteandoPasswordDoctor.set(d.id);
+  //   this.srv.resetearPassword(d.id, password).subscribe({
+  //     next: (res) => {
+  //       this.reseteandoPasswordDoctor.set(null);
+  //       this.cerrarResetPassword();
+  //       alert(res.mensaje);
+  //     },
+  //     error: (err) => {
+  //       this.reseteandoPasswordDoctor.set(null);
+  //       alert(err?.error?.mensaje || 'No se pudo resetear la contrasena');
+  //     },
+  //   });
+  // }
 
   // Popup de "Cambiar correo de acceso" -- corrige usuarios.email (el
   // identificador de login), no el correo de contacto del doctor.

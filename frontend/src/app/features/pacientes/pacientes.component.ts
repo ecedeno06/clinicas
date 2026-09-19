@@ -760,49 +760,62 @@ export class PacientesComponent implements OnInit {
 
   reseteandoPasswordPaciente = signal<string | null>(null);
 
-  // Popup de resetear contrasena (mismo patron "fixed + posicion por boton"
-  // que whatsappMenuPos, ver abrirSelectorWhatsapp) -- dos modos: autogenerar
-  // (como antes, sin ver la contrasena) o escribirla a mano, util cuando el
-  // correo del paciente tiene un error y de todas formas se le va a avisar
-  // por otro medio (telefono, en persona).
-  pacienteResetPasswordAbierto = signal<string | null>(null);
-  resetPasswordMenuPos = signal<{ top: number; left: number } | null>(null);
-  modoPasswordManual = signal(false);
-  passwordManualValor = signal('');
-
-  abrirResetPassword(p: Paciente, event: MouseEvent): void {
-    const boton = event.currentTarget as HTMLElement;
-    const rect = boton.getBoundingClientRect();
-    const anchoMenu = 260;
-    this.resetPasswordMenuPos.set({
-      top: rect.bottom + 6,
-      left: Math.max(8, Math.min(rect.right - anchoMenu, window.innerWidth - anchoMenu - 8)),
-    });
-    this.pacienteResetPasswordAbierto.set(p.id);
-    this.modoPasswordManual.set(false);
-    this.passwordManualValor.set('');
-  }
-
-  cerrarResetPassword(): void {
-    this.pacienteResetPasswordAbierto.set(null);
-    this.resetPasswordMenuPos.set(null);
-  }
-
-  confirmarResetPassword(p: Paciente): void {
-    const password = this.modoPasswordManual() ? this.passwordManualValor() : undefined;
+  // El popup con opcion manual/autogenerar se deshabilito a pedido del
+  // usuario: el boton de accion ahora dispara el envio automatico
+  // (autogenerado) directo, sin ventana intermedia. Se deja comentado el
+  // codigo del popup (mas abajo y en el .html) por si se quiere reactivar
+  // el flujo con confirmacion/opcion manual mas adelante.
+  resetearPasswordDirecto(p: Paciente): void {
     this.reseteandoPasswordPaciente.set(p.id);
-    this.srv.resetearPassword(p.id, password).subscribe({
-      next: (res) => {
-        this.reseteandoPasswordPaciente.set(null);
-        this.cerrarResetPassword();
-        alert(res.mensaje);
-      },
-      error: (err) => {
-        this.reseteandoPasswordPaciente.set(null);
-        alert(err?.error?.mensaje || 'No se pudo resetear la contrasena');
-      },
+    this.srv.resetearPassword(p.id).subscribe({
+      next: (res) => { this.reseteandoPasswordPaciente.set(null); alert(res.mensaje); },
+      error: (err) => { this.reseteandoPasswordPaciente.set(null); alert(err?.error?.mensaje || 'No se pudo resetear la contrasena'); },
     });
   }
+
+  // // Popup de resetear contrasena (mismo patron "fixed + posicion por boton"
+  // // que whatsappMenuPos, ver abrirSelectorWhatsapp) -- dos modos: autogenerar
+  // // (como antes, sin ver la contrasena) o escribirla a mano, util cuando el
+  // // correo del paciente tiene un error y de todas formas se le va a avisar
+  // // por otro medio (telefono, en persona).
+  // pacienteResetPasswordAbierto = signal<string | null>(null);
+  // resetPasswordMenuPos = signal<{ top: number; left: number } | null>(null);
+  // modoPasswordManual = signal(false);
+  // passwordManualValor = signal('');
+  //
+  // abrirResetPassword(p: Paciente, event: MouseEvent): void {
+  //   const boton = event.currentTarget as HTMLElement;
+  //   const rect = boton.getBoundingClientRect();
+  //   const anchoMenu = 260;
+  //   this.resetPasswordMenuPos.set({
+  //     top: rect.bottom + 6,
+  //     left: Math.max(8, Math.min(rect.right - anchoMenu, window.innerWidth - anchoMenu - 8)),
+  //   });
+  //   this.pacienteResetPasswordAbierto.set(p.id);
+  //   this.modoPasswordManual.set(false);
+  //   this.passwordManualValor.set('');
+  // }
+  //
+  // cerrarResetPassword(): void {
+  //   this.pacienteResetPasswordAbierto.set(null);
+  //   this.resetPasswordMenuPos.set(null);
+  // }
+  //
+  // confirmarResetPassword(p: Paciente): void {
+  //   const password = this.modoPasswordManual() ? this.passwordManualValor() : undefined;
+  //   this.reseteandoPasswordPaciente.set(p.id);
+  //   this.srv.resetearPassword(p.id, password).subscribe({
+  //     next: (res) => {
+  //       this.reseteandoPasswordPaciente.set(null);
+  //       this.cerrarResetPassword();
+  //       alert(res.mensaje);
+  //     },
+  //     error: (err) => {
+  //       this.reseteandoPasswordPaciente.set(null);
+  //       alert(err?.error?.mensaje || 'No se pudo resetear la contrasena');
+  //     },
+  //   });
+  // }
 
   // Popup de "Cambiar correo de acceso" (mismo patron fixed+posicion por
   // boton que el de arriba) -- corrige usuarios.email (el identificador de
