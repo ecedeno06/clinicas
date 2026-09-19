@@ -6,5 +6,6 @@ const { requireAuth, requireSuperAdmin } = require('../middleware/auth');
 router.use(requireAuth, requireSuperAdmin);
 
 router.get('/sesiones', ctrl.listarSesiones);
+router.post('/sesiones/cerrar', ctrl.cerrarSesiones);
 
 module.exports = router;

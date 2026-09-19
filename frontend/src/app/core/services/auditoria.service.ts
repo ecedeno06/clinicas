@@ -13,4 +13,8 @@ export class AuditoriaService {
     const params = new URLSearchParams(filtros).toString();
     return this.http.get<SesionAuditoria[]>(`${this.base}/sesiones${params ? '?' + params : ''}`);
   }
+
+  cerrarSesiones(ids: string[]): Observable<{ cerradas: number }> {
+    return this.http.post<{ cerradas: number }>(`${this.base}/sesiones/cerrar`, { ids });
+  }
 }

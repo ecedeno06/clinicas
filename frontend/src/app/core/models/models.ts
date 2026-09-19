@@ -119,7 +119,7 @@ export interface UsuarioDeEmpresa extends UsuarioGlobal {
 // auditoria.controller.js).
 export type MotivoSalidaSesion =
   | 'logout_usuario' | 'inactividad' | 'reset_password' | 'cambio_email' | 'recuperacion_2fa'
-  | 'en_curso' | 'expirada_sin_cerrar';
+  | 'cerrada_por_admin' | 'en_curso' | 'expirada_sin_cerrar';
 
 export interface SesionAuditoria {
   id: string;

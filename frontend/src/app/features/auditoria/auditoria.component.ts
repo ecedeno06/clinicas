@@ -36,6 +36,7 @@ const ETIQUETAS_MOTIVO: Record<MotivoSalidaSesion, string> = {
   reset_password: 'Reseteo de contrasena',
   cambio_email: 'Cambio de correo',
   recuperacion_2fa: 'Recuperacion 2FA',
+  cerrada_por_admin: 'Cerrada por administrador',
   en_curso: 'En curso',
   expirada_sin_cerrar: 'Expirada (sin cerrar)',
 };
@@ -59,6 +60,12 @@ export class AuditoriaComponent implements OnInit {
   // se revisa hacia atras en el tiempo.
   desde = signal(haceDiasISO(7));
   hasta = signal(hoyISO());
+
+  // "Matar sesion" solo tiene sentido para una sesion realmente EN CURSO
+  // (token todavia valido) -- una ya cerrada o expirada no se puede ni
+  // hace falta forzar, por eso solo esas filas muestran checkbox.
+  seleccionadas = signal<Set<string>>(new Set());
+  cerrandoSesiones = signal(false);
 
   constructor(
     private srv: AuditoriaService,
@@ -91,11 +98,54 @@ export class AuditoriaComponent implements OnInit {
 
   buscar(): void {
     this.cargando.set(true);
+    this.seleccionadas.set(new Set());
     const filtros: Record<string, string> = { desde: this.desde(), hasta: this.hasta() };
     if (this.usuarioId()) filtros['usuario_id'] = this.usuarioId();
     this.srv.listarSesiones(filtros).subscribe({
       next: (data) => { this.sesiones.set(data); this.cargando.set(false); this.buscado.set(true); },
       error: () => { this.sesiones.set([]); this.cargando.set(false); this.buscado.set(true); },
+    });
+  }
+
+  esSeleccionable(s: SesionAuditoria): boolean {
+    return s.motivo_salida === 'en_curso';
+  }
+
+  sesionesSeleccionables(): SesionAuditoria[] {
+    return this.sesiones().filter((s) => this.esSeleccionable(s));
+  }
+
+  todasSeleccionadas(): boolean {
+    const seleccionables = this.sesionesSeleccionables();
+    return seleccionables.length > 0 && seleccionables.every((s) => this.seleccionadas().has(s.id));
+  }
+
+  toggleSeleccion(id: string): void {
+    const actuales = new Set(this.seleccionadas());
+    if (actuales.has(id)) actuales.delete(id); else actuales.add(id);
+    this.seleccionadas.set(actuales);
+  }
+
+  toggleTodas(): void {
+    if (this.todasSeleccionadas()) {
+      this.seleccionadas.set(new Set());
+    } else {
+      this.seleccionadas.set(new Set(this.sesionesSeleccionables().map((s) => s.id)));
+    }
+  }
+
+  cerrarSeleccionadas(): void {
+    const ids = [...this.seleccionadas()];
+    if (!ids.length) return;
+    if (!confirm(`Se cerrara${ids.length > 1 ? 'n' : ''} ${ids.length} sesion${ids.length > 1 ? 'es' : ''} de inmediato. La persona debera iniciar sesion de nuevo. Continuar?`)) return;
+
+    this.cerrandoSesiones.set(true);
+    this.srv.cerrarSesiones(ids).subscribe({
+      next: () => { this.cerrandoSesiones.set(false); this.buscar(); },
+      error: (err) => {
+        this.cerrandoSesiones.set(false);
+        alert(err?.error?.mensaje || 'No se pudieron cerrar las sesiones');
+      },
     });
   }
 

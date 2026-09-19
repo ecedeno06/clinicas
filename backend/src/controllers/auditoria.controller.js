@@ -49,4 +49,27 @@ async function listarSesiones(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { listarSesiones };
+// POST /api/auditoria/sesiones/cerrar { ids: string[] } (solo super-admin)
+// -- cierra a la fuerza las sesiones indicadas ("matar sesion" desde la
+// pantalla de Auditoria). Solo tiene efecto real sobre sesiones "en
+// curso" (activo=true, sin expirar todavia): una ya cerrada o ya
+// expirada no cambia nada (el `and activo = true` la deja fuera), asi
+// que es seguro mandar cualquier seleccion sin filtrarla antes.
+async function cerrarSesiones(req, res, next) {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ mensaje: 'Debes indicar al menos una sesion' });
+    }
+    const { rows } = await pool.query(
+      `update sesiones set activo = false, razon_salida = 'cerrada_por_admin',
+         duracion_segundos = extract(epoch from (now() - created_at))::integer
+       where id = any($1::uuid[]) and activo = true
+       returning id`,
+      [ids]
+    );
+    res.json({ cerradas: rows.length });
+  } catch (err) { next(err); }
+}
+
+module.exports = { listarSesiones, cerrarSesiones };
