@@ -140,27 +140,89 @@ export class DoctoresComponent implements OnInit {
     });
   }
 
+  // Popup de "Resetear contrasena" -- mismo patron (posicion fija por
+  // boton, fondo ambar) que pacientes.component.ts.
   reseteandoPasswordDoctor = signal<string | null>(null);
+  doctorResetPasswordAbierto = signal<string | null>(null);
+  resetPasswordMenuPos = signal<{ top: number; left: number } | null>(null);
+  modoPasswordManual = signal(false);
+  passwordManualValor = signal('');
 
-  resetearPasswordDoctor(d: Doctor): void {
-    if (!confirm(`Se generara una nueva contrasena de acceso para "${d.nombre}" y se enviara a ${d.email}. Continuar?`)) return;
+  abrirResetPassword(d: Doctor, event: MouseEvent): void {
+    const boton = event.currentTarget as HTMLElement;
+    const rect = boton.getBoundingClientRect();
+    const anchoMenu = 260;
+    this.resetPasswordMenuPos.set({
+      top: rect.bottom + 6,
+      left: Math.max(8, Math.min(rect.right - anchoMenu, window.innerWidth - anchoMenu - 8)),
+    });
+    this.doctorResetPasswordAbierto.set(d.id);
+    this.modoPasswordManual.set(false);
+    this.passwordManualValor.set('');
+  }
+
+  cerrarResetPassword(): void {
+    this.doctorResetPasswordAbierto.set(null);
+    this.resetPasswordMenuPos.set(null);
+  }
+
+  confirmarResetPassword(d: Doctor): void {
+    const password = this.modoPasswordManual() ? this.passwordManualValor() : undefined;
     this.reseteandoPasswordDoctor.set(d.id);
-    this.srv.resetearPassword(d.id).subscribe({
-      next: (res) => { this.reseteandoPasswordDoctor.set(null); alert(res.mensaje); },
-      error: (err) => { this.reseteandoPasswordDoctor.set(null); alert(err?.error?.mensaje || 'No se pudo resetear la contrasena'); },
+    this.srv.resetearPassword(d.id, password).subscribe({
+      next: (res) => {
+        this.reseteandoPasswordDoctor.set(null);
+        this.cerrarResetPassword();
+        alert(res.mensaje);
+      },
+      error: (err) => {
+        this.reseteandoPasswordDoctor.set(null);
+        alert(err?.error?.mensaje || 'No se pudo resetear la contrasena');
+      },
     });
   }
 
-  // Corrige el correo de LOGIN de la cuenta ya vinculada (usuarios.email) --
-  // distinto del correo de contacto del doctor (d.email). Pensado para
-  // cuando el doctor perdio acceso a esa bandeja, o quedo mal escrito al
-  // invitarlo (ver resolverUsuarioPortal()).
-  cambiarCorreoAccesoDoctor(d: Doctor): void {
-    const nuevoEmail = prompt(`Nuevo correo de acceso (login) para "${d.nombre}" -- distinto de su correo de contacto (${d.email}):`);
-    if (!nuevoEmail) return;
-    this.srv.cambiarCorreoAcceso(d.id, nuevoEmail).subscribe({
-      next: () => { alert('Correo de acceso actualizado.'); this.cargar(); },
-      error: (err) => alert(err?.error?.mensaje || 'No se pudo cambiar el correo de acceso'),
+  // Popup de "Cambiar correo de acceso" -- corrige usuarios.email (el
+  // identificador de login), no el correo de contacto del doctor.
+  // Pensado para cuando el doctor perdio acceso a esa bandeja, o quedo
+  // mal escrito al invitarlo (ver resolverUsuarioPortal()).
+  cambiandoCorreoAcceso = signal<string | null>(null);
+  doctorCorreoAccesoAbierto = signal<string | null>(null);
+  correoAccesoMenuPos = signal<{ top: number; left: number } | null>(null);
+  correoAccesoValor = signal('');
+
+  abrirCorreoAcceso(d: Doctor, event: MouseEvent): void {
+    const boton = event.currentTarget as HTMLElement;
+    const rect = boton.getBoundingClientRect();
+    const anchoMenu = 260;
+    this.correoAccesoMenuPos.set({
+      top: rect.bottom + 6,
+      left: Math.max(8, Math.min(rect.right - anchoMenu, window.innerWidth - anchoMenu - 8)),
+    });
+    this.doctorCorreoAccesoAbierto.set(d.id);
+    this.correoAccesoValor.set('');
+  }
+
+  cerrarCorreoAcceso(): void {
+    this.doctorCorreoAccesoAbierto.set(null);
+    this.correoAccesoMenuPos.set(null);
+  }
+
+  guardarCorreoAcceso(d: Doctor): void {
+    const email = this.correoAccesoValor().trim();
+    if (!email) return;
+    this.cambiandoCorreoAcceso.set(d.id);
+    this.srv.cambiarCorreoAcceso(d.id, email).subscribe({
+      next: () => {
+        this.cambiandoCorreoAcceso.set(null);
+        this.cerrarCorreoAcceso();
+        alert('Correo de acceso actualizado.');
+        this.cargar();
+      },
+      error: (err) => {
+        this.cambiandoCorreoAcceso.set(null);
+        alert(err?.error?.mensaje || 'No se pudo cambiar el correo de acceso');
+      },
     });
   }
 

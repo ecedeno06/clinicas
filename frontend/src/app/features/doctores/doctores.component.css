@@ -169,3 +169,29 @@
 .time12 select:nth-child(1) { flex: 1.1; }
 .time12 select:nth-child(2) { flex: 1.1; }
 .time12 select:nth-child(3) { flex: 1.3; }
+
+/* Popups de "Resetear contrasena" y "Cambiar correo de acceso" -- mismo
+   estilo ambar opaco que pacientes.component.css (ver ahi el detalle de
+   por que hace falta :host-context() para el modo oscuro). */
+.dropdown-menu-ambar {
+  background: linear-gradient(135deg, #fff3d6, #e57777e6);
+  box-shadow:
+    0 0 0 1px rgba(255, 176, 0, 0.5),
+    0 0 18px 4px rgba(255, 176, 0, 0.35),
+    var(--shadow-md);
+}
+.dropdown-menu-ambar label,
+.dropdown-menu-ambar .text-muted {
+  color: #7a4a00;
+}
+:host-context([data-theme="dark"]) .dropdown-menu-ambar {
+  background: linear-gradient(135deg, #3d2c08, #241a03);
+  box-shadow:
+    0 0 0 1px rgba(255, 176, 0, 0.6),
+    0 0 22px 6px rgba(255, 176, 0, 0.4),
+    var(--shadow-md);
+}
+:host-context([data-theme="dark"]) .dropdown-menu-ambar label,
+:host-context([data-theme="dark"]) .dropdown-menu-ambar .text-muted {
+  color: #ffd98a;
+}

@@ -1,7 +1,7 @@
 const bcrypt = require('bcryptjs');
 const { pool } = require('../config/db');
 const { enviarCorreo, escaparHtml } = require('../utils/correo');
-const { obtenerPolitica, generarPasswordSegunPolitica } = require('../utils/politicaPassword');
+const { obtenerPolitica, generarPasswordSegunPolitica, validarPassword } = require('../utils/politicaPassword');
 const { resolverUsuarioPortal, cambiarEmailAcceso } = require('../utils/resolverUsuarioPortal');
 
 // true si la cuenta vinculada a este doctor (doctores.usuario_id) ya tiene
@@ -513,7 +513,16 @@ async function resetearPassword(req, res, next) {
     }
 
     const politica = await obtenerPolitica();
-    const passwordTemporal = generarPasswordSegunPolitica(politica);
+    // Mismo criterio que pacientes.controller.js#resetearPassword: si el
+    // admin escribe una contrasena a mano, se valida contra la politica.
+    const { password: passwordManual } = req.body;
+    let passwordTemporal = passwordManual;
+    if (passwordManual) {
+      const errores = validarPassword(passwordManual, politica);
+      if (errores.length) return res.status(400).json({ mensaje: errores.join(', ') });
+    } else {
+      passwordTemporal = generarPasswordSegunPolitica(politica);
+    }
     const password_hash = await bcrypt.hash(passwordTemporal, 10);
 
     const empresaRes = await pool.query('select nombre from empresas where id = $1', [req.empresaId]);

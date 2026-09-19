@@ -43,8 +43,8 @@ export class DoctoresService {
   desinvitar(id: string): Observable<Doctor> {
     return this.http.delete<Doctor>(`${this.base}/${id}/invitar`);
   }
-  resetearPassword(id: string): Observable<{ mensaje: string }> {
-    return this.http.post<{ mensaje: string }>(`${this.base}/${id}/resetear-password`, {});
+  resetearPassword(id: string, password?: string): Observable<{ mensaje: string }> {
+    return this.http.post<{ mensaje: string }>(`${this.base}/${id}/resetear-password`, password ? { password } : {});
   }
 
   // Corrige el correo de LOGIN de la cuenta ya vinculada (usuarios.email) --
