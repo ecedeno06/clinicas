@@ -6,6 +6,7 @@ import { citasGuard } from './core/guards/citas.guard';
 import { LayoutComponent } from './features/layout/layout.component';
 import { LoginComponent } from './features/login/login.component';
 import { RestablecerPasswordComponent } from './features/restablecer-password/restablecer-password.component';
+import { ConfirmarCambioEmailComponent } from './features/confirmar-cambio-email/confirmar-cambio-email.component';
 import { Recuperar2faComponent } from './features/recuperar-2fa/recuperar-2fa.component';
 import { DashboardComponent } from './features/dashboard/dashboard.component';
 import { PacientesComponent } from './features/pacientes/pacientes.component';
@@ -28,6 +29,7 @@ import { PerfilDoctorComponent } from './features/portal-doctor/perfil-doctor.co
 export const routes: Routes = [
   { path: 'login', component: LoginComponent },
   { path: 'restablecer-password', component: RestablecerPasswordComponent },
+  { path: 'confirmar-cambio-email', component: ConfirmarCambioEmailComponent },
   { path: 'recuperar-2fa', component: Recuperar2faComponent },
   {
     path: '',

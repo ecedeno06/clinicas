@@ -221,6 +221,7 @@
                 <button type="button" class="dropdown-item dropdown-item-danger" (click)="eliminarFotoPerfil()">Eliminar foto de perfil</button>
               }
               <button type="button" class="dropdown-item" (click)="abrirCambioPassword()">Cambiar contrasena</button>
+              <button type="button" class="dropdown-item" (click)="abrirCambioEmail()">Cambiar correo de acceso</button>
               <button type="button" class="dropdown-item" (click)="abrirSeguridad()">Seguridad (2FA)</button>
               <button type="button" class="dropdown-item dropdown-item-danger" (click)="auth.logout()">Salir</button>
             </div>
@@ -317,6 +318,38 @@
           @if (!cambioPasswordObligatorio()) {
             <button type="button" class="btn btn-outline" (click)="cerrarCambioPassword()">Cancelar</button>
           }
+        </div>
+      </form>
+    </div>
+  </div>
+}
+
+@if (panelEmailAbierto()) {
+  <div class="overlay">
+    <div class="drawer">
+      <div class="drawer-header">
+        <h2>Cambiar correo de acceso</h2>
+        <button class="close" (click)="cerrarCambioEmail()">&times;</button>
+      </div>
+      <div class="text-muted text-sm mt-8">
+        Es el correo con el que inicias sesion -- no el correo de contacto de tu ficha.
+        No se aplica de inmediato: te mandamos un enlace de confirmacion al correo nuevo,
+        y solo cambia cuando lo confirmas.
+      </div>
+      <form [formGroup]="emailForm" (ngSubmit)="guardarCambioEmail()">
+        <div class="form-group mt-16">
+          <label>Contrasena actual *</label>
+          <input class="input" type="password" formControlName="password_actual" />
+        </div>
+        <div class="form-group mt-16">
+          <label>Correo nuevo *</label>
+          <input class="input" type="email" formControlName="nuevo_email" />
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary" [disabled]="emailForm.invalid || enviandoCambioEmail()">
+            {{ enviandoCambioEmail() ? 'Enviando...' : 'Enviar enlace de confirmacion' }}
+          </button>
+          <button type="button" class="btn btn-outline" (click)="cerrarCambioEmail()">Cancelar</button>
         </div>
       </form>
     </div>

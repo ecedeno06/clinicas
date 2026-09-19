@@ -1,0 +1,18 @@
+<div class="auth-screen">
+  <div class="auth-card">
+    <div class="auth-logo">CM</div>
+
+    @if (cargando()) {
+      <h1>Confirmando...</h1>
+      <p class="text-muted text-sm">Un momento por favor.</p>
+    } @else if (exito()) {
+      <h1>Correo de acceso actualizado</h1>
+      <p class="text-muted text-sm">Ya puedes iniciar sesion con tu correo nuevo.</p>
+      <button type="button" class="btn btn-primary w-full mt-16" (click)="irALogin()">Ir a iniciar sesion</button>
+    } @else {
+      <h1>No se pudo confirmar</h1>
+      <div class="auth-error mt-16">{{ error() }}</div>
+      <a routerLink="/login" class="btn-link text-sm mt-16" style="display:inline-block;">Volver a iniciar sesion</a>
+    }
+  </div>
+</div>

@@ -701,6 +701,22 @@ create table if not exists dos_factor_recovery_tokens (
 );
 
 -- ---------------------------------------------------------
+-- Tabla: cambio_email_tokens (autoservicio de cambio de correo de acceso --
+-- migracion 054). El correo nuevo se guarda en el token, no en la cuenta,
+-- hasta que se confirma el enlace que llega a ESE correo -- ver
+-- POST /auth/cambiar-email/solicitar y /auth/cambiar-email/confirmar.
+-- ---------------------------------------------------------
+create table if not exists cambio_email_tokens (
+    id          uuid primary key default gen_random_uuid(),
+    usuario_id  uuid not null references usuarios(id) on delete cascade,
+    nuevo_email text not null,
+    token       text not null unique,
+    expira_en   timestamptz not null,
+    usado       boolean not null default false,
+    created_at  timestamptz not null default now()
+);
+
+-- ---------------------------------------------------------
 -- Indices
 -- ---------------------------------------------------------
 create index if not exists idx_sesiones_usuario on sesiones(usuario_id);
@@ -710,6 +726,7 @@ create index if not exists idx_password_reset_tokens_usuario on password_reset_t
 create index if not exists idx_password_reset_tokens_token_activo on password_reset_tokens(token) where usado = false;
 create index if not exists idx_dos_factor_recovery_tokens_usuario on dos_factor_recovery_tokens(usuario_id);
 create index if not exists idx_dos_factor_recovery_tokens_token_activo on dos_factor_recovery_tokens(token) where usado = false;
+create index if not exists idx_cambio_email_tokens_usuario on cambio_email_tokens(usuario_id);
 create index if not exists idx_usuarios_empresas_rol_usuario on usuarios_empresas_rol(usuario_id);
 create index if not exists idx_usuarios_empresas_rol_empresa on usuarios_empresas_rol(empresa_id);
 -- Permite mas de un rol de staff simultaneo por clinica (ej. admin Y

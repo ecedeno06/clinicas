@@ -19,6 +19,8 @@ const {
   me,
   actualizarPerfil,
   cambiarPassword,
+  solicitarCambioEmail,
+  confirmarCambioEmail,
 } = require('../controllers/auth.controller');
 const { requireAuth } = require('../middleware/auth');
 const rateLimitPista = require('../middleware/rateLimitPista');
@@ -45,5 +47,7 @@ router.get('/mis-empresas', requireAuth, misEmpresas);
 router.get('/me', requireAuth, me);
 router.put('/me', requireAuth, actualizarPerfil);
 router.put('/password', requireAuth, cambiarPassword);
+router.post('/cambiar-email/solicitar', requireAuth, solicitarCambioEmail);
+router.post('/cambiar-email/confirmar', confirmarCambioEmail);
 
 module.exports = router;

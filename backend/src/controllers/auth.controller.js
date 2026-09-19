@@ -479,6 +479,95 @@ async function restablecerPassword(req, res, next) {
   }
 }
 
+function generarTokenCambioEmail() {
+  return 'cem_' + crypto.randomBytes(32).toString('hex');
+}
+
+// POST /api/auth/cambiar-email/solicitar { password_actual, nuevo_email }
+// (requiere sesion). Autoservicio para cuando el usuario perdio acceso a
+// su correo de login actual, o simplemente quiere cambiarlo: confirma su
+// identidad con la contrasena actual, y el cambio de usuarios.email solo
+// se aplica cuando confirma el enlace que le llega al correo NUEVO (ver
+// confirmarCambioEmail) -- nunca de inmediato, para no dejar una cuenta
+// con un correo al que nadie tiene acceso ni permitir reclamar el correo
+// de otra persona sin comprobar que se puede recibir algo ahi.
+async function solicitarCambioEmail(req, res, next) {
+  try {
+    const { password_actual, nuevo_email } = req.body || {};
+    if (!password_actual || !nuevo_email) {
+      return res.status(400).json({ mensaje: 'password_actual y nuevo_email son requeridos' });
+    }
+    const email = String(nuevo_email).trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ mensaje: 'Correo invalido' });
+
+    const { rows } = await pool.query('select password_hash from usuarios where id = $1', [req.usuario.id]);
+    if (!rows[0]) return res.status(404).json({ mensaje: 'Usuario no encontrado' });
+    const passwordOk = await bcrypt.compare(password_actual, rows[0].password_hash);
+    if (!passwordOk) return res.status(401).json({ mensaje: 'La contrasena actual no es correcta' });
+
+    const ocupado = await pool.query('select id from usuarios where email = $1 and id <> $2', [email, req.usuario.id]);
+    if (ocupado.rows[0]) return res.status(409).json({ mensaje: 'Ese correo ya pertenece a otra cuenta.' });
+
+    const token = generarTokenCambioEmail();
+    const expiraEn = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
+    await pool.query(
+      'insert into cambio_email_tokens (usuario_id, nuevo_email, token, expira_en) values ($1, $2, $3, $4)',
+      [req.usuario.id, email, token, expiraEn]
+    );
+
+    const enlace = `${process.env.CORS_ORIGIN || 'http://localhost:4201'}/confirmar-cambio-email?token=${token}`;
+    try {
+      await enviarCorreo({
+        destinatario: email,
+        asunto: 'Confirma tu nuevo correo de acceso',
+        texto: `Hola ${req.usuario.nombre},\n\nPediste cambiar el correo con el que inicias sesion a este. Confirma el cambio con este enlace (valido por 1 hora):\n${enlace}\n\nSi no fuiste tu, ignora este correo -- tu cuenta sigue igual hasta que se confirme.`,
+        html: `<p>Hola ${req.usuario.nombre},</p><p>Pediste cambiar el correo con el que inicias sesion a este. Confirma el cambio con este enlace (valido por 1 hora):</p><p><a href="${enlace}">${enlace}</a></p><p>Si no fuiste tu, ignora este correo -- tu cuenta sigue igual hasta que se confirme.</p>`,
+      });
+    } catch (err) {
+      return res.status(502).json({ mensaje: 'No se pudo enviar el correo de confirmacion. Intenta de nuevo.' });
+    }
+
+    res.json({ mensaje: `Te enviamos un enlace de confirmacion a ${email}. Tu correo de acceso no cambia hasta que lo confirmes.` });
+  } catch (err) { next(err); }
+}
+
+// POST /api/auth/cambiar-email/confirmar { token } (publico -- se llega
+// desde el enlace del correo, sin sesion necesariamente activa en ese
+// dispositivo). Revisa de nuevo que el correo nuevo siga libre (pudo
+// haberlo tomado alguien mas mientras el token estaba pendiente) antes de
+// aplicar el cambio.
+async function confirmarCambioEmail(req, res, next) {
+  try {
+    const { token } = req.body || {};
+    if (!token) return res.status(400).json({ mensaje: 'token es requerido' });
+
+    const { rows } = await pool.query(
+      `select id, usuario_id, nuevo_email from cambio_email_tokens where token = $1 and usado = false and expira_en > now()`,
+      [token]
+    );
+    const registro = rows[0];
+    if (!registro) return res.status(400).json({ mensaje: 'El enlace es invalido o ya expiro. Solicita el cambio de nuevo.' });
+
+    const ocupado = await pool.query('select id from usuarios where email = $1 and id <> $2', [registro.nuevo_email, registro.usuario_id]);
+    if (ocupado.rows[0]) {
+      return res.status(409).json({ mensaje: 'Ese correo ya fue tomado por otra cuenta mientras tanto. Solicita el cambio de nuevo con otro correo.' });
+    }
+
+    await pool.query('update usuarios set email = $1 where id = $2', [registro.nuevo_email, registro.usuario_id]);
+    await pool.query('update cambio_email_tokens set usado = true where id = $1', [registro.id]);
+    // Mismo criterio que restablecerPassword: cambiar el identificador de
+    // login es sensible, se cierran las sesiones activas por seguridad.
+    await pool.query(
+      `update sesiones set activo = false, razon_salida = 'cambio_email',
+         duracion_segundos = extract(epoch from (now() - created_at))::integer
+       where usuario_id = $1 and activo = true`,
+      [registro.usuario_id]
+    );
+
+    res.json({ mensaje: 'Correo de acceso actualizado. Ya puedes iniciar sesion con el.' });
+  } catch (err) { next(err); }
+}
+
 function generarTokenRecuperacion2FA() {
   return 'r2f_' + crypto.randomBytes(32).toString('hex');
 }
@@ -850,4 +939,6 @@ module.exports = {
   me,
   actualizarPerfil,
   cambiarPassword,
+  solicitarCambioEmail,
+  confirmarCambioEmail,
 };

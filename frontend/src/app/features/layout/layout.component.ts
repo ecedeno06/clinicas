@@ -28,6 +28,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
   menuAbierto = signal(false);
   panelPasswordAbierto = signal(false);
   panelSeguridadAbierto = signal(false);
+  panelEmailAbierto = signal(false);
   verPasswordNueva = signal(false);
   verPasswordConfirmar = signal(false);
   passwordGenerada = signal(false);
@@ -59,6 +60,12 @@ export class LayoutComponent implements OnInit, OnDestroy {
     },
     { validators: passwordsCoincidenValidator }
   );
+
+  emailForm = this.fb.group({
+    password_actual: ['', Validators.required],
+    nuevo_email: ['', [Validators.required, Validators.email]],
+  });
+  enviandoCambioEmail = signal(false);
 
   // Se completa en ngOnInit (GET publico) -- hasta entonces el formulario
   // solo valida "required"/coincidencia, sin la politica todavia.
@@ -209,6 +216,37 @@ export class LayoutComponent implements OnInit, OnDestroy {
         alert('Contrasena actualizada correctamente.');
       },
       error: (err) => alert(err?.error?.mensaje || 'No se pudo cambiar la contrasena'),
+    });
+  }
+
+  // Autoservicio de cambio de correo de acceso: pide contrasena actual +
+  // el correo nuevo, pero NO lo aplica de inmediato -- el backend manda un
+  // enlace de confirmacion al correo nuevo (ver ConfirmarCambioEmailComponent)
+  // y el cambio solo se hace efectivo cuando se confirma ese enlace.
+  abrirCambioEmail(): void {
+    this.menuAbierto.set(false);
+    this.emailForm.reset();
+    this.panelEmailAbierto.set(true);
+  }
+
+  cerrarCambioEmail(): void {
+    this.panelEmailAbierto.set(false);
+  }
+
+  guardarCambioEmail(): void {
+    if (this.emailForm.invalid) return;
+    const { password_actual, nuevo_email } = this.emailForm.getRawValue();
+    this.enviandoCambioEmail.set(true);
+    this.auth.solicitarCambioEmail(password_actual!, nuevo_email!).subscribe({
+      next: (res) => {
+        this.enviandoCambioEmail.set(false);
+        this.cerrarCambioEmail();
+        alert(res.mensaje);
+      },
+      error: (err) => {
+        this.enviandoCambioEmail.set(false);
+        alert(err?.error?.mensaje || 'No se pudo solicitar el cambio de correo');
+      },
     });
   }
 }

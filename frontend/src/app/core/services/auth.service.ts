@@ -239,6 +239,21 @@ export class AuthService {
     return this.http.get<SessionConfig>(`${environment.apiUrl}/auth/session-config`);
   }
 
+  // POST /auth/cambiar-email/solicitar -- autoservicio para cuando se
+  // perdio acceso al correo de login actual (o simplemente se quiere
+  // cambiar). Confirma la contrasena actual; el cambio real de
+  // usuarios.email no se aplica hasta confirmar el enlace que llega al
+  // correo NUEVO (ver confirmarCambioEmail()).
+  solicitarCambioEmail(passwordActual: string, nuevoEmail: string): Observable<{ mensaje: string }> {
+    return this.http.post<{ mensaje: string }>(`${environment.apiUrl}/auth/cambiar-email/solicitar`, { password_actual: passwordActual, nuevo_email: nuevoEmail });
+  }
+
+  // POST /auth/cambiar-email/confirmar -- publico, usa el token del enlace
+  // enviado al correo nuevo (valido 1 hora, un solo uso).
+  confirmarCambioEmail(token: string): Observable<{ mensaje: string }> {
+    return this.http.post<{ mensaje: string }>(`${environment.apiUrl}/auth/cambiar-email/confirmar`, { token });
+  }
+
   // POST /auth/2fa/recovery -- publico. Se llama desde la pantalla que pide
   // el codigo de la app autenticadora ("perdi acceso a mi 2FA"), usando el
   // usuarioId que ya devolvio el login (contrasena ya validada). fraseReto
