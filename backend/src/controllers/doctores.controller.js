@@ -464,8 +464,9 @@ async function cambiarCorreoAcceso(req, res, next) {
     if (!EMAIL_REGEX.test(nuevoEmail)) return res.status(400).json({ mensaje: 'Correo invalido' });
 
     const doctorRes = await pool.query(
-      `select d.usuario_id from doctores d
+      `select d.email, d.usuario_id, u.email as usuario_email from doctores d
        join doctores_empresas de on de.doctor_id = d.id
+       join usuarios u on u.id = d.usuario_id
        where d.id = $1 and de.empresa_id = $2`,
       [req.params.id, req.empresaId]
     );
@@ -478,6 +479,13 @@ async function cambiarCorreoAcceso(req, res, next) {
     } catch (err) {
       if (err.correoOcupado) return res.status(409).json({ mensaje: 'Ese correo ya pertenece a otra cuenta.' });
       throw err;
+    }
+
+    // Igual que en pacientes.controller.js#cambiarCorreoAcceso: si el
+    // correo de contacto coincidia con el de acceso antes del cambio,
+    // se mantienen sincronizados.
+    if (doctor.email && doctor.email.toLowerCase() === doctor.usuario_email.toLowerCase()) {
+      await pool.query('update doctores set email = $1 where id = $2', [nuevoEmail, req.params.id]);
     }
 
     const doctorFinal = await obtenerDoctorConEspecialidades(pool, req.params.id, req.empresaId);

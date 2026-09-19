@@ -675,8 +675,9 @@ async function cambiarCorreoAcceso(req, res, next) {
     if (!EMAIL_REGEX.test(nuevoEmail)) return res.status(400).json({ mensaje: 'Correo invalido' });
 
     const pacienteRes = await pool.query(
-      `select p.usuario_id from pacientes p
+      `select p.email, p.usuario_id, u.email as usuario_email from pacientes p
        join pacientes_empresas pe on pe.paciente_id = p.id
+       join usuarios u on u.id = p.usuario_id
        where p.id = $1 and pe.empresa_id = $2`,
       [req.params.id, req.empresaId]
     );
@@ -689,6 +690,17 @@ async function cambiarCorreoAcceso(req, res, next) {
     } catch (err) {
       if (err.correoOcupado) return res.status(409).json({ mensaje: 'Ese correo ya pertenece a otra cuenta.' });
       throw err;
+    }
+
+    // Si el correo de contacto (pacientes.email) coincidia con el de
+    // acceso ANTES del cambio, se mantienen sincronizados: se actualiza
+    // tambien el de contacto al nuevo valor. Si ya venian distintos (ej.
+    // el caso de una cuenta vinculada con un correo mal escrito, ver
+    // resolverUsuarioPortal()), no se toca -- ya eran intencionalmente
+    // (o accidentalmente) dos valores distintos y no hay forma de saber
+    // cual de los dos es el correcto.
+    if (paciente.email && paciente.email.toLowerCase() === paciente.usuario_email.toLowerCase()) {
+      await pool.query('update pacientes set email = $1 where id = $2', [nuevoEmail, req.params.id]);
     }
 
     const { rows: final } = await pool.query(

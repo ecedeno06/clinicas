@@ -554,6 +554,14 @@ async function confirmarCambioEmail(req, res, next) {
     }
 
     await pool.query('update usuarios set email = $1 where id = $2', [registro.nuevo_email, registro.usuario_id]);
+    // Via autoservicio el usuario esta cambiando SU PROPIO correo -- a
+    // diferencia del boton de admin (pacientes/doctores.controller.js
+    // #cambiarCorreoAcceso), aca se sincroniza el correo de contacto
+    // siempre, sin condicion, porque es el propio dueno de los datos
+    // quien decide su correo. No-op si la cuenta no esta vinculada a un
+    // paciente o doctor.
+    await pool.query('update pacientes set email = $1 where usuario_id = $2', [registro.nuevo_email, registro.usuario_id]);
+    await pool.query('update doctores set email = $1 where usuario_id = $2', [registro.nuevo_email, registro.usuario_id]);
     await pool.query('update cambio_email_tokens set usado = true where id = $1', [registro.id]);
     // Mismo criterio que restablecerPassword: cambiar el identificador de
     // login es sensible, se cierran las sesiones activas por seguridad.
