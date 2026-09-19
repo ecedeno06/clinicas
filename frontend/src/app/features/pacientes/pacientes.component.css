@@ -12,6 +12,39 @@
   text-align: center;
 }
 
+/* Popup de "Resetear contrasena" -- fondo ambar en degrade, OPACO (nada
+   del contenido detras debe transparentarse) con el mismo glow luminoso
+   ya usado para "otra clinica" en el tablero de horarios del doctor
+   (doctores.component.css), para que se distinga de un dropdown-menu
+   comun. */
+.dropdown-menu-ambar {
+  background: linear-gradient(135deg, #fff3d6, #e57777e6);
+  box-shadow:
+    0 0 0 1px rgba(255, 176, 0, 0.5),
+    0 0 18px 4px rgba(255, 176, 0, 0.35),
+    var(--shadow-md);
+}
+.dropdown-menu-ambar label,
+.dropdown-menu-ambar .text-muted {
+  color: #7a4a00;
+}
+/* [data-theme="dark"] .dropdown-menu-ambar NO funciona aca: la
+   encapsulacion de Angular le agrega el atributo de scope del componente
+   tambien a "[data-theme="dark"]", que vive en <html> y jamas tendra ese
+   atributo -- la regla nunca llega a aplicar. :host-context() es la
+   forma correcta de referenciar un ancestro fuera del componente. */
+:host-context([data-theme="dark"]) .dropdown-menu-ambar {
+  background: linear-gradient(135deg, #3d2c08, #241a03);
+  box-shadow:
+    0 0 0 1px rgba(255, 176, 0, 0.6),
+    0 0 22px 6px rgba(255, 176, 0, 0.4),
+    var(--shadow-md);
+}
+:host-context([data-theme="dark"]) .dropdown-menu-ambar label,
+:host-context([data-theme="dark"]) .dropdown-menu-ambar .text-muted {
+  color: #ffd98a;
+}
+
 /* Lista de antecedentes patologicos del paciente (tab Antecedentes,
    drawer de historial clinico): no mas de ~5 filas visibles, el resto
    con scroll -- el detalle de la fila seleccionada se muestra en un

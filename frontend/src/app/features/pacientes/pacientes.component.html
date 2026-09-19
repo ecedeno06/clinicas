@@ -116,18 +116,18 @@
                   </button>
                   @if (pacienteResetPasswordAbierto() === p.id) {
                     <div class="dropdown-backdrop" (click)="cerrarResetPassword()"></div>
-                    <div class="dropdown-menu" style="position:fixed; padding:12px; width:260px;" [style.top.px]="resetPasswordMenuPos()?.top" [style.left.px]="resetPasswordMenuPos()?.left">
-                      <label class="text-sm text-muted" style="display:block; margin-bottom:8px;">Resetear contrasena de {{ p.nombre }}</label>
+                    <div class="dropdown-menu dropdown-menu-ambar" style="position:fixed; padding:12px; width:260px;" [style.top.px]="resetPasswordMenuPos()?.top" [style.left.px]="resetPasswordMenuPos()?.left">
+                      <label class="text-muted" style="display:block; margin-bottom:8px; text-align:center; font-weight:700; font-size:14px;">Resetear contrasena de {{ p.nombre }}</label>
                       <div class="flex gap-8" style="margin-bottom:10px;">
                         <button type="button" class="btn btn-sm" [class.btn-accent]="!modoPasswordManual()" [class.btn-outline]="modoPasswordManual()" (click)="modoPasswordManual.set(false)">Autogenerar</button>
                         <button type="button" class="btn btn-sm" [class.btn-accent]="modoPasswordManual()" [class.btn-outline]="!modoPasswordManual()" (click)="modoPasswordManual.set(true)">Manual</button>
                       </div>
                       @if (modoPasswordManual()) {
                         <input class="input" type="text" placeholder="Nueva contrasena" autocomplete="off" [ngModel]="passwordManualValor()" (ngModelChange)="passwordManualValor.set($event)" style="margin-bottom:8px;" />
-                        <div class="text-muted text-sm" style="margin-bottom:8px;">Se enviara por correo a {{ p.email }}.</div>
+                        <div class="text-muted text-sm" style="margin-bottom:8px; text-align:justify;">Se enviara por correo a {{ p.email }}.</div>
                         <button type="button" class="btn btn-accent btn-sm w-full" [disabled]="!passwordManualValor()" (click)="confirmarResetPassword(p)">Enviar</button>
                       } @else {
-                        <div class="text-muted text-sm" style="margin-bottom:8px;">Se genera una contrasena aleatoria y se envia por correo a {{ p.email }}.</div>
+                        <div class="text-muted text-sm" style="margin-bottom:8px; text-align:justify;">Se genera una contrasena aleatoria y se envia por correo a {{ p.email }}.</div>
                         <button type="button" class="btn btn-accent btn-sm w-full" (click)="confirmarResetPassword(p)">Resetear y enviar</button>
                       }
                     </div>

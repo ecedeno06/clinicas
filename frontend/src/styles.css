@@ -577,7 +577,18 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; colo
   display: flex;
   flex-direction: column;
   gap: 2px;
+  /* Un correo largo (sin espacios donde partir) no se envuelve por
+     defecto dentro de un contenedor flex -- sin esto empuja el ancho
+     del popup y se sale por el borde (ej. texto de resetear password
+     con el correo del paciente/doctor). white-space:normal es necesario
+     porque este popup suele vivir dentro de un <td class="table-actions">
+     (white-space:nowrap, ver esa regla mas abajo) -- al ser heredable,
+     sin este corte explicito el nowrap del ancestro gana sobre
+     overflow-wrap y el texto nunca se parte. */
+  overflow-wrap: break-word;
+  white-space: normal;
 }
+.dropdown-menu > * { min-width: 0; }
 
 .dropdown-item {
   display: flex;
