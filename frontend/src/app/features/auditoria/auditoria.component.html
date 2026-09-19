@@ -29,7 +29,7 @@
 @if (buscado()) {
   <div class="page-header mt-16">
     <div>
-      <h2 style="margin:0;">Resultados ({{ sesiones().length }})</h2>
+      <h2 style="margin:0;">Resultados ({{ sesionesFiltradas().length }})</h2>
       <p class="text-muted text-sm" style="margin:0;">{{ usuarioNombreFiltro() }} &middot; {{ desde() | date:'dd/MM/yyyy':'UTC' }} – {{ hasta() | date:'dd/MM/yyyy':'UTC' }}</p>
     </div>
     <div class="flex gap-8">
@@ -38,7 +38,7 @@
           Terminar sesion{{ seleccionadas().size > 1 ? 'es' : '' }} ({{ seleccionadas().size }})
         </button>
       }
-      @if (sesiones().length > 0) {
+      @if (sesionesFiltradas().length > 0) {
         <button type="button" class="btn btn-outline btn-sm" (click)="verPdf()">Ver PDF</button>
       }
     </div>
@@ -53,14 +53,27 @@
               <input type="checkbox" [checked]="todasSeleccionadas()" (change)="toggleTodas()" title="Seleccionar todas las sesiones en curso" />
             }
           </th>
-          <th>Fecha</th><th>Usuario</th><th>Clinica</th><th>Login</th><th>Logout</th><th>Tiempo en sesion</th><th>Motivo de salida</th>
+          <th>Fecha</th><th>Usuario</th><th>Clinica</th><th>Login</th><th>Logout</th><th>Tiempo en sesion</th><th>Motivo de salida</th><th></th>
+        </tr>
+        <tr class="filter-row">
+          <th></th>
+          <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroFecha()" (ngModelChange)="filtroFecha.set($event)" /></th>
+          <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroUsuario()" (ngModelChange)="filtroUsuario.set($event)" /></th>
+          <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroClinica()" (ngModelChange)="filtroClinica.set($event)" /></th>
+          <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroLogin()" (ngModelChange)="filtroLogin.set($event)" /></th>
+          <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroLogout()" (ngModelChange)="filtroLogout.set($event)" /></th>
+          <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroTiempo()" (ngModelChange)="filtroTiempo.set($event)" /></th>
+          <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroMotivo()" (ngModelChange)="filtroMotivo.set($event)" /></th>
+          <th>
+            @if (hayFiltrosColumna()) { <button type="button" class="btn btn-outline btn-sm" (click)="limpiarFiltrosColumna()">Limpiar</button> }
+          </th>
         </tr>
       </thead>
       <tbody>
         @if (cargando()) {
-          <tr><td colspan="8"><div class="empty-state">Buscando...</div></td></tr>
+          <tr><td colspan="9"><div class="empty-state">Buscando...</div></td></tr>
         } @else {
-          @for (s of sesiones(); track s.id) {
+          @for (s of sesionesFiltradas(); track s.id) {
             <tr>
               <td>
                 @if (esSeleccionable(s)) {
@@ -83,9 +96,16 @@
                   {{ motivoEtiqueta(s.motivo_salida) }}
                 </span>
               </td>
+              <td class="table-actions">
+                @if (esSeleccionable(s)) {
+                  <button type="button" class="btn-icon btn-icon-danger" [disabled]="cerrandoSesiones()" title="Terminar esta sesion" aria-label="Terminar sesion" (click)="cerrarSesionUnica(s)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
+                  </button>
+                }
+              </td>
             </tr>
           } @empty {
-            <tr><td colspan="8"><div class="empty-state">No hay sesiones para estos filtros.</div></td></tr>
+            <tr><td colspan="9"><div class="empty-state">No hay sesiones para estos filtros.</div></td></tr>
           }
         }
       </tbody>

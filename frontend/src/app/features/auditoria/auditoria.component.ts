@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, computed, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuditoriaService } from '../../core/services/auditoria.service';
@@ -67,6 +67,53 @@ export class AuditoriaComponent implements OnInit {
   seleccionadas = signal<Set<string>>(new Set());
   cerrandoSesiones = signal(false);
 
+  // Filtro por columna sobre lo ya cargado (mismo patron que
+  // pacientes.component.ts/citas.component.ts) -- distinto del buscador
+  // de arriba (usuarioId/desde/hasta), que va contra el backend.
+  filtroFecha = signal('');
+  filtroUsuario = signal('');
+  filtroClinica = signal('');
+  filtroLogin = signal('');
+  filtroLogout = signal('');
+  filtroTiempo = signal('');
+  filtroMotivo = signal('');
+
+  hayFiltrosColumna = computed(() => !!(
+    this.filtroFecha() || this.filtroUsuario() || this.filtroClinica() ||
+    this.filtroLogin() || this.filtroLogout() || this.filtroTiempo() || this.filtroMotivo()
+  ));
+
+  limpiarFiltrosColumna(): void {
+    this.filtroFecha.set('');
+    this.filtroUsuario.set('');
+    this.filtroClinica.set('');
+    this.filtroLogin.set('');
+    this.filtroLogout.set('');
+    this.filtroTiempo.set('');
+    this.filtroMotivo.set('');
+  }
+
+  sesionesFiltradas = computed(() => {
+    const fecha = this.filtroFecha().trim().toLowerCase();
+    const usuario = this.filtroUsuario().trim().toLowerCase();
+    const clinica = this.filtroClinica().trim().toLowerCase();
+    const login = this.filtroLogin().trim().toLowerCase();
+    const logout = this.filtroLogout().trim().toLowerCase();
+    const tiempo = this.filtroTiempo().trim().toLowerCase();
+    const motivo = this.filtroMotivo().trim().toLowerCase();
+
+    return this.sesiones().filter((s) => {
+      if (fecha && !soloFechaLocal(s.login_en).includes(fecha)) return false;
+      if (usuario && !`${s.usuario_nombre} ${s.usuario_email}`.toLowerCase().includes(usuario)) return false;
+      if (clinica && !`${s.empresa_nombre || ''} ${s.sucursal_nombre || ''}`.toLowerCase().includes(clinica)) return false;
+      if (login && !fechaHoraLocal(s.login_en).toLowerCase().includes(login)) return false;
+      if (logout && !fechaHoraLocal(s.logout_en).toLowerCase().includes(logout)) return false;
+      if (tiempo && !this.formatoDuracion(s.duracion_segundos).toLowerCase().includes(tiempo)) return false;
+      if (motivo && !this.motivoEtiqueta(s.motivo_salida).toLowerCase().includes(motivo)) return false;
+      return true;
+    });
+  });
+
   constructor(
     private srv: AuditoriaService,
     private empresasSrv: EmpresasService
@@ -99,6 +146,7 @@ export class AuditoriaComponent implements OnInit {
   buscar(): void {
     this.cargando.set(true);
     this.seleccionadas.set(new Set());
+    this.limpiarFiltrosColumna();
     const filtros: Record<string, string> = { desde: this.desde(), hasta: this.hasta() };
     if (this.usuarioId()) filtros['usuario_id'] = this.usuarioId();
     this.srv.listarSesiones(filtros).subscribe({
@@ -111,8 +159,10 @@ export class AuditoriaComponent implements OnInit {
     return s.motivo_salida === 'en_curso';
   }
 
+  // Sobre lo FILTRADO -- "seleccionar todas" no debe marcar filas que el
+  // filtro de columna dejo ocultas.
   sesionesSeleccionables(): SesionAuditoria[] {
-    return this.sesiones().filter((s) => this.esSeleccionable(s));
+    return this.sesionesFiltradas().filter((s) => this.esSeleccionable(s));
   }
 
   todasSeleccionadas(): boolean {
@@ -138,7 +188,17 @@ export class AuditoriaComponent implements OnInit {
     const ids = [...this.seleccionadas()];
     if (!ids.length) return;
     if (!confirm(`Se cerrara${ids.length > 1 ? 'n' : ''} ${ids.length} sesion${ids.length > 1 ? 'es' : ''} de inmediato. La persona debera iniciar sesion de nuevo. Continuar?`)) return;
+    this.ejecutarCierre(ids);
+  }
 
+  // Boton de accion individual por fila -- atajo para no tener que marcar
+  // el checkbox de una sola sesion antes de terminarla.
+  cerrarSesionUnica(s: SesionAuditoria): void {
+    if (!confirm(`Se cerrara de inmediato la sesion de "${s.usuario_nombre}". Debera iniciar sesion de nuevo. Continuar?`)) return;
+    this.ejecutarCierre([s.id]);
+  }
+
+  private ejecutarCierre(ids: string[]): void {
     this.cerrandoSesiones.set(true);
     this.srv.cerrarSesiones(ids).subscribe({
       next: () => { this.cerrandoSesiones.set(false); this.buscar(); },
@@ -150,7 +210,7 @@ export class AuditoriaComponent implements OnInit {
   }
 
   verPdf(): void {
-    const filas = this.sesiones().map((s) => [
+    const filas = this.sesionesFiltradas().map((s) => [
       soloFechaLocal(s.login_en),
       s.usuario_nombre,
       s.empresa_nombre || '-',
