@@ -28,6 +28,12 @@
           </span>
           <span class="nav-label">Mis Citas</span>
         </a>
+        <a routerLink="/portal/clinicas" routerLinkActive="active" title="Mis Clinicas">
+          <span class="nav-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 9h1M14 9h1M9 13h1M14 13h1M9 17h1M14 17h1"/></svg>
+          </span>
+          <span class="nav-label">Mis Clinicas</span>
+        </a>
       } @else if (auth.usuario()?.rol === 'doctor') {
         <a routerLink="/portal-doctor/perfil" routerLinkActive="active" title="Mi Perfil">
           <span class="nav-icon">

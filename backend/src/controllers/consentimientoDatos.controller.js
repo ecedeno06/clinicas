@@ -1,5 +1,5 @@
 const { pool } = require('../config/db');
-const { enviarCorreo, escaparHtml } = require('../utils/correo');
+const { notificarRespuesta } = require('../utils/notificacionConsentimiento');
 
 // GET /api/consentimiento-datos/:token (publico, sin sesion -- se llega
 // por el link del correo). Devuelve el contexto minimo para que la
@@ -73,60 +73,6 @@ async function responder(req, res, next) {
 
     res.json({ respuesta, paciente_nombre: registro.paciente_nombre });
   } catch (err) { next(err); }
-}
-
-// Avisa a super-admin y a la clinica que pidio el consentimiento, con
-// copia (CC) al paciente, en los dos desenlaces (aceptado/rechazado).
-// No es tecnicamente posible enviarlo "desde" el correo del paciente --
-// Gmail y el resto bloquean/marcan como spam cualquier remitente que no
-// paso por su propia infraestructura (SPF/DKIM/DMARC), y Resend exige
-// que el remitente sea del dominio verificado. El CC logra el mismo
-// efecto practico: el paciente recibe la confirmacion en su propia
-// bandeja, en el mismo correo. Si este envio falla, solo se loguea --
-// nunca revierte la respuesta ya guardada.
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-async function notificarRespuesta({ registro, respuesta }) {
-  try {
-    const superAdmins = await pool.query(
-      `select email from usuarios where es_super_admin = true and email is not null`
-    );
-    // Resend rechaza el envio COMPLETO si un solo correo del array "to" no
-    // tiene formato valido -- una sola cuenta con el correo mal escrito no
-    // deberia tumbar la notificacion para todos los demas destinatarios.
-    const destinatarios = [...superAdmins.rows.map((r) => r.email), registro.empresa_email]
-      .filter((email) => email && EMAIL_REGEX.test(email));
-    if (!destinatarios.length) return;
-
-    const aceptado = respuesta === 'aceptado';
-    const asunto = `Consentimiento ${aceptado ? 'aceptado' : 'rechazado'} - ${registro.paciente_nombre} (${registro.empresa_nombre})`;
-    const nombreP = escaparHtml(registro.paciente_nombre);
-    const identificacionP = escaparHtml(registro.identificacion || 'sin identificacion registrada');
-    const nombreE = escaparHtml(registro.empresa_nombre);
-    const fecha = new Date().toLocaleString('es-PA');
-
-    const texto = `El paciente ${registro.paciente_nombre} (identificacion ${registro.identificacion || 'N/D'}) ${aceptado ? 'ACEPTO' : 'RECHAZO'} el consentimiento para compartir su informacion medica entre las clinicas del ecosistema, solicitado por ${registro.empresa_nombre}.\n\nFecha: ${fecha}\nCorreo del paciente: ${registro.paciente_email || 'N/D'}`;
-    const html = `
-      <div style="font-family: Arial, sans-serif; max-width: 520px; margin: 0 auto; color:#1e293b;">
-        <p>El paciente <strong>${nombreP}</strong> (identificacion <strong>${identificacionP}</strong>)
-        ${aceptado
-          ? '<strong style="color:#0d9488;">ACEPTO</strong>'
-          : '<strong style="color:#dc2626;">RECHAZO</strong>'}
-        el consentimiento para compartir su informacion medica entre las clinicas del ecosistema, solicitado por <strong>${nombreE}</strong>.</p>
-        <p style="color:#64748b; font-size:13px;">Fecha: ${escaparHtml(fecha)}<br>Correo del paciente: ${escaparHtml(registro.paciente_email || 'N/D')}</p>
-      </div>
-    `;
-
-    await enviarCorreo({
-      destinatario: destinatarios,
-      cc: (registro.paciente_email && EMAIL_REGEX.test(registro.paciente_email)) ? registro.paciente_email : undefined,
-      asunto,
-      texto,
-      html,
-    });
-  } catch (err) {
-    console.error('No se pudo enviar la notificacion de consentimiento-datos', err);
-  }
 }
 
 module.exports = { obtener, responder };

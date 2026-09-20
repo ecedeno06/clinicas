@@ -25,6 +25,7 @@ import { CampanasComponent } from './features/campanas/campanas.component';
 import { ReporteCampanasComponent } from './features/reportes/reporte-campanas/reporte-campanas.component';
 import { ReporteCitasComponent } from './features/reportes/reporte-citas/reporte-citas.component';
 import { PerfilPacienteComponent } from './features/portal-paciente/perfil-paciente.component';
+import { MisClinicasComponent } from './features/portal-paciente/mis-clinicas.component';
 import { CitasPacienteComponent } from './features/portal-paciente/citas-paciente.component';
 import { PerfilDoctorComponent } from './features/portal-doctor/perfil-doctor.component';
 
@@ -57,6 +58,7 @@ export const routes: Routes = [
       { path: 'catalogo-examenes-laboratorio', component: CatalogoExamenesLaboratorioComponent, canActivate: [staffGuard] },
       { path: 'portal/perfil', component: PerfilPacienteComponent },
       { path: 'portal/citas', component: CitasPacienteComponent },
+      { path: 'portal/clinicas', component: MisClinicasComponent },
       { path: 'portal-doctor/perfil', component: PerfilDoctorComponent },
     ],
   },

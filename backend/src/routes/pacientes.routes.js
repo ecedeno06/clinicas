@@ -33,5 +33,6 @@ router.delete('/:id/invitar', requireRol('admin', 'doctor'), ctrl.desinvitar);
 router.put('/:id/correo-acceso', requireRol('admin'), ctrl.cambiarCorreoAcceso);
 router.post('/:id/resetear-password', requireRol('admin', 'doctor'), ctrl.resetearPassword);
 router.post('/:id/consentimiento-datos', requireRol('admin'), ctrl.solicitarConsentimientoDatos);
+router.delete('/:id/consentimiento-datos', requireRol('admin'), ctrl.rechazarConsentimientoDatos);
 
 module.exports = router;

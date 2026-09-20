@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { HistoriaClinica, OrdenLaboratorio, Paciente, Receta, SignosVitales } from '../models/models';
+import { ClinicaConsentimiento, HistoriaClinica, OrdenLaboratorio, Paciente, Receta, SignosVitales } from '../models/models';
 
 // Portal del rol 'paciente': solo ve (y puede editar su propia ficha) su
 // propia informacion, resuelta server-side a partir del usuario
@@ -26,5 +26,15 @@ export class PortalPacienteService {
   }
   laboratorioDeCita(citaId: string): Observable<OrdenLaboratorio[]> {
     return this.http.get<OrdenLaboratorio[]>(`${this.base}/citas/${citaId}/laboratorio`);
+  }
+
+  misClinicas(): Observable<ClinicaConsentimiento[]> {
+    return this.http.get<ClinicaConsentimiento[]>(`${this.base}/clinicas`);
+  }
+  revocarConsentimiento(empresaId: string): Observable<{ mensaje: string }> {
+    return this.http.post<{ mensaje: string }>(`${this.base}/clinicas/${empresaId}/revocar-consentimiento`, {});
+  }
+  solicitarConsentimiento(empresaId: string): Observable<{ mensaje: string }> {
+    return this.http.post<{ mensaje: string }>(`${this.base}/clinicas/${empresaId}/solicitar-consentimiento`, {});
   }
 }

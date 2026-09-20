@@ -760,22 +760,48 @@ export class PacientesComponent implements OnInit {
 
   solicitandoConsentimientoDatos = signal<string | null>(null);
 
+  // Boton toggle en la fila: si el paciente NO comparte con esta
+  // clinica, pide el consentimiento por correo (solicitarConsentimientoDatos);
+  // si YA comparte (ganchito verde), lo desactiva de inmediato
+  // (rechazarConsentimientoDatos) -- solo el paciente puede ACTIVARLO
+  // (por correo, con OTP), pero el staff si puede DESACTIVARLO
+  // directamente, mismo criterio que el propio paciente revocandolo
+  // desde su portal (portalPaciente.controller.js#revocarConsentimiento).
+  toggleConsentimientoDatos(p: Paciente): void {
+    if (p.comparte_historial_clinico) {
+      this.rechazarConsentimientoDatos(p);
+    } else {
+      this.solicitarConsentimientoDatos(p);
+    }
+  }
+
   // Le pide al paciente, por correo, autorizacion para que ESTA clinica
   // comparta su historial clinico (citas/historias/recetas/laboratorio)
   // con las demas clinicas del ecosistema a las que tambien este
   // vinculado -- es por clinica, no afecta lo que otras clinicas hayan
   // decidido. Ver pacientes.controller.js#solicitarConsentimientoDatos.
-  solicitarConsentimientoDatos(p: Paciente): void {
+  private solicitarConsentimientoDatos(p: Paciente): void {
     if (!p.email) { alert('Este paciente no tiene correo registrado.'); return; }
-    const mensaje = p.comparte_historial_clinico
-      ? `"${p.nombre}" ya autorizo compartir su historial de esta clinica. Se le enviara un nuevo correo de todas formas -- continuar?`
-      : `Se enviara un correo a ${p.email} pidiendo autorizacion para compartir su historial clinico de esta clinica con las demas clinicas del ecosistema. Continuar?`;
-    if (!confirm(mensaje)) return;
+    if (!confirm(`Se enviara un correo a ${p.email} pidiendo autorizacion para compartir su historial clinico de esta clinica con las demas clinicas del ecosistema. Continuar?`)) return;
 
     this.solicitandoConsentimientoDatos.set(p.id);
     this.srv.solicitarConsentimientoDatos(p.id).subscribe({
       next: () => { this.solicitandoConsentimientoDatos.set(null); alert('Correo de consentimiento enviado.'); this.cargar(); },
       error: (err) => { this.solicitandoConsentimientoDatos.set(null); alert(err?.error?.mensaje || 'No se pudo enviar el correo de consentimiento'); },
+    });
+  }
+
+  // Desactiva el compartir de inmediato (sin correo/OTP -- ver el
+  // comentario de rechazarConsentimientoDatos() en el backend). Dispara
+  // la misma notificacion de rechazo (a super-admin + esta clinica, con
+  // copia al paciente).
+  private rechazarConsentimientoDatos(p: Paciente): void {
+    if (!confirm(`Vas a dejar de compartir la informacion de "${p.nombre}" con las demas clinicas de la red. Continuar?`)) return;
+
+    this.solicitandoConsentimientoDatos.set(p.id);
+    this.srv.rechazarConsentimientoDatos(p.id).subscribe({
+      next: () => { this.solicitandoConsentimientoDatos.set(null); alert('Se dejo de compartir la informacion de este paciente con esta clinica.'); this.cargar(); },
+      error: (err) => { this.solicitandoConsentimientoDatos.set(null); alert(err?.error?.mensaje || 'No se pudo desactivar el compartir'); },
     });
   }
 

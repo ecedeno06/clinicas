@@ -1,0 +1,56 @@
+<div class="page-header">
+  <div>
+    <h1>Mis Clinicas</h1>
+    <div class="desc">Clinicas donde tienes expediente y con cuales compartes tu informacion en la red</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr><th>Clinica</th><th>Estado</th><th></th></tr>
+      </thead>
+      <tbody>
+        @if (cargando()) {
+          <tr><td colspan="3"><div class="empty-state">Cargando...</div></td></tr>
+        } @else if (error()) {
+          <tr><td colspan="3"><div class="empty-state">{{ error() }}</div></td></tr>
+        } @else {
+          @for (c of clinicas(); track c.empresa_id) {
+            <tr>
+              <td>{{ c.empresa_nombre }}</td>
+              <td>
+                <span class="badge" [class.badge-green]="c.comparte_historial_clinico" [class.badge-slate]="!c.comparte_historial_clinico">
+                  {{ c.comparte_historial_clinico ? 'Compartiendo' : 'No comparte' }}
+                </span>
+              </td>
+              <td class="table-actions">
+                @if (c.comparte_historial_clinico) {
+                  <button type="button" class="btn-icon"
+                    title="Ya autorizas compartir tu historial de esta clinica -- clic para dejar de compartir"
+                    aria-label="Dejar de compartir"
+                    [disabled]="revocando() === c.empresa_id"
+                    (click)="revocar(c)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                    <span class="icon-check-badge badge-check-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+                  </button>
+                } @else {
+                  <button type="button" class="btn-icon"
+                    title="Solicitar por correo el consentimiento para compartir tu historial de esta clinica"
+                    aria-label="Solicitar consentimiento"
+                    [disabled]="solicitando() === c.empresa_id"
+                    (click)="solicitar(c)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                  </button>
+                }
+              </td>
+            </tr>
+          } @empty {
+            <tr><td colspan="3"><div class="empty-state">No tienes expediente en ninguna clinica todavia.</div></td></tr>
+          }
+        }
+      </tbody>
+    </table>
+  </div>
+</div>

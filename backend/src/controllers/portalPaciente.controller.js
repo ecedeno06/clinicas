@@ -1,4 +1,6 @@
 const { pool } = require('../config/db');
+const { notificarRespuesta } = require('../utils/notificacionConsentimiento');
+const { enviarSolicitudConsentimiento } = require('../utils/solicitudConsentimiento');
 
 // Portal del rol 'paciente': a diferencia de pacientes.controller.js (uso
 // de staff), aqui el paciente_id NUNCA viene de un parametro/query del
@@ -288,4 +290,97 @@ async function laboratorioDeCita(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { perfil, actualizar, citas, signosVitalesDeCita, recetasDeCita, laboratorioDeCita };
+// GET /api/portal-paciente/clinicas -- TODAS las clinicas donde el
+// paciente tiene expediente (pacientes_empresas), no solo las que lo
+// autorizaron al portal (EMPRESAS_AUTORIZADAS es un conjunto distinto y
+// mas chico) -- puede tener un expediente en una clinica sin haber sido
+// invitado a su portal ahi, y de todas formas debe poder ver/gestionar
+// si esta compartiendo su informacion.
+async function clinicas(req, res, next) {
+  try {
+    const { rows } = await pool.query(
+      `select e.id as empresa_id, e.nombre as empresa_nombre, pe.activo, pe.comparte_historial_clinico
+       from pacientes_empresas pe
+       join pacientes p on p.id = pe.paciente_id
+       join empresas e on e.id = pe.empresa_id
+       where p.usuario_id = $1
+       order by e.nombre asc`,
+      [req.usuario.id]
+    );
+    res.json(rows);
+  } catch (err) { next(err); }
+}
+
+// POST /api/portal-paciente/clinicas/:empresaId/revocar-consentimiento
+// -- a diferencia del flujo publico (/consentimiento-datos, sin sesion,
+// por eso pide un OTP como segundo factor), aca el paciente ya esta
+// autenticado: revoca de inmediato, sin token ni OTP nuevo. Dispara la
+// MISMA notificacion que un rechazo por correo (a la clinica +
+// super-admin, con copia al paciente) -- ver notificacionConsentimiento.js.
+async function revocarConsentimiento(req, res, next) {
+  try {
+    const { rows } = await pool.query(
+      `select p.id as paciente_id, p.nombre as paciente_nombre, p.identificacion, p.email as paciente_email,
+              e.id as empresa_id, e.nombre as empresa_nombre, e.email as empresa_email
+       from pacientes p
+       join pacientes_empresas pe on pe.paciente_id = p.id and pe.empresa_id = $2
+       join empresas e on e.id = pe.empresa_id
+       where p.usuario_id = $1`,
+      [req.usuario.id, req.params.empresaId]
+    );
+    const registro = rows[0];
+    if (!registro) return res.status(404).json({ mensaje: 'No tienes expediente en esa clinica' });
+
+    // Idempotente: si ya estaba en false, se actualiza igual (sin error)
+    // y se envia la notificacion de todas formas -- es una accion
+    // explicita del paciente, no hace falta detectar si "no cambio nada".
+    await pool.query(
+      `update pacientes_empresas set comparte_historial_clinico = false where paciente_id = $1 and empresa_id = $2`,
+      [registro.paciente_id, registro.empresa_id]
+    );
+
+    await notificarRespuesta({ registro, respuesta: 'rechazado' });
+
+    res.json({ mensaje: 'Dejaste de compartir tu informacion con esta clinica.' });
+  } catch (err) { next(err); }
+}
+
+// POST /api/portal-paciente/clinicas/:empresaId/solicitar-consentimiento
+// -- activar el compartir es la accion mas sensible (autoriza a otras
+// clinicas a ver su historial), asi que exige el MISMO flujo de
+// correo+token+OTP que cuando lo pide el staff, sin importar quien lo
+// inicia -- ver solicitudConsentimiento.js y
+// pacientes.controller.js#solicitarConsentimientoDatos. El correo llega
+// al propio correo del paciente (no cambia comparte_historial_clinico
+// hasta que confirme el click + OTP en la pagina publica).
+async function solicitarConsentimiento(req, res, next) {
+  try {
+    const { rows } = await pool.query(
+      `select p.id as paciente_id, p.nombre, p.identificacion, p.email,
+              e.id as empresa_id, e.nombre as empresa_nombre, e.email as empresa_email, e.telefono as empresa_telefono
+       from pacientes p
+       join pacientes_empresas pe on pe.paciente_id = p.id and pe.empresa_id = $2
+       join empresas e on e.id = pe.empresa_id
+       where p.usuario_id = $1`,
+      [req.usuario.id, req.params.empresaId]
+    );
+    const registro = rows[0];
+    if (!registro) return res.status(404).json({ mensaje: 'No tienes expediente en esa clinica' });
+    if (!registro.email) return res.status(400).json({ mensaje: 'No tienes un correo registrado para recibir el consentimiento' });
+
+    try {
+      await enviarSolicitudConsentimiento({
+        pacienteId: registro.paciente_id,
+        empresaId: registro.empresa_id,
+        paciente: registro,
+        empresa: { nombre: registro.empresa_nombre, email: registro.empresa_email, telefono: registro.empresa_telefono },
+      });
+    } catch (err) {
+      return res.status(502).json({ mensaje: 'No se pudo enviar el correo de consentimiento. Intenta de nuevo.' });
+    }
+
+    res.json({ mensaje: 'Te enviamos un correo para confirmar el compartir de tu informacion.' });
+  } catch (err) { next(err); }
+}
+
+module.exports = { perfil, actualizar, citas, signosVitalesDeCita, recetasDeCita, laboratorioDeCita, clinicas, revocarConsentimiento, solicitarConsentimiento };

@@ -8,15 +8,30 @@ const { enviarCorreo, escaparHtml } = require('../utils/correo');
 // no del portal de pacientes (ver portalPaciente.controller.js); sin este
 // filtro, alguien que ademas es paciente de su propia clinica saldria
 // duplicado.
+//
+// Si quien consulta es super-admin, se agregan ademas las cuentas de
+// super-admin "huerfanas": sin ningun rol de staff en NINGUNA clinica
+// (ej. el super-admin inicial que crea bootstrapSuperAdmin.js,
+// admin@clinica) -- de otra forma son invisibles sin importar cual sea
+// la clinica activa. Aparecen con rol = null.
 async function listar(req, res, next) {
   try {
+    const huerfanos = req.usuario.es_super_admin
+      ? `union all
+         select u.id, u.nombre, u.email, u.telefono, u.acepta_whatsapp, u.activo, u.avatar, u.es_super_admin,
+                u.acepta_correo_super_admin, null::text as rol, u.created_at
+         from usuarios u
+         where u.es_super_admin = true
+           and not exists (select 1 from usuarios_empresas_rol x where x.usuario_id = u.id and x.rol <> 'paciente')`
+      : '';
     const { rows } = await pool.query(
       `select u.id, u.nombre, u.email, u.telefono, u.acepta_whatsapp, u.activo, u.avatar, u.es_super_admin,
-              uer.rol, u.created_at
+              u.acepta_correo_super_admin, uer.rol, u.created_at
        from usuarios u
        join usuarios_empresas_rol uer on uer.usuario_id = u.id
        where uer.empresa_id = $1 and uer.rol <> 'paciente'
-       order by u.nombre`,
+       ${huerfanos}
+       order by nombre`,
       [req.empresaId]
     );
     res.json(rows);
@@ -27,7 +42,7 @@ async function obtener(req, res, next) {
   try {
     const { rows } = await pool.query(
       `select u.id, u.nombre, u.email, u.telefono, u.acepta_whatsapp, u.activo, u.avatar, u.es_super_admin,
-              uer.rol, u.created_at
+              u.acepta_correo_super_admin, uer.rol, u.created_at
        from usuarios u
        join usuarios_empresas_rol uer on uer.usuario_id = u.id
        where u.id = $1 and uer.empresa_id = $2 and uer.rol <> 'paciente'`,
@@ -50,10 +65,10 @@ async function buscarPorEmail(req, res, next) {
   } catch (err) { next(err); }
 }
 
-// POST /api/usuarios  { nombre, email, password, telefono, acepta_whatsapp, rol, activo, empresa_id?, es_super_admin? }
+// POST /api/usuarios  { nombre, email, password, telefono, acepta_whatsapp, rol, activo, empresa_id?, es_super_admin?, acepta_correo_super_admin? }
 async function crear(req, res, next) {
   try {
-    const { nombre, email, password, telefono, acepta_whatsapp, rol, activo, empresa_id, es_super_admin } = req.body;
+    const { nombre, email, password, telefono, acepta_whatsapp, rol, activo, empresa_id, es_super_admin, acepta_correo_super_admin } = req.body;
     if (!email) return res.status(400).json({ mensaje: 'email es requerido' });
 
     // es_super_admin es un permiso global (independiente de la clinica) --
@@ -61,6 +76,9 @@ async function crear(req, res, next) {
     // puede elegir a que clinica va este usuario (empresa_id abajo). Un
     // admin normal que intente mandar este campo simplemente se ignora.
     const otorgarSuperAdmin = req.usuario.es_super_admin && es_super_admin === true;
+    // Solo tiene sentido para un super-admin, y solo otro super-admin
+    // puede cambiarselo a alguien mas -- mismo criterio que es_super_admin.
+    const nuevaAceptaCorreo = req.usuario.es_super_admin && acepta_correo_super_admin !== undefined ? acepta_correo_super_admin : undefined;
 
     let empresaDestino = req.empresaId;
     if (req.usuario.es_super_admin && empresa_id) {
@@ -77,6 +95,9 @@ async function crear(req, res, next) {
       if (otorgarSuperAdmin) {
         await pool.query('update usuarios set es_super_admin = true where id = $1', [usuarioId]);
       }
+      if (nuevaAceptaCorreo !== undefined) {
+        await pool.query('update usuarios set acepta_correo_super_admin = $1 where id = $2', [nuevaAceptaCorreo, usuarioId]);
+      }
     } else {
       if (!nombre || !password) {
         return res.status(400).json({ mensaje: 'nombre y password son requeridos para un usuario nuevo' });
@@ -85,9 +106,9 @@ async function crear(req, res, next) {
       if (erroresPassword.length) return res.status(400).json({ mensaje: erroresPassword.join('. ') });
       const password_hash = await bcrypt.hash(password, 10);
       const { rows } = await pool.query(
-        `insert into usuarios (nombre, email, password_hash, telefono, acepta_whatsapp, activo, debe_cambiar_password, es_super_admin)
-         values ($1,$2,$3,$4, coalesce($5, false), coalesce($6, true), true, $7) returning id`,
-        [nombre, email, password_hash, telefono, acepta_whatsapp, activo, otorgarSuperAdmin]
+        `insert into usuarios (nombre, email, password_hash, telefono, acepta_whatsapp, activo, debe_cambiar_password, es_super_admin, acepta_correo_super_admin)
+         values ($1,$2,$3,$4, coalesce($5, false), coalesce($6, true), true, $7, coalesce($8, true)) returning id`,
+        [nombre, email, password_hash, telefono, acepta_whatsapp, activo, otorgarSuperAdmin, nuevaAceptaCorreo]
       );
       usuarioId = rows[0].id;
     }
@@ -108,7 +129,7 @@ async function crear(req, res, next) {
     );
 
     const { rows: usuarioRows } = await pool.query(
-      'select id, nombre, email, telefono, acepta_whatsapp, activo, avatar, es_super_admin, created_at from usuarios where id = $1',
+      'select id, nombre, email, telefono, acepta_whatsapp, activo, avatar, es_super_admin, acepta_correo_super_admin, created_at from usuarios where id = $1',
       [usuarioId]
     );
 
@@ -116,19 +137,33 @@ async function crear(req, res, next) {
   } catch (err) { next(err); }
 }
 
-// PUT /api/usuarios/:id  { nombre, password, avatar, telefono, acepta_whatsapp, activo, rol, rol_actual?, es_super_admin? }
+// PUT /api/usuarios/:id  { nombre, password, avatar, telefono, acepta_whatsapp, activo, rol, rol_actual?, es_super_admin?, acepta_correo_super_admin? }
 // rol_actual: cual de sus roles de staff en esta clinica se esta
 // editando -- solo hace falta si el usuario tiene mas de uno (ver
 // uq_usuarios_empresas_rol_staff, ahora permite admin+doctor a la vez).
 async function actualizar(req, res, next) {
   try {
-    const { nombre, password, avatar, telefono, acepta_whatsapp, activo, rol, rol_actual, es_super_admin } = req.body;
+    const { nombre, password, avatar, telefono, acepta_whatsapp, activo, rol, rol_actual, es_super_admin, acepta_correo_super_admin } = req.body;
 
     const pertenece = await pool.query(
       "select 1 from usuarios_empresas_rol where usuario_id = $1 and empresa_id = $2 and rol <> 'paciente'",
       [req.params.id, req.empresaId]
     );
-    if (!pertenece.rows[0]) return res.status(404).json({ mensaje: 'Usuario no encontrado en esta clinica' });
+    // Un super-admin ademas puede editar una cuenta de super-admin
+    // "huerfana" (sin ningun rol de staff en NINGUNA clinica, ver
+    // listar() arriba) aunque no tenga rol en la clinica activa -- para
+    // cualquier otro usuario que no pertenezca a esta clinica, se sigue
+    // respondiendo 404 (evita editar staff de OTRA clinica desde aca).
+    let esHuerfanoGlobal = false;
+    if (!pertenece.rows[0]) {
+      if (!req.usuario.es_super_admin) return res.status(404).json({ mensaje: 'Usuario no encontrado en esta clinica' });
+      const tieneAlgunRol = await pool.query(
+        "select 1 from usuarios_empresas_rol where usuario_id = $1 and rol <> 'paciente'",
+        [req.params.id]
+      );
+      if (tieneAlgunRol.rows[0]) return res.status(404).json({ mensaje: 'Usuario no encontrado en esta clinica' });
+      esHuerfanoGlobal = true;
+    }
 
     if (password) {
       const erroresPassword = validarPassword(password, await obtenerPolitica());
@@ -139,6 +174,9 @@ async function actualizar(req, res, next) {
     // otorgarlo o quitarlo; un admin normal que lo mande se ignora
     // silenciosamente (coalesce deja el valor actual sin tocar).
     const nuevoSuperAdmin = req.usuario.es_super_admin && es_super_admin !== undefined ? es_super_admin : null;
+    // Solo tiene sentido para un super-admin, y solo otro super-admin
+    // puede cambiarselo a alguien mas -- mismo criterio que es_super_admin.
+    const nuevaAceptaCorreo = req.usuario.es_super_admin && acepta_correo_super_admin !== undefined ? acepta_correo_super_admin : null;
     // Si un admin le pone una contrasena nueva a otro usuario (reset), esa
     // contrasena es temporal -- la conoce el admin, no la eligio el
     // usuario, asi que se le exige cambiarla en su siguiente login.
@@ -151,12 +189,13 @@ async function actualizar(req, res, next) {
          activo = coalesce($5, activo),
          password_hash = coalesce($6, password_hash),
          debe_cambiar_password = case when $6::text is not null then true else debe_cambiar_password end,
-         es_super_admin = coalesce($8, es_super_admin)
+         es_super_admin = coalesce($8, es_super_admin),
+         acepta_correo_super_admin = coalesce($9, acepta_correo_super_admin)
        where id = $7`,
-      [nombre, avatar, telefono, acepta_whatsapp, activo, password_hash, req.params.id, nuevoSuperAdmin]
+      [nombre, avatar, telefono, acepta_whatsapp, activo, password_hash, req.params.id, nuevoSuperAdmin, nuevaAceptaCorreo]
     );
 
-    if (rol) {
+    if (rol && !esHuerfanoGlobal) {
       // Si tiene mas de un rol de staff aca (ej. admin Y doctor), hace
       // falta saber cual de los dos se esta editando -- sin eso, un
       // update "a ciegas" cambiaria AMBAS filas al mismo rol nuevo y
@@ -180,13 +219,21 @@ async function actualizar(req, res, next) {
     // Si tiene mas de un rol de staff, se devuelve puntualmente la fila que
     // se acaba de editar (el nuevo valor de "rol") en vez de una fila
     // arbitraria entre las que tenga.
-    const { rows } = await pool.query(
-      `select u.id, u.nombre, u.email, u.telefono, u.acepta_whatsapp, u.activo, u.avatar, u.es_super_admin, uer.rol, u.created_at
-       from usuarios u
-       join usuarios_empresas_rol uer on uer.usuario_id = u.id
-       where u.id = $1 and uer.empresa_id = $2 and uer.rol <> 'paciente' ${rol ? 'and uer.rol = $3' : ''}`,
-      rol ? [req.params.id, req.empresaId, rol] : [req.params.id, req.empresaId]
-    );
+    const { rows } = esHuerfanoGlobal
+      ? await pool.query(
+          `select id, nombre, email, telefono, acepta_whatsapp, activo, avatar, es_super_admin,
+                  acepta_correo_super_admin, null::text as rol, created_at
+           from usuarios where id = $1`,
+          [req.params.id]
+        )
+      : await pool.query(
+          `select u.id, u.nombre, u.email, u.telefono, u.acepta_whatsapp, u.activo, u.avatar, u.es_super_admin,
+                  u.acepta_correo_super_admin, uer.rol, u.created_at
+           from usuarios u
+           join usuarios_empresas_rol uer on uer.usuario_id = u.id
+           where u.id = $1 and uer.empresa_id = $2 and uer.rol <> 'paciente' ${rol ? 'and uer.rol = $3' : ''}`,
+          rol ? [req.params.id, req.empresaId, rol] : [req.params.id, req.empresaId]
+        );
     res.json(rows[0]);
   } catch (err) { next(err); }
 }
@@ -232,7 +279,20 @@ async function resetearPassword(req, res, next) {
        where u.id = $1 and uer.empresa_id = $2 and uer.rol <> 'paciente'`,
       [req.params.id, req.empresaId]
     );
-    const usuario = rows[0];
+    let usuario = rows[0];
+    // Mismo bypass que actualizar(): un super-admin puede resetear la
+    // contrasena de una cuenta de super-admin huerfana (sin rol de staff
+    // en ninguna clinica) aunque no pertenezca a la clinica activa.
+    if (!usuario && req.usuario.es_super_admin) {
+      const tieneAlgunRol = await pool.query(
+        "select 1 from usuarios_empresas_rol where usuario_id = $1 and rol <> 'paciente'",
+        [req.params.id]
+      );
+      if (!tieneAlgunRol.rows[0]) {
+        const global = await pool.query('select id, nombre, email from usuarios where id = $1', [req.params.id]);
+        usuario = global.rows[0];
+      }
+    }
     if (!usuario) return res.status(404).json({ mensaje: 'Usuario no encontrado en esta clinica' });
 
     const politica = await obtenerPolitica();

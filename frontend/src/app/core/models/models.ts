@@ -12,6 +12,10 @@ export interface Usuario {
   acepta_whatsapp?: boolean;
   avatar?: string | null;
   es_super_admin?: boolean;
+  // Solo aplica si es_super_admin: si quiere recibir los correos de
+  // notificacion de consentimiento (aceptacion/rechazo de compartir
+  // historial entre clinicas) -- ver notificacionConsentimiento.js.
+  acepta_correo_super_admin?: boolean;
   two_factor_enabled?: boolean;
   // Fuerza el formulario de cambio de contrasena al iniciar sesion (lo
   // activa un admin al crear el usuario o resetearle la contrasena).
@@ -457,6 +461,16 @@ export interface HistoriaClinica {
   tiene_laboratorio?: boolean;
   estado_laboratorio?: EstadoLaboratorio | null;
   created_at?: string;
+}
+
+// Fila de "Mis Clinicas" en el portal del paciente -- clinicas donde
+// tiene expediente (pacientes_empresas), independiente de si tiene
+// acceso al portal ahi. Ver PortalPacienteService.misClinicas().
+export interface ClinicaConsentimiento {
+  empresa_id: string;
+  empresa_nombre: string;
+  activo: boolean;
+  comparte_historial_clinico: boolean;
 }
 
 export interface RecetaMedicamento {

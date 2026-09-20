@@ -176,12 +176,15 @@
               }
             }
             @if (auth.puedeEditar()) {
-              <button type="button" class="btn-icon" [style.color]="p.comparte_historial_clinico ? 'var(--green-600, green)' : null"
-                [title]="p.comparte_historial_clinico ? 'Ya autorizo compartir su historial de esta clinica -- clic para reenviar el correo' : 'Solicitar consentimiento para compartir informacion clinica entre clinicas'"
+              <button type="button" class="btn-icon"
+                [title]="p.comparte_historial_clinico ? 'Ya autorizo compartir su historial de esta clinica -- clic para dejar de compartir' : 'Solicitar consentimiento para compartir informacion clinica entre clinicas'"
                 aria-label="Solicitar consentimiento de datos compartidos"
                 [disabled]="solicitandoConsentimientoDatos() === p.id"
-                (click)="solicitarConsentimientoDatos(p)">
+                (click)="toggleConsentimientoDatos(p)">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                @if (p.comparte_historial_clinico) {
+                  <span class="icon-check-badge badge-check-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+                }
               </button>
             }
             @if (auth.puedeEditar()) {

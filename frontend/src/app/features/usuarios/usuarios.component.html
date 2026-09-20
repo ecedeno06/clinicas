@@ -1,7 +1,13 @@
 <div class="page-header">
   <div>
     <h1>Usuarios</h1>
-    <div class="desc">Personas con acceso a esta clinica (doctores, recepcionistas, administradores)</div>
+    <div class="desc">
+      @if (auth.esSuperAdmin()) {
+        Personas con acceso a esta clinica (doctores, recepcionistas, administradores), incluyendo las cuentas de super administrador sin clinica asignada.
+      } @else {
+        Personas con acceso a esta clinica (doctores, recepcionistas, administradores)
+      }
+    </div>
   </div>
   <button class="btn btn-accent" (click)="abrirNuevo()">+ Nuevo usuario</button>
 </div>
@@ -25,7 +31,16 @@
         <tr>
           <td>{{ u.nombre }}</td>
           <td>{{ u.email }}</td>
-          <td><span class="badge badge-slate">{{ u.rol }}</span></td>
+          <td>
+            @if (u.rol) {
+              <span class="badge badge-slate">{{ u.rol }}</span>
+              @if (u.es_super_admin) {
+                <span class="badge badge-amber" title="Ademas es super administrador (gestiona todas las clinicas)">Super admin</span>
+              }
+            } @else {
+              <span class="badge badge-amber" title="Cuenta de super administrador sin rol de staff en ninguna clinica">Super admin (sin clinica)</span>
+            }
+          </td>
           <td><span class="badge" [class.badge-green]="u.activo" [class.badge-slate]="!u.activo">{{ u.activo ? 'Activo' : 'Inactivo' }}</span></td>
           <td class="table-actions">
             <button type="button" class="btn-icon" title="Resetear contrasena (se envia por correo)" aria-label="Resetear contrasena" [disabled]="reseteandoPassword() === u.id" (click)="resetearPassword(u)">
@@ -38,9 +53,11 @@
             <button type="button" class="btn-icon" title="Editar" aria-label="Editar" (click)="abrirEditar(u)">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
             </button>
-            <button type="button" class="btn-icon btn-icon-danger" title="Eliminar" aria-label="Eliminar" (click)="eliminar(u)">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
-            </button>
+            @if (u.rol) {
+              <button type="button" class="btn-icon btn-icon-danger" title="Eliminar" aria-label="Eliminar" (click)="eliminar(u)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+              </button>
+            }
           </td>
         </tr>
       } @empty {
@@ -118,14 +135,16 @@
           </div>
         }
 
-        <div class="form-group mt-16">
-          <label>Rol</label>
-          <select class="input" formControlName="rol">
-            <option value="recepcionista">Recepcionista</option>
-            <option value="doctor">Doctor</option>
-            <option value="admin">Administrador</option>
-          </select>
-        </div>
+        @if (!editando() || editando()!.rol) {
+          <div class="form-group mt-16">
+            <label>Rol</label>
+            <select class="input" formControlName="rol">
+              <option value="recepcionista">Recepcionista</option>
+              <option value="doctor">Doctor</option>
+              <option value="admin">Administrador</option>
+            </select>
+          </div>
+        }
         <div class="form-group mt-16">
           <label class="flex items-center gap-8"><input type="checkbox" formControlName="activo" /> Usuario activo</label>
         </div>
@@ -136,6 +155,14 @@
               Gestiona todas las clinicas del sistema, sin importar el rol elegido arriba. Solo otro super administrador puede otorgar o quitar este permiso.
             </div>
           </div>
+          @if (form.get('es_super_admin')?.value) {
+            <div class="form-group mt-16">
+              <label class="flex items-center gap-8"><input type="checkbox" formControlName="acepta_correo_super_admin" /> Acepta correo como super admin</label>
+              <div class="text-muted text-sm mt-8">
+                Recibe los correos de notificacion cuando un paciente acepta o rechaza compartir su historial entre clinicas.
+              </div>
+            </div>
+          }
         }
         <div class="form-actions">
           <button type="submit" class="btn btn-primary" [disabled]="form.invalid">Guardar</button>

@@ -56,6 +56,7 @@ export class UsuariosComponent implements OnInit {
     rol: ['recepcionista' as Rol],
     activo: [true],
     es_super_admin: [false],
+    acepta_correo_super_admin: [true],
   });
 
   politica = signal<PoliticaPassword | null>(null);
@@ -94,7 +95,7 @@ export class UsuariosComponent implements OnInit {
     this.usuarioExistente.set(null);
     this.verPassword.set(false);
     this.passwordGenerada.set(false);
-    this.form.reset({ rol: 'recepcionista', activo: true, es_super_admin: false });
+    this.form.reset({ rol: 'recepcionista', activo: true, es_super_admin: false, acepta_correo_super_admin: true });
     // nombre/password no son obligatorios aqui: si el email ya existe en el
     // sistema (otra clinica), el backend solo lo asocia a esta clinica (como
     // recepcionista por defecto; el rol se ajusta despues editando).

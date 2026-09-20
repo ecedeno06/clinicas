@@ -43,6 +43,11 @@ create table if not exists usuarios (
     -- Acceso global de super-administracion (gestiona todas las clinicas),
     -- independiente del rol que tenga en usuarios_empresas_rol.
     es_super_admin  boolean not null default false,
+    -- Si es_super_admin: si quiere recibir los correos de notificacion de
+    -- consentimiento (aceptacion/rechazo de compartir historial entre
+    -- clinicas, ver notificacionConsentimiento.js). Default true para no
+    -- romper el comportamiento previo a esta columna.
+    acepta_correo_super_admin boolean not null default true,
     -- Foto de perfil en base64 (data URI)
     avatar          text,
     -- Pista de contrasena, mostrada en el login (GET /auth/pista). Se

@@ -14,5 +14,8 @@ router.get('/citas', ctrl.citas);
 router.get('/citas/:citaId/signos-vitales', ctrl.signosVitalesDeCita);
 router.get('/citas/:citaId/recetas', ctrl.recetasDeCita);
 router.get('/citas/:citaId/laboratorio', ctrl.laboratorioDeCita);
+router.get('/clinicas', ctrl.clinicas);
+router.post('/clinicas/:empresaId/revocar-consentimiento', ctrl.revocarConsentimiento);
+router.post('/clinicas/:empresaId/solicitar-consentimiento', ctrl.solicitarConsentimiento);
 
 module.exports = router;

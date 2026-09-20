@@ -65,4 +65,11 @@ export class PacientesService {
   solicitarConsentimientoDatos(id: string): Observable<Paciente> {
     return this.http.post<Paciente>(`${this.base}/${id}/consentimiento-datos`, {});
   }
+
+  // Desactiva el compartir directamente, sin correo/OTP (el staff puede
+  // hacerlo aunque solo el paciente pueda ACTIVARLO) -- ver
+  // pacientes.controller.js#rechazarConsentimientoDatos.
+  rechazarConsentimientoDatos(id: string): Observable<Paciente> {
+    return this.http.delete<Paciente>(`${this.base}/${id}/consentimiento-datos`);
+  }
 }
