@@ -48,6 +48,32 @@ docker run --rm -i -e PGPASSWORD='<password>' postgres:16 \
 | `028_usuarios_debe_cambiar_password.sql` | Columna `debe_cambiar_password` en `usuarios` (fuerza cambio de contrasena en el siguiente login al crear un usuario o resetearle la contrasena desde Usuarios) | ✅ Aplicada 2026-09-09 | ✅ Aplicada 2026-09-09 |
 | `029_password_reset_tokens.sql` | Tabla nueva `password_reset_tokens` (recuperar contrasena por correo, self-service: token de un solo uso, 1 hora de vigencia) | ✅ Aplicada 2026-09-09 | ✅ Aplicada 2026-09-09 |
 | `030_pacientes_email_no_unico.sql` | Quita la restriccion de unicidad de `pacientes.email` (varios pacientes pueden compartir un email, ej. un familiar/cuidador) | ✅ Aplicada 2026-09-09 | ✅ Aplicada 2026-09-09 |
+| `031_dos_factor_recovery_tokens.sql` | Tabla nueva `dos_factor_recovery_tokens`: recuperar acceso por correo cuando se pierde el dispositivo del 2FA (desactiva el 2FA de la cuenta) | ✅ Aplicada 2026-09-10 | ✅ Aplicada 2026-09-10 |
+| `032_telefonos_con_codigo_pais.sql` | `telefono` pasa a incluir codigo de pais pegado (formato que necesita wa.me); backfill agrega "507" a los numeros locales existentes | ✅ Aplicada 2026-09-10 | ✅ Aplicada 2026-09-10 |
+| `033_two_factor_challenge.sql` | Columna `two_factor_challenge_hash` en `usuarios`: frase-reto (bcrypt) que se pide antes de enviar el correo de recuperacion de 2FA | ✅ Aplicada 2026-09-10 | ✅ Aplicada 2026-09-10 |
+| `034_pacientes_estado_civil_laboral.sql` | Columnas `estado_civil`/`estado_laboral`/`tipo_trabajo`/`lugar_trabajo` en `pacientes` | ✅ Aplicada 2026-09-11 | ✅ Aplicada 2026-09-11 |
+| `035_familiares_paciente.sql` | Tabla nueva `familiares_paciente` (reemplaza el campo unico "contacto de emergencia" por una lista) | ✅ Aplicada 2026-09-11 | ✅ Aplicada 2026-09-11 |
+| `036_catalogo_antecedentes.sql` | Tablas nuevas `categorias_antecedentes`/`antecedentes_patologicos`: catalogo global de antecedentes patologicos, solo editable por super admin | ✅ Aplicada 2026-09-11 | ✅ Aplicada 2026-09-11 |
+| `037_paciente_antecedente.sql` | Tabla nueva `paciente_antecedente`: antecedentes que presenta cada paciente, tomados del catalogo global (migracion 036) | ✅ Aplicada 2026-09-11 | ✅ Aplicada 2026-09-11 |
+| `038_paciente_antecedente_autor.sql` | Columna `creado_por` en `paciente_antecedente`: solo el autor puede editar/eliminar (mismo criterio que `recetas.creado_por`) | ✅ Aplicada 2026-09-11 | ✅ Aplicada 2026-09-11 |
+| `039_paciente_antecedente_doctor.sql` | Columna `doctor_id` en `paciente_antecedente`: doctor que diagnostico el antecedente (distinto de `creado_por`) | ✅ Aplicada 2026-09-11 | ✅ Aplicada 2026-09-11 |
+| `040_catalogo_examenes_laboratorio.sql` | Tablas nuevas `categorias_examenes_laboratorio`/`examenes_laboratorio_catalogo`: catalogo global de examenes, mismo patron que antecedentes (036) | ✅ Aplicada 2026-09-11 | ✅ Aplicada 2026-09-11 |
+| `041_orden_laboratorio_examen_catalogo.sql` | Columna `examen_id` en `orden_laboratorio_examenes`: enlaza cada linea al catalogo global (040) cuando aplica | ✅ Aplicada 2026-09-11 | ✅ Aplicada 2026-09-11 |
+| `042_examenes_laboratorio_por_clinica.sql` | Columna `empresa_id` en `categorias_examenes_laboratorio`/`examenes_laboratorio_catalogo`: cada clinica puede agregar sus propios examenes ademas del catalogo global | ✅ Aplicada 2026-09-12 | ✅ Aplicada 2026-09-12 |
+| `043_doctores_globales.sql` | `doctores` pasa a ser global (multi-clinica, mismo patron que pacientes): nueva tabla `doctores_empresas`, columna `identificacion` como llave de red | ✅ Aplicada 2026-09-12 | ✅ Aplicada 2026-09-12 |
+| `044_especialidades_hibridas.sql` | `especialidades` pasa a catalogo hibrido (global + por-clinica), mismo patron que examenes de laboratorio (042) | ✅ Aplicada 2026-09-12 | ✅ Aplicada 2026-09-12 |
+| `045_seed_especialidades_globales.sql` | Seed del catalogo global de especialidades medicas mas comunes (idempotente via `on conflict`) | ✅ Aplicada 2026-09-12 | ✅ Aplicada 2026-09-12 |
+| `046_especialidades_empresas.sql` | Tabla nueva `especialidades_empresas`: que especialidades globales tiene activadas cada clinica | ✅ Aplicada 2026-09-12 | ✅ Aplicada 2026-09-12 |
+| `047_pacientes_usuario_paciente.sql` | Columna `usuario_id` en `pacientes` + rol `'paciente'`: permite invitar a un paciente a su propio portal de solo lectura | ✅ Aplicada 2026-09-13 | ✅ Aplicada 2026-09-13 |
+| `048_sesiones_rol_paciente.sql` | Corrige el check de `sesiones.rol` (independiente del de `usuarios_empresas_rol`) para admitir el rol `'paciente'` agregado en 047 | ✅ Aplicada 2026-09-13 | ✅ Aplicada 2026-09-13 |
+| `049_multi_rol_por_clinica.sql` | Permite un rol de staff Y un rol `'paciente'` a la vez en la misma clinica (dos indices unicos parciales en vez de un `unique` simple) | ✅ Aplicada 2026-09-13 | ✅ Aplicada 2026-09-13 |
+| `050_politica_password.sql` | Tabla singleton `politica_password`: reglas de contrasena configurables por el super admin (sembrada para no cambiar el comportamiento actual) | ✅ Aplicada 2026-09-13 | ✅ Aplicada 2026-09-13 |
+| `051_doctor_foto_multi_rol_staff.sql` | Columna `foto` en `doctores` + permite mas de un rol de staff a la vez (ej. admin Y doctor) en la misma clinica | ✅ Aplicada 2026-09-15 | ✅ Aplicada 2026-09-15 |
+| `052_familiar_acepta_whatsapp.sql` | Columna `acepta_whatsapp` en `familiares_paciente`, mismo patron que `pacientes.acepta_whatsapp` | ✅ Aplicada 2026-09-16 | ✅ Aplicada 2026-09-16 |
+| `053_sucursal_acepta_whatsapp.sql` | Columna `acepta_whatsapp` en `sucursales` | ✅ Aplicada 2026-09-16 | ✅ Aplicada 2026-09-16 |
+| `054_cambio_email_tokens.sql` | Tabla nueva `cambio_email_tokens`: autoservicio de cambio de correo de acceso, confirmado por token + contrasena actual | ✅ Aplicada 2026-09-19 | ✅ Aplicada 2026-09-19 |
+| `055_consentimiento_datos.sql` | Columna `comparte_historial_clinico` en `pacientes_empresas` + tabla `consentimiento_datos_tokens`: consentimiento del paciente (por clinica) para compartir su historial entre clinicas del ecosistema | ✅ Aplicada 2026-09-19 | ✅ Aplicada 2026-09-19 |
+| `056_acepta_correo_super_admin.sql` | Columna `acepta_correo_super_admin` en `usuarios`: cada super-admin decide si recibe los correos de notificacion de consentimiento (default true) | ✅ Aplicada 2026-09-20 | ✅ Aplicada 2026-09-20 |
 
 **Verificado 2026-09-02**: comparacion completa de esquema (tablas, columnas,
 indices, constraints, funciones, triggers) entre `.19` y Neon — identicos
