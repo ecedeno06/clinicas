@@ -8,6 +8,7 @@ import { ReporteDiagnosticoFila, Sucursal } from '../../../core/models/models';
 import { formatoAmPm } from '../../../core/utils/hora12.util';
 import { hoyISO } from '../../../core/utils/fecha.util';
 import { generarPdf, encabezadoClinica, formatoFechaCorta } from '../../../core/utils/pdf.util';
+import { exportarCsv } from '../../../core/utils/csv.util';
 import { TDocumentDefinitions } from 'pdfmake/interfaces';
 
 @Component({
@@ -156,5 +157,23 @@ export class ReporteDiagnosticosComponent implements OnInit {
     };
 
     generarPdf(doc);
+  }
+
+  // Mismo criterio que imprimir(): solo las filas marcadas con checkbox.
+  exportarCsv(): void {
+    const seleccionadas = this.filas().filter((f) => this.seleccionados().has(f.cita_id));
+    const filas = seleccionadas.map((f) => [
+      `${formatoFechaCorta(f.fecha)} ${formatoAmPm(f.hora_inicio)} - ${formatoAmPm(f.hora_fin)}`,
+      f.paciente_nombre,
+      f.diagnostico,
+      f.medicamentos || '',
+      f.doctor_nombre,
+      f.sucursal_nombre,
+    ]);
+    exportarCsv(
+      `reporte-diagnosticos_${this.desde()}_${this.hasta()}`,
+      ['Fecha - Hora', 'Paciente', 'Diagnostico', 'Medicamento', 'Doctor', 'Sucursal'],
+      filas
+    );
   }
 }
