@@ -914,6 +914,20 @@ table.data-table {
 
 .form-actions { display: flex; gap: 8px; margin-top: 16px; }
 
+/* Dentro de un .drawer (panel lateral que puede crecer mucho -- ej. la
+   lista de usuarios asociados a una clinica), los botones de guardar se
+   quedan pegados abajo en vez de requerir scrollear hasta el final --
+   en mobile, sin esto, quedaban fuera del viewport visible y parecian
+   haber desaparecido. */
+.drawer .form-actions {
+  position: sticky;
+  bottom: -22px;
+  margin: 16px -22px -22px;
+  padding: 12px 22px 22px;
+  background: var(--white);
+  border-top: 1px solid var(--slate-100);
+}
+
 /* ---------- Modal / panel lateral ---------- */
 .overlay {
   position: fixed; inset: 0;
