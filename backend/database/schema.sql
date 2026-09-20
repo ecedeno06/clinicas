@@ -287,6 +287,13 @@ create table if not exists pacientes_empresas (
     paciente_id  uuid not null references pacientes(id) on delete cascade,
     empresa_id   uuid not null references empresas(id) on delete cascade,
     activo       boolean not null default true,
+    -- Consentimiento del paciente para que ESTA clinica libere su
+    -- historial clinico (citas/historias/signos vitales/recetas/
+    -- laboratorio) hacia las demas clinicas del ecosistema a las que
+    -- tambien este vinculado. Es por relacion paciente-clinica, no
+    -- global al paciente -- ver consentimiento_datos_tokens. No aplica
+    -- a antecedentes patologicos, que ya se comparten siempre.
+    comparte_historial_clinico boolean not null default false,
     created_at   timestamptz not null default now(),
     updated_at   timestamptz not null default now(),
     unique (paciente_id, empresa_id)
@@ -715,6 +722,29 @@ create table if not exists cambio_email_tokens (
     usado       boolean not null default false,
     created_at  timestamptz not null default now()
 );
+
+-- ---------------------------------------------------------
+-- Tabla: consentimiento_datos_tokens (consentimiento del paciente para
+-- compartir su historial clinico entre clinicas, por clinica --
+-- migracion 055). Link publico enviado por correo, sin sesion; respuesta
+-- guarda la eleccion real (no solo "usado") para tener el historial de
+-- que decidio y cuando. El otp (6 digitos, mostrado en el mismo correo)
+-- solo se exige para confirmar un 'aceptado' -- ver
+-- POST /consentimiento-datos/responder.
+-- ---------------------------------------------------------
+create table if not exists consentimiento_datos_tokens (
+    id            uuid primary key default gen_random_uuid(),
+    paciente_id   uuid not null references pacientes(id) on delete cascade,
+    empresa_id    uuid not null references empresas(id) on delete cascade,
+    token         text not null unique,
+    otp           text not null,
+    respuesta     text not null default 'pendiente' check (respuesta in ('pendiente', 'aceptado', 'rechazado')),
+    expira_en     timestamptz not null,
+    respondido_en timestamptz,
+    created_at    timestamptz not null default now()
+);
+
+create index if not exists idx_consentimiento_datos_tokens_paciente on consentimiento_datos_tokens(paciente_id);
 
 -- ---------------------------------------------------------
 -- Indices

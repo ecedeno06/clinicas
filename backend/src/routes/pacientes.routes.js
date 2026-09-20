@@ -32,5 +32,6 @@ router.delete('/:id/invitar', requireRol('admin', 'doctor'), ctrl.desinvitar);
 // invitar/resetear password -- se restringe a admin.
 router.put('/:id/correo-acceso', requireRol('admin'), ctrl.cambiarCorreoAcceso);
 router.post('/:id/resetear-password', requireRol('admin', 'doctor'), ctrl.resetearPassword);
+router.post('/:id/consentimiento-datos', requireRol('admin'), ctrl.solicitarConsentimientoDatos);
 
 module.exports = router;

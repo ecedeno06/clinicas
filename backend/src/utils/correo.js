@@ -19,12 +19,16 @@ function obtenerResend() {
 }
 
 // destinatario: string o array de strings. html es opcional (si no se
-// pasa, se usa texto plano para ambos).
-async function enviarCorreo({ destinatario, asunto, texto, html }) {
+// pasa, se usa texto plano para ambos). cc es opcional (string o array),
+// para cuando el mismo correo debe llegarle tambien a alguien mas sin
+// que sea el destinatario principal (ej. notificaciones de
+// consentimiento-datos, donde el paciente va en copia).
+async function enviarCorreo({ destinatario, asunto, texto, html, cc }) {
   const remitente = process.env.EMAIL_FROM || 'Clinica <notificaciones@mail.vetnetsolutions.com>';
   const { error } = await obtenerResend().emails.send({
     from: remitente,
     to: destinatario,
+    ...(cc ? { cc } : {}),
     subject: asunto,
     text: texto,
     html: html || texto,

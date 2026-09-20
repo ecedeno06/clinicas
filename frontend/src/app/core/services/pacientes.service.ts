@@ -58,4 +58,11 @@ export class PacientesService {
   cambiarCorreoAcceso(id: string, email: string): Observable<Paciente> {
     return this.http.put<Paciente>(`${this.base}/${id}/correo-acceso`, { email });
   }
+
+  // Le envia al paciente el correo de consentimiento para compartir su
+  // historial clinico entre clinicas -- ver
+  // pacientes.controller.js#solicitarConsentimientoDatos.
+  solicitarConsentimientoDatos(id: string): Observable<Paciente> {
+    return this.http.post<Paciente>(`${this.base}/${id}/consentimiento-datos`, {});
+  }
 }

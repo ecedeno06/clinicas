@@ -758,6 +758,27 @@ export class PacientesComponent implements OnInit {
     });
   }
 
+  solicitandoConsentimientoDatos = signal<string | null>(null);
+
+  // Le pide al paciente, por correo, autorizacion para que ESTA clinica
+  // comparta su historial clinico (citas/historias/recetas/laboratorio)
+  // con las demas clinicas del ecosistema a las que tambien este
+  // vinculado -- es por clinica, no afecta lo que otras clinicas hayan
+  // decidido. Ver pacientes.controller.js#solicitarConsentimientoDatos.
+  solicitarConsentimientoDatos(p: Paciente): void {
+    if (!p.email) { alert('Este paciente no tiene correo registrado.'); return; }
+    const mensaje = p.comparte_historial_clinico
+      ? `"${p.nombre}" ya autorizo compartir su historial de esta clinica. Se le enviara un nuevo correo de todas formas -- continuar?`
+      : `Se enviara un correo a ${p.email} pidiendo autorizacion para compartir su historial clinico de esta clinica con las demas clinicas del ecosistema. Continuar?`;
+    if (!confirm(mensaje)) return;
+
+    this.solicitandoConsentimientoDatos.set(p.id);
+    this.srv.solicitarConsentimientoDatos(p.id).subscribe({
+      next: () => { this.solicitandoConsentimientoDatos.set(null); alert('Correo de consentimiento enviado.'); this.cargar(); },
+      error: (err) => { this.solicitandoConsentimientoDatos.set(null); alert(err?.error?.mensaje || 'No se pudo enviar el correo de consentimiento'); },
+    });
+  }
+
   reseteandoPasswordPaciente = signal<string | null>(null);
 
   // Popup de confirmacion (mismo estilo ambar que el resto) -- a pedido

@@ -21,5 +21,6 @@ router.use('/geocodificacion', require('./geocodificacion.routes'));
 router.use('/portal-paciente', require('./portalPaciente.routes'));
 router.use('/politica-password', require('./politicaPassword.routes'));
 router.use('/auditoria', require('./auditoria.routes'));
+router.use('/consentimiento-datos', require('./consentimientoDatos.routes'));
 
 module.exports = router;

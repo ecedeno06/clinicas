@@ -1,0 +1,66 @@
+<div class="auth-screen">
+  <div class="auth-card">
+    <div class="auth-logo">GC</div>
+
+    @if (cargando()) {
+      <h1>Cargando...</h1>
+      <p class="text-muted text-sm">Un momento por favor.</p>
+    } @else if (error()) {
+      <h1>No se pudo cargar</h1>
+      <div class="auth-error mt-16">{{ error() }}</div>
+      <a routerLink="/login" class="btn-link text-sm mt-16" style="display:inline-block;">Volver a iniciar sesion</a>
+    } @else if (resultado()) {
+      @if (resultado() === 'aceptado') {
+        <h1>Consentimiento registrado</h1>
+        <p class="text-muted text-sm">Gracias -- autorizaste a {{ contexto()?.empresa_nombre }} a compartir tu historial clinico con las demas clinicas del ecosistema.</p>
+      } @else {
+        <h1>Respuesta registrada</h1>
+        <p class="text-muted text-sm">Registramos que NO autorizas compartir tu historial clinico de {{ contexto()?.empresa_nombre }} con otras clinicas.</p>
+      }
+      <button type="button" class="btn btn-primary w-full mt-16" (click)="irALogin()">Ir a iniciar sesion</button>
+    } @else {
+      @if (contexto(); as ctx) {
+        <h1>Consentimiento para compartir tu informacion</h1>
+        <p class="text-muted text-sm">Hola {{ ctx.paciente_nombre }}, esta solicitud la envio <strong>{{ ctx.empresa_nombre }}</strong>.</p>
+
+        @if (ctx.ya_respondido) {
+          <div class="auth-error mt-16" style="background: var(--tint-amber-bg); color: var(--text-on-tint-amber);">
+            Esta solicitud ya fue respondida anteriormente
+            ({{ ctx.respuesta_actual === 'aceptado' ? 'aceptaste' : 'rechazaste' }} el consentimiento). Si quieres
+            cambiar tu decision, pide que te envien una solicitud nueva.
+          </div>
+          <a routerLink="/login" class="btn-link text-sm mt-16" style="display:inline-block;">Volver a iniciar sesion</a>
+        } @else {
+          @if (respuesta() === 'aceptado') {
+            <p class="text-sm" style="text-align:justify; margin-top:16px;">
+              Vas a <strong>autorizar</strong> que {{ ctx.empresa_nombre }} comparta tu historial clinico (citas,
+              historias, recetas, laboratorio) con las demas clinicas del ecosistema donde tambien te atiendas.
+              Para confirmar, escribe el codigo de 6 digitos que te enviamos en el correo.
+            </p>
+            <div class="form-group mt-16">
+              <label>Codigo de confirmacion</label>
+              <input class="input" type="text" inputmode="numeric" maxlength="6" placeholder="000000"
+                style="text-align:center; letter-spacing:0.3em; font-size:20px; font-weight:700;"
+                [ngModel]="otpValor()" (ngModelChange)="otpValor.set($event)" />
+            </div>
+          } @else {
+            <p class="text-sm" style="text-align:justify; margin-top:16px;">
+              Vas a <strong>rechazar</strong> que {{ ctx.empresa_nombre }} comparta tu historial clinico con las
+              demas clinicas del ecosistema. Puedes cambiar de opinion mas adelante si te envian una nueva solicitud.
+            </p>
+          }
+
+          @if (errorConfirmar()) {
+            <div class="auth-error mt-16">{{ errorConfirmar() }}</div>
+          }
+
+          <button type="button" class="btn btn-primary w-full mt-16"
+            [disabled]="enviando() || (respuesta() === 'aceptado' && otpValor().trim().length !== 6)"
+            (click)="confirmar()">
+            {{ enviando() ? 'Enviando...' : (respuesta() === 'aceptado' ? 'Confirmar aceptacion' : 'Confirmar rechazo') }}
+          </button>
+        }
+      }
+    }
+  </div>
+</div>

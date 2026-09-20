@@ -226,7 +226,23 @@ export interface Paciente {
   // listado de Pacientes esta habilitado o muestra "Acceso activo".
   tiene_acceso_esta_clinica?: boolean;
   activo: boolean;
+  // Consentimiento del paciente para que la clinica ACTIVA comparta su
+  // historial clinico (citas/historias/signos vitales/recetas/
+  // laboratorio, NO antecedentes) con las demas clinicas del ecosistema
+  // a las que tambien este vinculado -- es un dato de la RELACION
+  // paciente-clinica (pacientes_empresas), no del paciente global. Ver
+  // PacientesService.solicitarConsentimientoDatos().
+  comparte_historial_clinico?: boolean;
   created_at?: string;
+}
+
+// Contexto que muestra la pagina publica de consentimiento-datos antes
+// de pedir la confirmacion final (ver ConsentimientoDatosComponent).
+export interface ConsentimientoDatosInfo {
+  paciente_nombre: string;
+  empresa_nombre: string;
+  respuesta_actual: 'pendiente' | 'aceptado' | 'rechazado';
+  ya_respondido: boolean;
 }
 
 // Catalogo hibrido (mismo patron que CategoriaExamenLaboratorio):
