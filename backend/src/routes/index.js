@@ -22,5 +22,6 @@ router.use('/portal-paciente', require('./portalPaciente.routes'));
 router.use('/politica-password', require('./politicaPassword.routes'));
 router.use('/auditoria', require('./auditoria.routes'));
 router.use('/consentimiento-datos', require('./consentimientoDatos.routes'));
+router.use('/reportes', require('./reportes.routes'));
 
 module.exports = router;

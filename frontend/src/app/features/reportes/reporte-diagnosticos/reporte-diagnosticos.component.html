@@ -1,0 +1,83 @@
+<div class="page-header">
+  <div>
+    <h1>Reporte de diagnosticos</h1>
+    <div class="desc">Diagnosticos y medicamentos por sucursal y rango de fechas</div>
+  </div>
+</div>
+
+<div class="flex gap-16" style="flex-wrap:wrap;">
+  <div class="form-group" style="min-width:220px;">
+    <label>Sucursal</label>
+    <select class="input" [ngModel]="sucursalId()" (ngModelChange)="sucursalId.set($event)">
+      <option value="">Todas las sucursales</option>
+      @for (s of sucursales(); track s.id) { <option [value]="s.id">{{ s.nombre }}</option> }
+    </select>
+  </div>
+  <div class="form-group" style="min-width:160px;">
+    <label>Desde</label>
+    <input class="input" type="date" [ngModel]="desde()" (ngModelChange)="desde.set($event)" />
+  </div>
+  <div class="form-group" style="min-width:160px;">
+    <label>Hasta</label>
+    <input class="input" type="date" [ngModel]="hasta()" (ngModelChange)="hasta.set($event)" />
+  </div>
+  <div class="form-group" style="justify-content:flex-end; display:flex;">
+    <button type="button" class="btn btn-accent" (click)="buscar()">Buscar</button>
+  </div>
+</div>
+
+@if (buscado()) {
+  <div class="page-header mt-16">
+    <div>
+      <h2 style="margin:0;">Resultados ({{ filasFiltradas().length }})</h2>
+      <p class="text-muted text-sm" style="margin:0;">{{ desde() | date:'dd/MM/yyyy':'UTC' }} – {{ hasta() | date:'dd/MM/yyyy':'UTC' }}</p>
+    </div>
+    <button type="button" class="btn-icon" title="Imprimir seleccionados" aria-label="Imprimir seleccionados" [disabled]="!haySeleccion()" (click)="imprimir()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+    </button>
+  </div>
+
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th><input type="checkbox" [checked]="todosVisiblesSeleccionados()" (change)="toggleSeleccionarTodosVisibles()" title="Seleccionar todos" /></th>
+          <th>Fecha - Hora</th><th>Paciente</th><th>Diagnostico</th><th>Medicamento</th><th>Doctor</th><th>Sucursal</th>
+        </tr>
+        <tr class="filter-row">
+          <th></th>
+          <th></th>
+          <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroPaciente()" (ngModelChange)="filtroPaciente.set($event)" /></th>
+          <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroDiagnostico()" (ngModelChange)="filtroDiagnostico.set($event)" /></th>
+          <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroMedicamento()" (ngModelChange)="filtroMedicamento.set($event)" /></th>
+          <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroDoctor()" (ngModelChange)="filtroDoctor.set($event)" /></th>
+          <th>
+            <input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroSucursal()" (ngModelChange)="filtroSucursal.set($event)" />
+          </th>
+        </tr>
+        @if (hayFiltrosColumna()) {
+          <tr><th colspan="7" style="text-align:right;"><button class="btn btn-outline btn-sm" (click)="limpiarFiltrosColumna()">Limpiar filtros</button></th></tr>
+        }
+      </thead>
+      <tbody>
+        @if (cargando()) {
+          <tr><td colspan="7"><div class="empty-state">Buscando...</div></td></tr>
+        } @else {
+          @for (f of filasFiltradas(); track f.cita_id) {
+            <tr>
+              <td><input type="checkbox" [checked]="seleccionados().has(f.cita_id)" (change)="toggleSeleccion(f.cita_id)" /></td>
+              <td>{{ f.fecha | date:'dd/MM/yyyy':'UTC' }}<div class="text-muted text-sm">{{ formatoAmPm(f.hora_inicio) }} - {{ formatoAmPm(f.hora_fin) }}</div></td>
+              <td>{{ f.paciente_nombre }}</td>
+              <td>{{ f.diagnostico }}</td>
+              <td>{{ f.medicamentos || '-' }}</td>
+              <td>{{ f.doctor_nombre }}</td>
+              <td>{{ f.sucursal_nombre }}</td>
+            </tr>
+          } @empty {
+            <tr><td colspan="7"><div class="empty-state">No hay diagnosticos para estos filtros.</div></td></tr>
+          }
+        }
+      </tbody>
+    </table>
+  </div>
+}

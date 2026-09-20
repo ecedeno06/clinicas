@@ -95,6 +95,9 @@
           <a routerLink="/reportes/citas" routerLinkActive="active" class="nav-sub" title="Reporte de citas">
             <span class="nav-label">Citas</span>
           </a>
+          <a routerLink="/reportes/diagnosticos" routerLinkActive="active" class="nav-sub" title="Reporte de diagnosticos">
+            <span class="nav-label">Diagnosticos</span>
+          </a>
         }
       }
       @if (auth.esSuperAdmin() || auth.usuario()?.rol === 'admin') {

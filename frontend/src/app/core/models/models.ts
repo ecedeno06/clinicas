@@ -600,3 +600,18 @@ export interface PoliticaPassword {
   pista_similitud_maxima_porcentaje: number;
   updated_at?: string;
 }
+
+// Fila del reporte de Diagnosticos (GET /api/reportes/diagnosticos, solo
+// admin) -- una por cita con historia clinica registrada; "medicamentos"
+// ya viene agregado (todas las recetas de esa cita, separadas por coma).
+export interface ReporteDiagnosticoFila {
+  cita_id: string;
+  fecha: string;
+  hora_inicio: string;
+  hora_fin: string;
+  paciente_nombre: string;
+  diagnostico: string;
+  medicamentos: string | null;
+  doctor_nombre: string;
+  sucursal_nombre: string;
+}
