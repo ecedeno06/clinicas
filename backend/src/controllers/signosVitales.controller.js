@@ -1,4 +1,5 @@
 const { pool } = require('../config/db');
+const { condicionAccesoPorCita } = require('../utils/accesoCitaCrossClinica');
 
 // GET /api/citas/:citaId/signos-vitales
 async function obtenerPorCita(req, res, next) {
@@ -6,7 +7,7 @@ async function obtenerPorCita(req, res, next) {
     const { rows } = await pool.query(
       `select sv.* from signos_vitales sv
        join citas c on c.id = sv.cita_id
-       where sv.cita_id = $1 and c.empresa_id = $2`,
+       where sv.cita_id = $1 and ${condicionAccesoPorCita('c', '$2')}`,
       [req.params.citaId, req.empresaId]
     );
     if (!rows[0]) return res.status(404).json({ mensaje: 'Esta cita todavia no tiene signos vitales registrados' });

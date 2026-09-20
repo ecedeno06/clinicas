@@ -1,4 +1,5 @@
 const { pool } = require('../config/db');
+const { condicionAccesoPorCita } = require('../utils/accesoCitaCrossClinica');
 
 // Solo quien creo la receta puede editarla/eliminarla. Las recetas de
 // antes de este campo (creado_por null, autor desconocido) quedan sin
@@ -23,7 +24,7 @@ async function listarPorCita(req, res, next) {
     const { rows } = await pool.query(
       `select r.* from recetas r
        join citas c on c.id = r.cita_id
-       where r.cita_id = $1 and c.empresa_id = $2
+       where r.cita_id = $1 and ${condicionAccesoPorCita('c', '$2')}
        order by r.created_at asc`,
       [req.params.citaId, req.empresaId]
     );

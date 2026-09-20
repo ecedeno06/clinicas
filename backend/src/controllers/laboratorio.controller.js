@@ -1,4 +1,5 @@
 const { pool } = require('../config/db');
+const { condicionAccesoPorCita } = require('../utils/accesoCitaCrossClinica');
 
 async function cargarExamenes(ordenId) {
   const { rows } = await pool.query(
@@ -44,7 +45,7 @@ async function listarPorCita(req, res, next) {
     const { rows } = await pool.query(
       `select o.* from ordenes_laboratorio o
        join citas c on c.id = o.cita_id
-       where o.cita_id = $1 and c.empresa_id = $2
+       where o.cita_id = $1 and ${condicionAccesoPorCita('c', '$2')}
        order by o.created_at asc`,
       [req.params.citaId, req.empresaId]
     );
