@@ -98,6 +98,12 @@
           <a routerLink="/reportes/diagnosticos" routerLinkActive="active" class="nav-sub" title="Reporte de diagnosticos">
             <span class="nav-label">Diagnosticos</span>
           </a>
+          <a routerLink="/reportes/medicamentos" routerLinkActive="active" class="nav-sub" title="Reporte de medicamentos">
+            <span class="nav-label">Medicamentos</span>
+          </a>
+          <a routerLink="/reportes/laboratorios" routerLinkActive="active" class="nav-sub" title="Reporte de laboratorios">
+            <span class="nav-label">Laboratorios</span>
+          </a>
         }
       }
       @if (auth.esSuperAdmin() || auth.usuario()?.rol === 'admin') {

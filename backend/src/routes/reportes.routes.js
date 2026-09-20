@@ -8,5 +8,7 @@ const { requireAuth, requireEmpresa, requireRol } = require('../middleware/auth'
 router.use(requireAuth, requireEmpresa, requireRol('admin'));
 
 router.get('/diagnosticos', ctrl.diagnosticos);
+router.get('/medicamentos', ctrl.medicamentos);
+router.get('/laboratorios', ctrl.laboratorios);
 
 module.exports = router;

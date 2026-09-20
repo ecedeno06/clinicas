@@ -776,6 +776,37 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; colo
   overflow: auto;
 }
 
+/* Tablas largas (Citas, los Reportes) que en vez de estirar toda la
+   pagina muestran lo que cabe en la ventana y scrollean solas, con el
+   encabezado (titulos + fila de filtros) siempre visible. El offset es
+   distinto por pantalla porque cambia cuanto contenido fijo hay arriba
+   de la tabla (topbar + encabezado + filtros) -- se define inline con
+   --table-scroll-offset en cada plantilla. */
+.table-wrap-scroll-viewport {
+  max-height: calc(100vh - var(--table-scroll-offset, 300px));
+  overflow-y: auto;
+}
+/* Sticky en el <thead> completo (no fila por fila): asi ambas filas del
+   encabezado (titulos + filtros) se quedan pegadas juntas sin importar
+   su alto real -- fijar un "top" a mano por fila rompia cada vez que el
+   alto del encabezado cambiaba (ej. la tabla de Citas usa una fuente mas
+   chica que el resto, dejando un hueco por el que se filtraban filas). */
+.table-wrap-scroll-viewport thead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+/* border-collapse:collapse (el default de .data-table) hace que Chrome/
+   Edge no pinten bien el fondo de un th sticky sobre las filas que
+   scrollean debajo -- se filtran fragmentos de la fila por las costuras
+   del borde colapsado. border-collapse:separate evita el problema (los
+   bordes se ven igual porque cada celda ya trae su propio
+   border-bottom). */
+.table-wrap-scroll-viewport table.data-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
 table.data-table {
   width: 100%;
   border-collapse: collapse;

@@ -615,3 +615,41 @@ export interface ReporteDiagnosticoFila {
   doctor_nombre: string;
   sucursal_nombre: string;
 }
+
+// Fila del reporte de Medicamentos (GET /api/reportes/medicamentos, solo
+// admin) -- una por MEDICAMENTO, no por cita: una cita puede tener varias
+// recetas y cada receta varios medicamentos (a diferencia de
+// ReporteDiagnosticoFila, aca no se agrega nada).
+export interface ReporteMedicamentoFila {
+  medicamento_id: string;
+  cita_id: string;
+  fecha: string;
+  hora_inicio: string;
+  hora_fin: string;
+  paciente_nombre: string;
+  medicamento: string;
+  dosis: string | null;
+  frecuencia: string | null;
+  duracion: string | null;
+  doctor_nombre: string;
+  sucursal_nombre: string;
+}
+
+// Fila del reporte de Laboratorios (GET /api/reportes/laboratorios, solo
+// admin) -- una por EXAMEN, no por cita ni por orden: una cita puede
+// tener varias ordenes y cada orden varios examenes.
+export interface ReporteLaboratorioFila {
+  examen_id: string;
+  cita_id: string;
+  fecha: string;
+  hora_inicio: string;
+  hora_fin: string;
+  paciente_nombre: string;
+  nombre_examen: string;
+  resultado: string | null;
+  valor_referencia: string | null;
+  unidad: string | null;
+  orden_estado: 'pendiente' | 'completada' | 'cancelada';
+  doctor_nombre: string;
+  sucursal_nombre: string;
+}

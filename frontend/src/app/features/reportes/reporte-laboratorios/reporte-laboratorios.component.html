@@ -1,7 +1,7 @@
 <div class="page-header">
   <div>
-    <h1>Reporte de diagnosticos</h1>
-    <div class="desc">Diagnosticos y medicamentos por sucursal y rango de fechas</div>
+    <h1>Reporte de laboratorios</h1>
+    <div class="desc">Examenes de laboratorio por sucursal y rango de fechas</div>
   </div>
 </div>
 
@@ -47,39 +47,48 @@
       <thead>
         <tr>
           <th><input type="checkbox" [checked]="todosVisiblesSeleccionados()" (change)="toggleSeleccionarTodosVisibles()" title="Seleccionar todos" /></th>
-          <th>Fecha - Hora</th><th>Paciente</th><th>Diagnostico</th><th>Medicamento</th><th>Doctor</th><th>Sucursal</th>
+          <th>Fecha - Hora</th><th>Paciente</th><th>Examen</th><th>Resultado</th><th>Estado</th><th>Doctor</th><th>Sucursal</th>
         </tr>
         <tr class="filter-row">
           <th></th>
           <th></th>
           <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroPaciente()" (ngModelChange)="filtroPaciente.set($event)" /></th>
-          <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroDiagnostico()" (ngModelChange)="filtroDiagnostico.set($event)" /></th>
-          <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroMedicamento()" (ngModelChange)="filtroMedicamento.set($event)" /></th>
+          <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroExamen()" (ngModelChange)="filtroExamen.set($event)" /></th>
+          <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroResultado()" (ngModelChange)="filtroResultado.set($event)" /></th>
+          <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroEstado()" (ngModelChange)="filtroEstado.set($event)" /></th>
           <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroDoctor()" (ngModelChange)="filtroDoctor.set($event)" /></th>
           <th>
             <input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroSucursal()" (ngModelChange)="filtroSucursal.set($event)" />
           </th>
         </tr>
         @if (hayFiltrosColumna()) {
-          <tr><th colspan="7" style="text-align:right;"><button class="btn btn-outline btn-sm" (click)="limpiarFiltrosColumna()">Limpiar filtros</button></th></tr>
+          <tr><th colspan="8" style="text-align:right;"><button class="btn btn-outline btn-sm" (click)="limpiarFiltrosColumna()">Limpiar filtros</button></th></tr>
         }
       </thead>
       <tbody>
         @if (cargando()) {
-          <tr><td colspan="7"><div class="empty-state">Buscando...</div></td></tr>
+          <tr><td colspan="8"><div class="empty-state">Buscando...</div></td></tr>
         } @else {
-          @for (f of filasFiltradas(); track f.cita_id) {
+          @for (f of filasFiltradas(); track f.examen_id) {
             <tr>
-              <td><input type="checkbox" [checked]="seleccionados().has(f.cita_id)" (change)="toggleSeleccion(f.cita_id)" /></td>
+              <td><input type="checkbox" [checked]="seleccionados().has(f.examen_id)" (change)="toggleSeleccion(f.examen_id)" /></td>
               <td>{{ f.fecha | date:'dd/MM/yyyy':'UTC' }}<div class="text-muted text-sm">{{ formatoAmPm(f.hora_inicio) }} - {{ formatoAmPm(f.hora_fin) }}</div></td>
               <td>{{ f.paciente_nombre }}</td>
-              <td>{{ f.diagnostico }}</td>
-              <td>{{ f.medicamentos || '-' }}</td>
+              <td>{{ f.nombre_examen }}</td>
+              <td>{{ f.resultado || '-' }}</td>
+              <td>
+                <span class="badge"
+                  [class.badge-slate]="f.orden_estado === 'pendiente'"
+                  [class.badge-green]="f.orden_estado === 'completada'"
+                  [class.badge-red]="f.orden_estado === 'cancelada'">
+                  {{ estadoEtiqueta(f.orden_estado) }}
+                </span>
+              </td>
               <td>{{ f.doctor_nombre }}</td>
               <td>{{ f.sucursal_nombre }}</td>
             </tr>
           } @empty {
-            <tr><td colspan="7"><div class="empty-state">No hay diagnosticos para estos filtros.</div></td></tr>
+            <tr><td colspan="8"><div class="empty-state">No hay examenes para estos filtros.</div></td></tr>
           }
         }
       </tbody>
