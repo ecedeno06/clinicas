@@ -104,7 +104,7 @@
       </div>
 
       <div class="mt-16">
-        <app-mini-calendario-mes [fechaSeleccionada]="fechaCalendario()" (fechaElegida)="seleccionarFechaCalendario($event)"></app-mini-calendario-mes>
+        <app-mini-calendario-mes [fechaSeleccionada]="fechaCalendario()" [diasConCitas]="diasConCitasCalendario()" (fechaElegida)="seleccionarFechaCalendario($event)"></app-mini-calendario-mes>
       </div>
     </aside>
 

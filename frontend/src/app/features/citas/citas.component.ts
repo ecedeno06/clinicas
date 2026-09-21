@@ -329,6 +329,26 @@ export class CitasComponent implements OnInit {
     });
   });
 
+  // Dias con al menos una cita para marcar en el mini-calendario del
+  // sidebar -- a diferencia de citasCalendarioFiltradas (que solo trae el
+  // dia activo, cargado por cargarCalendario()), esto se calcula sobre
+  // `citas` (todas las fechas, ya cargado por cargar() para la vista
+  // Lista), aplicando los mismos filtros de doctor/estado/sucursal del
+  // sidebar del calendario.
+  diasConCitasCalendario = computed(() => {
+    const doctorIds = this.filtroCalDoctorIds();
+    const estados = this.filtroCalEstados();
+    const sucursalId = this.filtroCalSucursal();
+    const dias = new Set<string>();
+    for (const c of this.citas()) {
+      if (doctorIds.size > 0 && !doctorIds.has(c.doctor_id)) continue;
+      if (!estados.has(estadoEfectivo(c))) continue;
+      if (sucursalId && c.sucursal_id !== sucursalId) continue;
+      dias.add(c.fecha.substring(0, 10));
+    }
+    return dias;
+  });
+
   cambiarVista(v: 'lista' | 'calendario'): void {
     this.vista.set(v);
     if (v === 'calendario') this.cargarCalendario();
