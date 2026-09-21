@@ -8,6 +8,13 @@
   }
 </div>
 
+@if (filtroCumpleanos()) {
+  <div class="flex items-center gap-8" style="background:var(--tint-teal-bg); border-radius:var(--radius); padding:10px 14px; margin-bottom:12px;">
+    <span style="flex:1;">Mostrando pacientes con cumpleanos el <strong>{{ filtroCumpleanosLegible() }}</strong>.</span>
+    <button type="button" class="btn btn-outline btn-sm" (click)="limpiarFiltros()">Quitar filtro</button>
+  </div>
+}
+
 <div class="table-wrap table-wrap-scroll-viewport" style="--table-scroll-offset: 160px;">
   <table class="data-table">
     <thead>
@@ -15,6 +22,7 @@
         <th>Nombre</th>
         <th>Identificacion</th>
         <th>Telefono</th>
+        <th>Fecha nacimiento</th>
         <th>Estado</th>
         <th></th>
       </tr>
@@ -22,6 +30,7 @@
         <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroNombre()" (ngModelChange)="filtroNombre.set($event)" /></th>
         <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroIdentificacion()" (ngModelChange)="filtroIdentificacion.set($event)" /></th>
         <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroTelefono()" (ngModelChange)="filtroTelefono.set($event)" /></th>
+        <th><input class="input" type="text" placeholder="dd/mmm/aaaa" [ngModel]="filtroFechaNacimiento()" (ngModelChange)="filtroFechaNacimiento.set($event)" /></th>
         <th></th>
         <th>
           @if (hayFiltros()) { <button class="btn btn-outline btn-sm" (click)="limpiarFiltros()">Limpiar</button> }
@@ -31,9 +40,17 @@
     <tbody>
       @for (p of pacientesFiltrados(); track p.id) {
         <tr>
-          <td>{{ p.nombre }}</td>
+          <td>
+            {{ p.nombre }}
+            @if (p.telefono && p.acepta_whatsapp && esCumpleanosHoy(p)) {
+              <a [href]="felicitarCumpleanosUrl(p)" target="_blank" rel="noopener" class="btn-icon" [title]="'Cumple ' + edadQueCumple(p) + ' anios hoy -- Felicitar por WhatsApp'" aria-label="Felicitar por su cumpleanos" style="color:#25D366;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21v-7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v7"/><path d="M5 15c1-1 2-1 3 0s2 1 3 0 2-1 3 0 2 1 3 0"/><path d="M12 12V8"/><path d="M9 12V9"/><path d="M15 12V9"/><circle cx="12" cy="6" r="1"/><circle cx="9" cy="7" r="1"/><circle cx="15" cy="7" r="1"/></svg>
+              </a>
+            }
+          </td>
           <td>{{ p.identificacion || '-' }}</td>
           <td>{{ p.telefono || '-' }}</td>
+          <td>{{ formatoFechaNacimiento(p.fecha_nacimiento) || '-' }}</td>
           <td><span class="badge" [class.badge-green]="p.activo" [class.badge-slate]="!p.activo">{{ p.activo ? 'Activo' : 'Inactivo' }}</span></td>
           <td class="table-actions">
             @if (direccionPrincipal(p); as dirPrincipal) {
@@ -200,7 +217,7 @@
           </td>
         </tr>
       } @empty {
-        <tr><td colspan="5"><div class="empty-state">{{ hayFiltros() ? 'Ningun paciente coincide con los filtros.' : 'No hay pacientes registrados todavia.' }}</div></td></tr>
+        <tr><td colspan="6"><div class="empty-state">{{ hayFiltros() ? 'Ningun paciente coincide con los filtros.' : 'No hay pacientes registrados todavia.' }}</div></td></tr>
       }
     </tbody>
   </table>

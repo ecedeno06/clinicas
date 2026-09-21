@@ -53,6 +53,14 @@ export class DashboardComponent implements OnInit {
   citasPendientes = computed(() => this.citasFiltradas().filter((c) => c.estado === 'pendiente' || c.estado === 'confirmada').length);
   citasPorReagendar = computed(() => this.citasFiltradas().filter((c) => c.estado === 'reagendar').length);
 
+  // Cumpleanos del dia mostrado en la Agenda (hoy por defecto, o la fecha
+  // elegida) -- compara solo mes/dia de fecha_nacimiento, sin el anio.
+  cumpleanosDelDia = computed(() => {
+    const mesDia = this.fechaAgenda().substring(5, 10);
+    return this.pacientes().filter((p) => p.activo && p.fecha_nacimiento?.substring(5, 10) === mesDia);
+  });
+  mesDiaParaFiltro = computed(() => this.fechaAgenda().substring(5, 10));
+
   esHoy = computed(() => this.fechaAgenda() === hoyISO());
 
   agendaDelDia = computed(() =>

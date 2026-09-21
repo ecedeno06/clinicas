@@ -13,3 +13,22 @@
   padding: 10px;
   min-width: 240px;
 }
+
+/* Tarjetas de resumen mas compactas -- solo en el tablero, para que quepan
+   6 sin desbordar en pantallas medianas (las demas pantallas que reusan
+   .stat-card/.stats-grid no se ven afectadas por el encapsulamiento de
+   estilos de Angular). */
+.stats-grid {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+.stat-card {
+  padding: 10px 12px;
+}
+.stat-card .label {
+  font-size: 10.5px;
+}
+.stat-card .value {
+  font-size: 20px;
+  margin-top: 2px;
+}

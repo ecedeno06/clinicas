@@ -24,3 +24,13 @@ export function haceDiasISO(dias: number): string {
   const dia = String(d.getDate()).padStart(2, '0');
   return `${anio}-${mes}-${dia}`;
 }
+
+const MESES_CORTO = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+
+// dd/MMM/aaaa (ej. "21/sep/2001") -- usado en columnas de fecha de
+// nacimiento, donde el mes abreviado se lee mas rapido que el numero.
+export function formatoFechaDiaMesAbrAnio(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const [anio, mes, dia] = iso.substring(0, 10).split('-');
+  return `${dia}/${MESES_CORTO[Number(mes) - 1]}/${anio}`;
+}

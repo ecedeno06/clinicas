@@ -1,5 +1,6 @@
 import { Component, OnInit, ViewChild, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { ActivatedRoute } from '@angular/router';
 import { FormArray, FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { PacientesService } from '../../core/services/pacientes.service';
 import { CitasService } from '../../core/services/citas.service';
@@ -12,7 +13,7 @@ import { AntecedentesPatologicosService } from '../../core/services/antecedentes
 import { PacienteAntecedentesService } from '../../core/services/pacienteAntecedentes.service';
 import { DireccionPaciente, Doctor, EstadoCita, FamiliarPaciente, HistoriaClinica, OrdenLaboratorio, Paciente, PacienteAntecedente, Receta, SignosVitales, Sucursal, CategoriaAntecedente, AntecedentePatologico } from '../../core/models/models';
 import { formatoFechaCorta } from '../../core/utils/pdf.util';
-import { hoyISO } from '../../core/utils/fecha.util';
+import { hoyISO, formatoFechaDiaMesAbrAnio } from '../../core/utils/fecha.util';
 import { formatoAmPm } from '../../core/utils/hora12.util';
 import { clasificarImc } from '../../core/utils/imc.util';
 import { clasificarPresion } from '../../core/utils/presion.util';
@@ -118,24 +119,44 @@ export class PacientesComponent implements OnInit {
   filtroNombre = signal('');
   filtroIdentificacion = signal('');
   filtroTelefono = signal('');
+  filtroFechaNacimiento = signal('');
+  formatoFechaNacimiento = formatoFechaDiaMesAbrAnio;
 
-  hayFiltros = computed(() => !!(this.filtroNombre() || this.filtroIdentificacion() || this.filtroTelefono()));
+  // Pre-filtro que llega por query param (?cumpleanos=MM-DD) desde la
+  // tarjeta "Cumpleanos de hoy" del tablero -- no tiene su propia columna
+  // en la tabla, asi que se muestra como un aviso aparte en vez de un
+  // input de filtro mas.
+  filtroCumpleanos = signal('');
+  filtroCumpleanosLegible = computed(() => {
+    const [mes, dia] = this.filtroCumpleanos().split('-');
+    return `${dia}/${mes}`;
+  });
+
+  hayFiltros = computed(() =>
+    !!(this.filtroNombre() || this.filtroIdentificacion() || this.filtroTelefono() || this.filtroFechaNacimiento() || this.filtroCumpleanos())
+  );
 
   limpiarFiltros(): void {
     this.filtroNombre.set('');
     this.filtroIdentificacion.set('');
     this.filtroTelefono.set('');
+    this.filtroFechaNacimiento.set('');
+    this.filtroCumpleanos.set('');
   }
 
   pacientesFiltrados = computed(() => {
     const nombre = this.filtroNombre().trim().toLowerCase();
     const identificacion = this.filtroIdentificacion().trim().toLowerCase();
     const telefono = this.filtroTelefono().trim().toLowerCase();
+    const fechaNacimiento = this.filtroFechaNacimiento().trim().toLowerCase();
+    const cumpleanos = this.filtroCumpleanos();
 
     return this.pacientes().filter((p) => {
       if (nombre && !p.nombre.toLowerCase().includes(nombre)) return false;
       if (identificacion && !(p.identificacion ?? '').toLowerCase().includes(identificacion)) return false;
       if (telefono && !(p.telefono ?? '').toLowerCase().includes(telefono)) return false;
+      if (fechaNacimiento && !formatoFechaDiaMesAbrAnio(p.fecha_nacimiento).toLowerCase().includes(fechaNacimiento)) return false;
+      if (cumpleanos && p.fecha_nacimiento?.substring(5, 10) !== cumpleanos) return false;
       return true;
     });
   });
@@ -205,6 +226,7 @@ export class PacientesComponent implements OnInit {
     private antecedentesPatologicosSrv: AntecedentesPatologicosService,
     private pacienteAntecedentesSrv: PacienteAntecedentesService,
     private doctoresSrv: DoctoresService,
+    private route: ActivatedRoute,
     public auth: AuthService
   ) {}
 
@@ -214,6 +236,9 @@ export class PacientesComponent implements OnInit {
     this.antecedentesPatologicosSrv.listar().subscribe((data) => this.antecedentesCatalogo.set(data));
     this.sucursalesSrv.listar().subscribe((data) => this.sucursales.set(data.filter((s) => s.activo)));
     this.doctoresSrv.listar().subscribe((data) => this.doctoresParaAntecedente.set(data));
+
+    const cumpleanos = this.route.snapshot.queryParamMap.get('cumpleanos');
+    if (cumpleanos) this.filtroCumpleanos.set(cumpleanos);
   }
   cargar(): void { this.srv.listar().subscribe((data) => this.pacientes.set(data)); }
 
@@ -557,6 +582,25 @@ export class PacientesComponent implements OnInit {
 
   soloDigitos(telefono: string | null | undefined): string {
     return (telefono || '').replace(/\D/g, '');
+  }
+
+  // Boton de cumpleanos en la fila: solo aparece si hoy es el cumpleanos
+  // del paciente (compara mes/dia de fecha_nacimiento, sin el anio) -- no
+  // tiene sentido felicitar a alguien un dia cualquiera.
+  esCumpleanosHoy(p: Paciente): boolean {
+    return !!p.fecha_nacimiento && p.fecha_nacimiento.substring(5, 10) === hoyISO().substring(5, 10);
+  }
+
+  edadQueCumple(p: Paciente): number {
+    const anioNacimiento = Number(p.fecha_nacimiento?.substring(0, 4));
+    return Number(hoyISO().substring(0, 4)) - anioNacimiento;
+  }
+
+  felicitarCumpleanosUrl(p: Paciente): string {
+    const telefono = this.soloDigitos(p.telefono);
+    const empresa = this.auth.empresaActiva()?.empresa_nombre || 'la clinica';
+    const mensaje = `Feliz cumpleanos, ${p.nombre}! Todo el equipo de ${empresa} te desea un dia lleno de alegria y bendiciones.`;
+    return `https://wa.me/${telefono}?text=${encodeURIComponent(mensaje)}`;
   }
 
   enviarWhatsapp(p: Paciente): void {

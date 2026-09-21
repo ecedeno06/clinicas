@@ -43,6 +43,10 @@
       <div class="value">{{ laboratoriosPendientes().length }}</div>
     </button>
   }
+  <a class="stat-card stat-card-clickable" routerLink="/pacientes" [queryParams]="{ cumpleanos: mesDiaParaFiltro() }">
+    <div class="label">{{ esHoy() ? 'Cumpleanos de hoy' : 'Cumpleanos del dia' }}</div>
+    <div class="value">{{ cumpleanosDelDia().length }}</div>
+  </a>
 </div>
 
 @if (mostrarPendientesLaboratorio()) {
