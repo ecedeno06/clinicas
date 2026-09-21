@@ -26,6 +26,7 @@ import { BuscadorAntecedenteComponent } from '../../core/components/buscador-ant
 import { BuscadorPacienteComponent } from '../../core/components/buscador-paciente/buscador-paciente.component';
 import { PacienteRapidoFormComponent } from '../../core/components/paciente-rapido-form/paciente-rapido-form.component';
 import { extraerLatLng } from '../../core/components/mapa-selector/mapa-selector.component';
+import { puedeCompartirUbicacionCita, whatsappUrlUbicacionCita } from '../../core/utils/compartirUbicacionCita.util';
 import { direccionPrincipal } from '../../core/utils/direccion.util';
 import { generarPdf, encabezadoClinica, formatoFechaCorta } from '../../core/utils/pdf.util';
 import { TDocumentDefinitions } from 'pdfmake/interfaces';
@@ -892,9 +893,10 @@ export class CitasComponent implements OnInit {
 
   // Solo tiene sentido ofrecer "compartir ubicacion" si hay a donde
   // mandarlo (telefono del paciente, marcado explicitamente como que
-  // recibe WhatsApp) y que mandar (enlace de la sucursal).
+  // recibe WhatsApp) y que mandar (enlace de la sucursal) -- logica
+  // compartida con dashboard.component.ts, ver compartirUbicacionCita.util.ts.
   puedeCompartirUbicacion(c: Cita): boolean {
-    return !!c.paciente_telefono && !!c.paciente_acepta_whatsapp && !!c.sucursal_google_maps_url;
+    return puedeCompartirUbicacionCita(c);
   }
 
   // Mismo criterio que puedeCompartirUbicacion(), pero evaluado ANTES de
@@ -908,37 +910,10 @@ export class CitasComponent implements OnInit {
   }
 
   // wa.me abre WhatsApp Web/app con el mensaje precargado para ese numero
-  // -- no requiere API ni cuenta de WhatsApp Business.
+  // -- no requiere API ni cuenta de WhatsApp Business. Logica compartida
+  // con dashboard.component.ts, ver compartirUbicacionCita.util.ts.
   whatsappUrl(c: Cita): string {
-    const telefono = (c.paciente_telefono || '').replace(/\D/g, '');
-    const empresa = this.auth.empresaActiva()?.empresa_nombre;
-
-    const lineas = [
-      `Hola ${c.paciente_nombre}, te confirmamos los datos de tu cita en ${empresa}:`,
-      '',
-      `Fecha: ${formatearFecha(c.fecha)}`,
-      `Hora: ${formatoAmPm(c.hora_inicio)}`,
-      `Doctor: ${c.doctor_nombre} (${c.especialidad_nombre})`,
-      `Sucursal: ${c.sucursal_nombre}`,
-    ];
-    if (c.sucursal_direccion) lineas.push(c.sucursal_direccion);
-    if (c.sucursal_hora_apertura && c.sucursal_hora_cierre) {
-      lineas.push(`Horario de atencion de la sucursal: ${formatoAmPm(c.sucursal_hora_apertura)} - ${formatoAmPm(c.sucursal_hora_cierre)}`);
-    }
-    if (c.sucursal_telefono) {
-      lineas.push(`Telefono: ${c.sucursal_telefono}${c.sucursal_acepta_whatsapp ? ' (WhatsApp)' : ''}`);
-    }
-    lineas.push('', `Ubicacion (Google Maps): ${c.sucursal_google_maps_url}`);
-
-    // Waze es muy usado en la region junto a Google Maps -- si se puede
-    // extraer lat/lng del enlace guardado, se ofrece tambien el link
-    // directo para abrir la navegacion en Waze.
-    const coords = extraerLatLng(c.sucursal_google_maps_url);
-    if (coords) {
-      lineas.push(`Abrir con Waze: https://waze.com/ul?ll=${coords[0]},${coords[1]}&navigate=yes`);
-    }
-
-    return `https://wa.me/${telefono}?text=${encodeURIComponent(lineas.join('\n'))}`;
+    return whatsappUrlUbicacionCita(c, this.auth.empresaActiva()?.empresa_nombre);
   }
 
   abrirNuevo(): void {

@@ -2,6 +2,7 @@ import { Component, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { forkJoin } from 'rxjs';
 import { PacientesService } from '../../core/services/pacientes.service';
 import { DoctoresService } from '../../core/services/doctores.service';
@@ -12,6 +13,8 @@ import { Cita, Doctor, LaboratorioPendiente, Paciente, Sucursal } from '../../co
 import { formatoAmPm } from '../../core/utils/hora12.util';
 import { hoyISO } from '../../core/utils/fecha.util';
 import { colorEstadoCita, estadoEfectivo } from '../citas/calendario/calendario.util';
+import { extraerLatLng } from '../../core/components/mapa-selector/mapa-selector.component';
+import { puedeCompartirUbicacionCita, whatsappUrlUbicacionCita } from '../../core/utils/compartirUbicacionCita.util';
 
 @Component({
   selector: 'app-dashboard',
@@ -73,7 +76,8 @@ export class DashboardComponent implements OnInit {
     private doctoresSrv: DoctoresService,
     private citasSrv: CitasService,
     private sucursalesSrv: SucursalesService,
-    public auth: AuthService
+    public auth: AuthService,
+    private sanitizer: DomSanitizer
   ) {}
 
   puedeVerLaboratorio(): boolean {
@@ -103,5 +107,43 @@ export class DashboardComponent implements OnInit {
   fechaParaFiltro(iso: string): string {
     const [anio, mes, dia] = iso.substring(0, 10).split('-');
     return `${dia}/${mes}/${anio}`;
+  }
+
+  // Popup "Ubicacion de la sucursal": un mapa de Google (embebido, sin
+  // API key -- mismo truco de ?output=embed que usan enlaces publicos de
+  // Google Maps) mas un boton para compartir esa misma ubicacion por
+  // WhatsApp con el paciente de esa cita (logica compartida con
+  // citas.component.ts, ver compartirUbicacionCita.util.ts).
+  citaMapaAbierta = signal<Cita | null>(null);
+  urlMapaAbierta = signal<SafeResourceUrl | null>(null);
+
+  // El embed de Google Maps sin API key solo funciona con lat/lng en la
+  // URL (?q=lat,lng&output=embed) -- si el enlace guardado no trae
+  // coordenadas (ej. un link corto o de busqueda por nombre), no hay
+  // forma de embeberlo y se ofrece en su lugar un link a Google Maps.
+  // bypassSecurityTrustResourceUrl es seguro aca: la URL la arma este
+  // mismo metodo a partir de numeros ya validados por extraerLatLng(),
+  // nunca de texto libre del usuario.
+  //
+  // Se calcula UNA sola vez al abrir el popup (no desde el template) --
+  // llamarlo directamente en el template recreaba el SafeResourceUrl en
+  // cada ciclo de deteccion de cambios, y Angular interpretaba eso como
+  // un src nuevo cada vez, recargando el iframe sin parar (se veia como
+  // un parpadeo constante del mapa).
+  abrirMapaSucursal(c: Cita): void {
+    this.citaMapaAbierta.set(c);
+    const coords = extraerLatLng(c.sucursal_google_maps_url);
+    this.urlMapaAbierta.set(
+      coords ? this.sanitizer.bypassSecurityTrustResourceUrl(`https://www.google.com/maps?q=${coords[0]},${coords[1]}&z=16&output=embed`) : null
+    );
+  }
+  cerrarMapaSucursal(): void {
+    this.citaMapaAbierta.set(null);
+    this.urlMapaAbierta.set(null);
+  }
+
+  puedeCompartirUbicacion = puedeCompartirUbicacionCita;
+  whatsappUrlUbicacion(c: Cita): string {
+    return whatsappUrlUbicacionCita(c, this.auth.empresaActiva()?.empresa_nombre);
   }
 }
