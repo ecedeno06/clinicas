@@ -2,7 +2,6 @@ import { Component, ElementRef, ViewChild, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import * as L from 'leaflet';
-import 'leaflet.heat';
 import { ReportesService } from '../../../core/services/reportes.service';
 import { ReporteMapaCalorFila } from '../../../core/models/models';
 import { hoyISO } from '../../../core/utils/fecha.util';
@@ -22,6 +21,28 @@ const CENTRO_POR_DEFECTO: [number, number] = [8.9824, -79.5199];
 // por completo (queda en intensidad 1 siempre que el mapa este a este
 // zoom exacto).
 const ZOOM_UN_PUNTO = 15;
+
+// leaflet.heat NO exporta nada -- es un script clasico que espera
+// encontrar una variable global "L" y le agrega heatLayer/HeatLayer
+// encima. Con "ng serve" (dev), "leaflet" se resuelve por su entrada
+// CommonJS/UMD, que como efecto secundario deja "window.L" definido, asi
+// que el parche cae sobre el mismo objeto que usa este componente. En el
+// build de produccion (optimizado para tree-shaking), "leaflet" se
+// resuelve por su entrada ESM, que NO deja ese global -- leaflet.heat
+// termina parchando un "L" distinto (o ninguno), y L.heatLayer queda
+// undefined aca ("L.heatLayer is not a function" solo en produccion).
+// Por eso se fuerza "window.L" a este MISMO modulo antes de
+// cargar el plugin (con import() dinamico, para que ocurra en ese orden
+// exacto -- un import estatico normal se ejecutaria antes que cualquier
+// otra linea de este archivo, sin importar donde se escriba).
+let leafletHeatListo: Promise<void> | null = null;
+function asegurarLeafletHeat(): Promise<void> {
+  if (!leafletHeatListo) {
+    (window as unknown as { L: typeof L }).L = L;
+    leafletHeatListo = import('leaflet.heat').then(() => undefined);
+  }
+  return leafletHeatListo;
+}
 
 // Mapa de calor de diagnosticos por sucursal: agrega el volumen de
 // diagnosticos registrados (mismo criterio que ReporteDiagnosticosComponent)
@@ -66,13 +87,13 @@ export class ReporteMapaCalorDiagnosticosComponent {
         this.buscado.set(true);
         // El contenedor del mapa recien se renderiza con @if -- hay que
         // esperar al siguiente ciclo para que exista en el DOM.
-        setTimeout(() => this.actualizarMapa(), 0);
+        setTimeout(() => { this.actualizarMapa().catch((err) => console.error('No se pudo pintar el mapa de calor', err)); }, 0);
       },
       error: () => { this.filas.set([]); this.cargando.set(false); this.buscado.set(true); },
     });
   }
 
-  private actualizarMapa(): void {
+  private async actualizarMapa(): Promise<void> {
     if (!this.mapa) {
       if (!this.mapaContainerRef) return;
       const calles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -110,6 +131,9 @@ export class ReporteMapaCalorDiagnosticosComponent {
       const bounds = L.latLngBounds(conCoordenadas.map((f) => [f.latitud, f.longitud]));
       this.mapa.fitBounds(bounds, { padding: [40, 40], maxZoom: ZOOM_UN_PUNTO });
     }
+
+    await asegurarLeafletHeat();
+    if (!this.mapa) return; // por si el componente se destruyo mientras se cargaba el plugin
 
     const maxCantidad = Math.max(...conCoordenadas.map((f) => f.cantidad));
     const puntos: [number, number, number][] = conCoordenadas.map((f) => [f.latitud, f.longitud, f.cantidad / maxCantidad]);
