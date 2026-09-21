@@ -15,6 +15,7 @@ const NOMBRES_DIA_CORTO = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
 })
 export class MiniCalendarioMesComponent implements OnChanges {
   @Input() fechaSeleccionada = hoyISO();
+  @Input() diasConCitas: ReadonlySet<string> = new Set();
   @Output() fechaElegida = new EventEmitter<string>();
 
   readonly nombresDia = NOMBRES_DIA_CORTO;
@@ -64,6 +65,10 @@ export class MiniCalendarioMesComponent implements OnChanges {
 
   esHoy(fecha: string): boolean {
     return fecha === hoyISO();
+  }
+
+  tieneCitas(fecha: string): boolean {
+    return this.diasConCitas.has(fecha);
   }
 
   elegir(fecha: string): void {

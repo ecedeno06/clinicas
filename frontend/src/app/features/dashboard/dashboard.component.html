@@ -84,7 +84,17 @@
     <p class="desc" style="margin-bottom:0;">Citas agendadas para la fecha seleccionada, ordenadas por hora</p>
   </div>
   <div class="flex items-center gap-8">
-    <input class="input" type="date" [ngModel]="fechaAgenda()" (ngModelChange)="fechaAgenda.set($event)" style="max-width:180px;" />
+    <div class="calendario-agenda-wrap">
+      <button type="button" class="btn btn-outline btn-sm" (click)="calendarioAbierto.set(!calendarioAbierto())">
+        {{ fechaParaFiltro(fechaAgenda()) }}
+      </button>
+      @if (calendarioAbierto()) {
+        <div class="dropdown-backdrop" (click)="calendarioAbierto.set(false)"></div>
+        <div class="dropdown-menu calendario-agenda-menu">
+          <app-mini-calendario-mes [fechaSeleccionada]="fechaAgenda()" [diasConCitas]="diasConCitas()" (fechaElegida)="seleccionarFechaCalendario($event)"></app-mini-calendario-mes>
+        </div>
+      }
+    </div>
     @if (!esHoy()) {
       <button type="button" class="btn btn-outline btn-sm" (click)="irAHoy()">Hoy</button>
     }

@@ -13,13 +13,14 @@ import { Cita, Doctor, LaboratorioPendiente, Paciente, Sucursal } from '../../co
 import { formatoAmPm } from '../../core/utils/hora12.util';
 import { hoyISO } from '../../core/utils/fecha.util';
 import { colorEstadoCita, estadoEfectivo } from '../citas/calendario/calendario.util';
+import { MiniCalendarioMesComponent } from '../citas/calendario/mini-calendario-mes.component';
 import { extraerLatLng } from '../../core/components/mapa-selector/mapa-selector.component';
 import { puedeCompartirUbicacionCita, whatsappUrlUbicacionCita } from '../../core/utils/compartirUbicacionCita.util';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink, MiniCalendarioMesComponent],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.css',
 })
@@ -68,6 +69,18 @@ export class DashboardComponent implements OnInit {
   sucursalNombreFiltro = computed(() => this.sucursales().find((s) => s.id === this.sucursalFiltro())?.nombre ?? '');
 
   irAHoy(): void { this.fechaAgenda.set(hoyISO()); }
+
+  // Selector de fecha de la Agenda: reemplaza el <input type="date"> nativo
+  // (su calendario emergente es del navegador, no se puede marcar) por
+  // app-mini-calendario-mes (ya usado en Citas > Calendario), que sí permite
+  // resaltar los días con citas agendadas.
+  calendarioAbierto = signal(false);
+  diasConCitas = computed(() => new Set(this.citasFiltradas().map((c) => c.fecha.substring(0, 10))));
+
+  seleccionarFechaCalendario(fecha: string): void {
+    this.fechaAgenda.set(fecha);
+    this.calendarioAbierto.set(false);
+  }
 
   formatoAmPm = formatoAmPm;
 

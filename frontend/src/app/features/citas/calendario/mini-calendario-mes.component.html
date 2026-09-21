@@ -19,6 +19,7 @@
         [class.fuera-de-mes]="!dia.enMes"
         [class.hoy]="esHoy(dia.fecha)"
         [class.seleccionado]="dia.fecha === fechaSeleccionada"
+        [class.con-citas]="tieneCitas(dia.fecha)"
         (click)="elegir(dia.fecha)"
       >
         {{ diaDeMes(dia.fecha) }}

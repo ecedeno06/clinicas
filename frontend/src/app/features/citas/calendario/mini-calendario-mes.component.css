@@ -69,3 +69,14 @@
   color: var(--white);
 }
 .mini-cal-celda.seleccionado:hover { background: var(--slate-800); }
+
+.mini-cal-celda.con-citas::after {
+  content: '';
+  position: absolute;
+  bottom: 3px;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--teal-500);
+}
+.mini-cal-celda.con-citas.seleccionado::after { background: var(--white); }

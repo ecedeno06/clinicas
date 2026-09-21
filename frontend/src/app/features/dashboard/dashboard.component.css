@@ -4,3 +4,12 @@
   border: 0;
   border-radius: 8px;
 }
+
+.calendario-agenda-wrap {
+  position: relative;
+}
+
+.calendario-agenda-menu {
+  padding: 10px;
+  min-width: 240px;
+}
