@@ -11,6 +11,18 @@ import { hoyISO } from '../../../core/utils/fecha.util';
 // Panama) para cuando ninguna sucursal tiene coordenadas todavia.
 const CENTRO_POR_DEFECTO: [number, number] = [8.9824, -79.5199];
 
+// Zoom fijo para cuando solo hay UNA sucursal con coordenadas: fitBounds
+// sobre un bounds de un solo punto (area cero) es un caso ambiguo en
+// Leaflet -- el zoom resultante depende del tamano del contenedor y
+// puede terminar muy lejos o muy cerca, y leaflet.heat atenua la
+// intensidad segun que tan lejos este el zoom actual de su propio
+// "maxZoom" (options.maxZoom abajo), asi que un zoom inesperado puede
+// dejar el resplandor practicamente invisible. Usar el mismo numero fijo
+// para el zoom Y para options.maxZoom del heatLayer evita esa atenuacion
+// por completo (queda en intensidad 1 siempre que el mapa este a este
+// zoom exacto).
+const ZOOM_UN_PUNTO = 15;
+
 // Mapa de calor de diagnosticos por sucursal: agrega el volumen de
 // diagnosticos registrados (mismo criterio que ReporteDiagnosticosComponent)
 // por sucursal, y lo pinta como un resplandor de calor sobre sus
@@ -88,14 +100,19 @@ export class ReporteMapaCalorDiagnosticosComponent {
       .filter((f) => !Number.isNaN(f.latitud) && !Number.isNaN(f.longitud));
     if (conCoordenadas.length === 0) return;
 
-    // fitBounds primero: si algo falla al pintar el resplandor, el mapa
-    // igual queda centrado/con zoom correcto en vez de en el centro por
-    // defecto de todo Panama.
-    const bounds = L.latLngBounds(conCoordenadas.map((f) => [f.latitud, f.longitud]));
-    this.mapa.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 });
+    // Centrar/hacer zoom primero: si algo falla al pintar el resplandor,
+    // el mapa igual queda bien ubicado en vez de en el centro por
+    // defecto de todo Panama. Con una sola sucursal se usa setView a un
+    // zoom fijo en vez de fitBounds (ver comentario de ZOOM_UN_PUNTO).
+    if (conCoordenadas.length === 1) {
+      this.mapa.setView([conCoordenadas[0].latitud, conCoordenadas[0].longitud], ZOOM_UN_PUNTO);
+    } else {
+      const bounds = L.latLngBounds(conCoordenadas.map((f) => [f.latitud, f.longitud]));
+      this.mapa.fitBounds(bounds, { padding: [40, 40], maxZoom: ZOOM_UN_PUNTO });
+    }
 
     const maxCantidad = Math.max(...conCoordenadas.map((f) => f.cantidad));
     const puntos: [number, number, number][] = conCoordenadas.map((f) => [f.latitud, f.longitud, f.cantidad / maxCantidad]);
-    this.capaCalor = L.heatLayer(puntos, { radius: 45, blur: 35, maxZoom: 17 }).addTo(this.mapa);
+    this.capaCalor = L.heatLayer(puntos, { radius: 45, blur: 35, maxZoom: ZOOM_UN_PUNTO, minOpacity: 0.4 }).addTo(this.mapa);
   }
 }
