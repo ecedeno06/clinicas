@@ -1,0 +1,68 @@
+<div class="page-header">
+  <div>
+    <h1>Mapa de calor de diagnosticos</h1>
+    <div class="desc">Concentracion de diagnosticos por sucursal, segun su ubicacion</div>
+  </div>
+</div>
+
+<div class="flex gap-16" style="flex-wrap:wrap;">
+  <div class="form-group" style="min-width:160px;">
+    <label>Desde</label>
+    <input class="input" type="date" [ngModel]="desde()" (ngModelChange)="desde.set($event)" />
+  </div>
+  <div class="form-group" style="min-width:160px;">
+    <label>Hasta</label>
+    <input class="input" type="date" [ngModel]="hasta()" (ngModelChange)="hasta.set($event)" />
+  </div>
+  <div class="form-group" style="min-width:220px; flex:1;">
+    <label>Buscar en el diagnostico (opcional)</label>
+    <input class="input" type="text" placeholder="ej. diabetes" [ngModel]="filtroTexto()" (ngModelChange)="filtroTexto.set($event)" />
+  </div>
+  <div class="form-group" style="justify-content:flex-end; display:flex;">
+    <button type="button" class="btn btn-accent" (click)="buscar()">Buscar</button>
+  </div>
+</div>
+
+@if (buscado()) {
+  <div class="page-header mt-16">
+    <div>
+      <h2 style="margin:0;">{{ totalDiagnosticos() }} diagnosticos en {{ filas().length }} sucursal{{ filas().length === 1 ? '' : 'es' }}</h2>
+      <p class="text-muted text-sm" style="margin:0;">{{ desde() | date:'dd/MM/yyyy':'UTC' }} – {{ hasta() | date:'dd/MM/yyyy':'UTC' }}</p>
+    </div>
+  </div>
+
+  <!-- El contenedor del mapa NUNCA se destruye entre busquedas (a
+       diferencia de un @if/@else sobre cargando()) -- si se destruyera,
+       el mapa de Leaflet creado en la primera busqueda quedaria
+       apuntando a un <div> ya eliminado del DOM, y las busquedas
+       siguientes no pintarian nada (ver actualizarMapa() en el .ts). -->
+  <div class="card" style="position:relative;">
+    @if (cargando()) {
+      <div class="empty-state" style="position:absolute; inset:0; z-index:5; background:rgba(255,255,255,0.75); display:flex; align-items:center; justify-content:center;">Buscando...</div>
+    }
+    <div #mapaContainer class="mapa-calor-mapa"></div>
+  </div>
+
+  @if (!cargando()) {
+    <div class="table-wrap mt-16">
+      <table class="data-table">
+        <thead><tr><th>Sucursal</th><th>Diagnosticos</th><th></th></tr></thead>
+        <tbody>
+          @for (f of filas(); track f.sucursal_id) {
+            <tr>
+              <td>{{ f.sucursal_nombre }}</td>
+              <td>{{ f.cantidad }}</td>
+              <td>
+                @if (f.latitud == null || f.longitud == null) {
+                  <span class="badge badge-amber" title="Edita su direccion en Sucursales (elige la ubicacion en el mapa) para que aparezca aqui">Sin ubicacion guardada</span>
+                }
+              </td>
+            </tr>
+          } @empty {
+            <tr><td colspan="3"><div class="empty-state">No hay diagnosticos para estos filtros.</div></td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+}

@@ -104,6 +104,9 @@
           <a routerLink="/reportes/laboratorios" routerLinkActive="active" class="nav-sub" title="Reporte de laboratorios">
             <span class="nav-label">Laboratorios</span>
           </a>
+          <a routerLink="/reportes/mapa-calor-diagnosticos" routerLinkActive="active" class="nav-sub" title="Mapa de calor de diagnosticos">
+            <span class="nav-label">Mapa de calor</span>
+          </a>
         }
       }
       @if (auth.esSuperAdmin() || auth.usuario()?.rol === 'admin') {

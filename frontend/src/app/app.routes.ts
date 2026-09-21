@@ -27,6 +27,7 @@ import { ReporteCitasComponent } from './features/reportes/reporte-citas/reporte
 import { ReporteDiagnosticosComponent } from './features/reportes/reporte-diagnosticos/reporte-diagnosticos.component';
 import { ReporteMedicamentosComponent } from './features/reportes/reporte-medicamentos/reporte-medicamentos.component';
 import { ReporteLaboratoriosComponent } from './features/reportes/reporte-laboratorios/reporte-laboratorios.component';
+import { ReporteMapaCalorDiagnosticosComponent } from './features/reportes/reporte-mapa-calor-diagnosticos/reporte-mapa-calor-diagnosticos.component';
 import { PerfilPacienteComponent } from './features/portal-paciente/perfil-paciente.component';
 import { MisClinicasComponent } from './features/portal-paciente/mis-clinicas.component';
 import { CitasPacienteComponent } from './features/portal-paciente/citas-paciente.component';
@@ -57,6 +58,7 @@ export const routes: Routes = [
       { path: 'reportes/diagnosticos', component: ReporteDiagnosticosComponent, canActivate: [staffGuard] },
       { path: 'reportes/medicamentos', component: ReporteMedicamentosComponent, canActivate: [staffGuard] },
       { path: 'reportes/laboratorios', component: ReporteLaboratoriosComponent, canActivate: [staffGuard] },
+      { path: 'reportes/mapa-calor-diagnosticos', component: ReporteMapaCalorDiagnosticosComponent, canActivate: [staffGuard] },
       { path: 'empresas', component: EmpresasComponent, canActivate: [superAdminGuard] },
       { path: 'catalogo-antecedentes', component: CatalogoAntecedentesComponent, canActivate: [superAdminGuard] },
       { path: 'politica-password', component: PoliticaPasswordComponent, canActivate: [superAdminGuard] },

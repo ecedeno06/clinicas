@@ -25,13 +25,13 @@ async function obtener(req, res, next) {
 // POST /api/sucursales
 async function crear(req, res, next) {
   try {
-    const { nombre, direccion, telefono, acepta_whatsapp, google_maps_url, zona_horaria, hora_apertura, hora_cierre, activo } = req.body;
+    const { nombre, direccion, telefono, acepta_whatsapp, google_maps_url, latitud, longitud, zona_horaria, hora_apertura, hora_cierre, activo } = req.body;
     if (!nombre) return res.status(400).json({ mensaje: 'nombre es requerido' });
 
     const { rows } = await pool.query(
-      `insert into sucursales (empresa_id, nombre, direccion, telefono, acepta_whatsapp, google_maps_url, zona_horaria, hora_apertura, hora_cierre, activo)
-       values ($1,$2,$3,$4,$5,$6, coalesce($7, 'America/Panama'), $8,$9, coalesce($10, true)) returning *`,
-      [req.empresaId, nombre, direccion, telefono, !!acepta_whatsapp, google_maps_url, zona_horaria, hora_apertura || null, hora_cierre || null, activo]
+      `insert into sucursales (empresa_id, nombre, direccion, telefono, acepta_whatsapp, google_maps_url, latitud, longitud, zona_horaria, hora_apertura, hora_cierre, activo)
+       values ($1,$2,$3,$4,$5,$6,$7,$8, coalesce($9, 'America/Panama'), $10,$11, coalesce($12, true)) returning *`,
+      [req.empresaId, nombre, direccion, telefono, !!acepta_whatsapp, google_maps_url, latitud ?? null, longitud ?? null, zona_horaria, hora_apertura || null, hora_cierre || null, activo]
     );
     res.status(201).json(rows[0]);
   } catch (err) { next(err); }
@@ -43,7 +43,7 @@ async function crear(req, res, next) {
 // "Eliminar" desde la UI en realidad desactiva (activo = false).
 async function actualizar(req, res, next) {
   try {
-    const { nombre, direccion, telefono, acepta_whatsapp, google_maps_url, zona_horaria, hora_apertura, hora_cierre, activo } = req.body;
+    const { nombre, direccion, telefono, acepta_whatsapp, google_maps_url, latitud, longitud, zona_horaria, hora_apertura, hora_cierre, activo } = req.body;
 
     if (activo === false) {
       const otras = await pool.query(
@@ -62,12 +62,14 @@ async function actualizar(req, res, next) {
          telefono = coalesce($3, telefono),
          acepta_whatsapp = coalesce($4, acepta_whatsapp),
          google_maps_url = coalesce($5, google_maps_url),
-         zona_horaria = coalesce($6, zona_horaria),
-         hora_apertura = $7,
-         hora_cierre = $8,
-         activo = coalesce($9, activo)
-       where id = $10 and empresa_id = $11 returning *`,
-      [nombre, direccion, telefono, acepta_whatsapp, google_maps_url, zona_horaria, hora_apertura || null, hora_cierre || null, activo, req.params.id, req.empresaId]
+         latitud = coalesce($6, latitud),
+         longitud = coalesce($7, longitud),
+         zona_horaria = coalesce($8, zona_horaria),
+         hora_apertura = $9,
+         hora_cierre = $10,
+         activo = coalesce($11, activo)
+       where id = $12 and empresa_id = $13 returning *`,
+      [nombre, direccion, telefono, acepta_whatsapp, google_maps_url, latitud ?? null, longitud ?? null, zona_horaria, hora_apertura || null, hora_cierre || null, activo, req.params.id, req.empresaId]
     );
     if (!rows[0]) return res.status(404).json({ mensaje: 'Sucursal no encontrada' });
     res.json(rows[0]);

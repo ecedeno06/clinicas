@@ -401,6 +401,13 @@ create table if not exists sucursales (
     -- mismo patron que pacientes.acepta_whatsapp (migracion 053).
     acepta_whatsapp boolean not null default false,
     google_maps_url text,
+    -- Coordenadas reales, calculadas por mapa-selector.component.ts al
+    -- elegir el punto (migracion 058) -- google_maps_url sigue siendo la
+    -- fuente original, esto es para poder ubicar la sucursal en un mapa
+    -- (ej. mapa de calor de diagnosticos por sucursal) sin tener que
+    -- parsear el link cada vez.
+    latitud         numeric(10,7),
+    longitud        numeric(10,7),
     zona_horaria    text not null default 'America/Panama',
     -- Horario general de atencion (limite superior, distinto del horario
     -- individual de cada doctor -- ver DISENO-ZONA-HORARIA-SUCURSALES.md

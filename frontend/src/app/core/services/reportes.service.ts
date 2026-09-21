@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { ReporteDiagnosticoFila, ReporteMedicamentoFila, ReporteLaboratorioFila } from '../models/models';
+import { ReporteDiagnosticoFila, ReporteMedicamentoFila, ReporteLaboratorioFila, ReporteMapaCalorFila } from '../models/models';
 
 @Injectable({ providedIn: 'root' })
 export class ReportesService {
@@ -22,5 +22,10 @@ export class ReportesService {
   laboratorios(filtros: Record<string, string> = {}): Observable<ReporteLaboratorioFila[]> {
     const params = new URLSearchParams(filtros).toString();
     return this.http.get<ReporteLaboratorioFila[]>(`${this.base}/laboratorios${params ? '?' + params : ''}`);
+  }
+
+  mapaCalorDiagnosticos(filtros: Record<string, string> = {}): Observable<ReporteMapaCalorFila[]> {
+    const params = new URLSearchParams(filtros).toString();
+    return this.http.get<ReporteMapaCalorFila[]>(`${this.base}/diagnosticos/mapa-calor${params ? '?' + params : ''}`);
   }
 }

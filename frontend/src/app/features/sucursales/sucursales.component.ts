@@ -55,6 +55,8 @@ export class SucursalesComponent implements OnInit {
     telefono: [''],
     acepta_whatsapp: [false],
     google_maps_url: [''],
+    latitud: [null as number | null],
+    longitud: [null as number | null],
     zona_horaria: ['America/Panama', Validators.required],
     hora_apertura: [''],
     hora_cierre: [''],
@@ -93,7 +95,7 @@ export class SucursalesComponent implements OnInit {
   }
 
   onUbicacionElegida(u: UbicacionSeleccionada): void {
-    this.form.patchValue({ google_maps_url: u.url });
+    this.form.patchValue({ google_maps_url: u.url, latitud: u.lat, longitud: u.lng });
   }
 
   // wa.me abre WhatsApp Web/app con el mensaje precargado -- no requiere

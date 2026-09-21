@@ -50,6 +50,8 @@ export interface Sucursal {
   telefono?: string | null;
   acepta_whatsapp?: boolean;
   google_maps_url?: string | null;
+  latitud?: number | null;
+  longitud?: number | null;
   zona_horaria: string;
   hora_apertura?: string | null;
   hora_cierre?: string | null;
@@ -657,4 +659,17 @@ export interface ReporteLaboratorioFila {
   orden_estado: 'pendiente' | 'completada' | 'cancelada';
   doctor_nombre: string;
   sucursal_nombre: string;
+}
+
+// Fila del mapa de calor de diagnosticos (GET
+// /api/reportes/diagnosticos/mapa-calor, solo admin) -- una por
+// SUCURSAL, con la cantidad total de diagnosticos en el rango.
+// latitud/longitud vienen null si la sucursal nunca guardo coordenadas
+// (ver migracion 058) -- esas no se pueden ubicar en el mapa.
+export interface ReporteMapaCalorFila {
+  sucursal_id: string;
+  sucursal_nombre: string;
+  latitud: number | null;
+  longitud: number | null;
+  cantidad: number;
 }

@@ -7,6 +7,7 @@ const { requireAuth, requireEmpresa, requireRol } = require('../middleware/auth'
 // layout.component.html).
 router.use(requireAuth, requireEmpresa, requireRol('admin'));
 
+router.get('/diagnosticos/mapa-calor', ctrl.mapaCalorDiagnosticos);
 router.get('/diagnosticos', ctrl.diagnosticos);
 router.get('/medicamentos', ctrl.medicamentos);
 router.get('/laboratorios', ctrl.laboratorios);

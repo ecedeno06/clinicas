@@ -75,6 +75,7 @@ docker run --rm -i -e PGPASSWORD='<password>' postgres:16 \
 | `055_consentimiento_datos.sql` | Columna `comparte_historial_clinico` en `pacientes_empresas` + tabla `consentimiento_datos_tokens`: consentimiento del paciente (por clinica) para compartir su historial entre clinicas del ecosistema | ✅ Aplicada 2026-09-19 | ✅ Aplicada 2026-09-19 |
 | `056_acepta_correo_super_admin.sql` | Columna `acepta_correo_super_admin` en `usuarios`: cada super-admin decide si recibe los correos de notificacion de consentimiento (default true) | ✅ Aplicada 2026-09-20 | ✅ Aplicada 2026-09-20 |
 | `057_consentimiento_datos_accion.sql` | Columna `accion` en `consentimiento_datos_tokens` (default `'solicitud'`): distingue una solicitud de compartir nueva de una revocacion (dejar de compartir algo activo, iniciada desde el portal del paciente) -- revocar siempre exige OTP, a diferencia de rechazar una solicitud nueva | ✅ Aplicada 2026-09-20 | ✅ Aplicada 2026-09-20 |
+| `058_sucursales_coordenadas.sql` | Columnas `latitud`/`longitud` en `sucursales`, con backfill automatico desde `google_maps_url` (patrones `?q=lat,lng` y `@lat,lng,zoom`) -- usadas por el mapa de calor de diagnosticos por sucursal | ✅ Aplicada 2026-09-21 | ✅ Aplicada 2026-09-21 |
 
 **Verificado 2026-09-02**: comparacion completa de esquema (tablas, columnas,
 indices, constraints, funciones, triggers) entre `.19` y Neon — identicos

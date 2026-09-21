@@ -109,4 +109,40 @@ async function laboratorios(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { diagnosticos, medicamentos, laboratorios };
+// GET /api/reportes/diagnosticos/mapa-calor?desde=&hasta=&q=
+// Agrega la cantidad de diagnosticos (mismo criterio que diagnosticos()
+// -- cita atendida con historia clinica) por SUCURSAL, para pintar un
+// mapa de calor. "q" es un filtro de texto opcional sobre el
+// diagnostico (no hay catalogo/CIE, es texto libre). Devuelve TODAS las
+// sucursales con al menos un diagnostico en el rango, tengan o no
+// latitud/longitud guardada -- el frontend distingue las que no se
+// pueden ubicar en el mapa (ver migracion 058) para mostrarlas aparte
+// en vez de omitirlas en silencio.
+async function mapaCalorDiagnosticos(req, res, next) {
+  try {
+    const { q } = req.query;
+    const condicionesBase = ['c.empresa_id = $1', 'hc.diagnostico is not null', "hc.diagnostico <> ''"];
+    const { where, valores } = condicionesFecha(req, condicionesBase);
+
+    let whereFinal = where;
+    if (q) {
+      valores.push(`%${q}%`);
+      whereFinal += ` and hc.diagnostico ilike $${valores.length}`;
+    }
+
+    const { rows } = await pool.query(
+      `select s.id as sucursal_id, s.nombre as sucursal_nombre, s.latitud, s.longitud,
+              count(hc.id)::int as cantidad
+       from sucursales s
+       join citas c on c.sucursal_id = s.id
+       join historias_clinicas hc on hc.cita_id = c.id
+       ${whereFinal}
+       group by s.id, s.nombre, s.latitud, s.longitud
+       order by cantidad desc`,
+      valores
+    );
+    res.json(rows);
+  } catch (err) { next(err); }
+}
+
+module.exports = { diagnosticos, medicamentos, laboratorios, mapaCalorDiagnosticos };
