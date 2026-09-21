@@ -744,6 +744,10 @@ create table if not exists consentimiento_datos_tokens (
     token         text not null unique,
     otp           text not null,
     respuesta     text not null default 'pendiente' check (respuesta in ('pendiente', 'aceptado', 'rechazado')),
+    -- 'solicitud' (default): pide compartir, Aceptar exige OTP y
+    -- Rechazar no. 'revocacion': el paciente ya autenticado pide DEJAR
+    -- de compartir algo activo -- siempre exige OTP (migracion 057).
+    accion        text not null default 'solicitud' check (accion in ('solicitud', 'revocacion')),
     expira_en     timestamptz not null,
     respondido_en timestamptz,
     created_at    timestamptz not null default now()

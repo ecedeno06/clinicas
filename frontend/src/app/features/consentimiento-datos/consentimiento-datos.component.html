@@ -37,12 +37,12 @@
               historias, recetas, laboratorio) con las demas clinicas del ecosistema donde tambien te atiendas.
               Para confirmar, escribe el codigo de 6 digitos que te enviamos en el correo.
             </p>
-            <div class="form-group mt-16">
-              <label>Codigo de confirmacion</label>
-              <input class="input" type="text" inputmode="numeric" maxlength="6" placeholder="000000"
-                style="text-align:center; letter-spacing:0.3em; font-size:20px; font-weight:700;"
-                [ngModel]="otpValor()" (ngModelChange)="otpValor.set($event)" />
-            </div>
+          } @else if (ctx.accion === 'revocacion') {
+            <p class="text-sm" style="text-align:justify; margin-top:16px;">
+              Vas a <strong>dejar de compartir</strong> tu historial clinico de {{ ctx.empresa_nombre }} con las
+              demas clinicas del ecosistema. Como ya estaba activo, para confirmarlo escribe el codigo de 6 digitos
+              que te enviamos en el correo.
+            </p>
           } @else {
             <p class="text-sm" style="text-align:justify; margin-top:16px;">
               Vas a <strong>rechazar</strong> que {{ ctx.empresa_nombre }} comparta tu historial clinico con las
@@ -50,12 +50,21 @@
             </p>
           }
 
+          @if (requiereOtp()) {
+            <div class="form-group mt-16">
+              <label>Codigo de confirmacion</label>
+              <input class="input" type="text" inputmode="numeric" maxlength="6" placeholder="000000"
+                style="text-align:center; letter-spacing:0.3em; font-size:20px; font-weight:700;"
+                [ngModel]="otpValor()" (ngModelChange)="otpValor.set($event)" />
+            </div>
+          }
+
           @if (errorConfirmar()) {
             <div class="auth-error mt-16">{{ errorConfirmar() }}</div>
           }
 
           <button type="button" class="btn btn-primary w-full mt-16"
-            [disabled]="enviando() || (respuesta() === 'aceptado' && otpValor().trim().length !== 6)"
+            [disabled]="enviando() || (requiereOtp() && otpValor().trim().length !== 6)"
             (click)="confirmar()">
             {{ enviando() ? 'Enviando...' : (respuesta() === 'aceptado' ? 'Confirmar aceptacion' : 'Confirmar rechazo') }}
           </button>

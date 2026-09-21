@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -32,6 +32,11 @@ export class ConsentimientoDatosComponent implements OnInit {
   errorConfirmar = signal<string | null>(null);
   resultado = signal<Respuesta | null>(null);
 
+  // Aceptar siempre exige OTP; rechazar normalmente no, PERO un token de
+  // 'revocacion' (el paciente ya autenticado pidiendo dejar de compartir
+  // algo activo, ver mis-clinicas) siempre lo exige tambien.
+  requiereOtp = computed(() => this.respuesta() === 'aceptado' || this.contexto()?.accion === 'revocacion');
+
   private token = '';
 
   constructor(private srv: ConsentimientoDatosService, private route: ActivatedRoute, private router: Router) {}
@@ -60,11 +65,11 @@ export class ConsentimientoDatosComponent implements OnInit {
   confirmar(): void {
     const respuesta = this.respuesta();
     if (!respuesta) return;
-    if (respuesta === 'aceptado' && this.otpValor().trim().length !== 6) return;
+    if (this.requiereOtp() && this.otpValor().trim().length !== 6) return;
 
     this.enviando.set(true);
     this.errorConfirmar.set(null);
-    this.srv.responder(this.token, respuesta, respuesta === 'aceptado' ? this.otpValor().trim() : undefined).subscribe({
+    this.srv.responder(this.token, respuesta, this.requiereOtp() ? this.otpValor().trim() : undefined).subscribe({
       next: () => { this.enviando.set(false); this.resultado.set(respuesta); },
       error: (err) => {
         this.enviando.set(false);

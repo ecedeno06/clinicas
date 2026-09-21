@@ -247,6 +247,11 @@ export interface ConsentimientoDatosInfo {
   empresa_nombre: string;
   respuesta_actual: 'pendiente' | 'aceptado' | 'rechazado';
   ya_respondido: boolean;
+  // 'solicitud': el correo ofrece aceptar/rechazar una solicitud nueva
+  // (rechazar no exige OTP). 'revocacion': el paciente ya autenticado
+  // pidio dejar de compartir algo activo -- siempre exige OTP, aunque la
+  // respuesta tambien sea 'rechazado'.
+  accion: 'solicitud' | 'revocacion';
 }
 
 // Catalogo hibrido (mismo patron que CategoriaExamenLaboratorio):

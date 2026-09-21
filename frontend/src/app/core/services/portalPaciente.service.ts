@@ -31,8 +31,8 @@ export class PortalPacienteService {
   misClinicas(): Observable<ClinicaConsentimiento[]> {
     return this.http.get<ClinicaConsentimiento[]>(`${this.base}/clinicas`);
   }
-  revocarConsentimiento(empresaId: string): Observable<{ mensaje: string }> {
-    return this.http.post<{ mensaje: string }>(`${this.base}/clinicas/${empresaId}/revocar-consentimiento`, {});
+  solicitarRevocacion(empresaId: string): Observable<{ mensaje: string }> {
+    return this.http.post<{ mensaje: string }>(`${this.base}/clinicas/${empresaId}/solicitar-revocacion`, {});
   }
   solicitarConsentimiento(empresaId: string): Observable<{ mensaje: string }> {
     return this.http.post<{ mensaje: string }>(`${this.base}/clinicas/${empresaId}/solicitar-consentimiento`, {});

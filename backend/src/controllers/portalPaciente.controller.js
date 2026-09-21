@@ -1,6 +1,5 @@
 const { pool } = require('../config/db');
-const { notificarRespuesta } = require('../utils/notificacionConsentimiento');
-const { enviarSolicitudConsentimiento } = require('../utils/solicitudConsentimiento');
+const { enviarSolicitudConsentimiento, enviarSolicitudRevocacion } = require('../utils/solicitudConsentimiento');
 
 // Portal del rol 'paciente': a diferencia de pacientes.controller.js (uso
 // de staff), aqui el paciente_id NUNCA viene de un parametro/query del
@@ -311,16 +310,19 @@ async function clinicas(req, res, next) {
   } catch (err) { next(err); }
 }
 
-// POST /api/portal-paciente/clinicas/:empresaId/revocar-consentimiento
-// -- a diferencia del flujo publico (/consentimiento-datos, sin sesion,
-// por eso pide un OTP como segundo factor), aca el paciente ya esta
-// autenticado: revoca de inmediato, sin token ni OTP nuevo. Dispara la
-// MISMA notificacion que un rechazo por correo (a la clinica +
-// super-admin, con copia al paciente) -- ver notificacionConsentimiento.js.
-async function revocarConsentimiento(req, res, next) {
+// POST /api/portal-paciente/clinicas/:empresaId/solicitar-revocacion --
+// dejar de compartir algo que ya estaba ACTIVO es mas sensible que nunca
+// haberlo compartido, asi que exige el mismo tipo de correo+OTP que
+// activar el compartir (ver solicitarConsentimiento), aunque el paciente
+// ya este autenticado -- ver enviarSolicitudRevocacion. No cambia
+// comparte_historial_clinico hasta que confirme el OTP en la pagina
+// publica (consentimientoDatos.controller.js#responder), que ademas
+// dispara la notificacion final (a la clinica + super-admin, con copia
+// al paciente).
+async function solicitarRevocacion(req, res, next) {
   try {
     const { rows } = await pool.query(
-      `select p.id as paciente_id, p.nombre as paciente_nombre, p.identificacion, p.email as paciente_email,
+      `select p.id as paciente_id, p.nombre, p.identificacion, p.email,
               e.id as empresa_id, e.nombre as empresa_nombre, e.email as empresa_email
        from pacientes p
        join pacientes_empresas pe on pe.paciente_id = p.id and pe.empresa_id = $2
@@ -330,18 +332,20 @@ async function revocarConsentimiento(req, res, next) {
     );
     const registro = rows[0];
     if (!registro) return res.status(404).json({ mensaje: 'No tienes expediente en esa clinica' });
+    if (!registro.email) return res.status(400).json({ mensaje: 'No tienes un correo registrado para recibir la confirmacion' });
 
-    // Idempotente: si ya estaba en false, se actualiza igual (sin error)
-    // y se envia la notificacion de todas formas -- es una accion
-    // explicita del paciente, no hace falta detectar si "no cambio nada".
-    await pool.query(
-      `update pacientes_empresas set comparte_historial_clinico = false where paciente_id = $1 and empresa_id = $2`,
-      [registro.paciente_id, registro.empresa_id]
-    );
+    try {
+      await enviarSolicitudRevocacion({
+        pacienteId: registro.paciente_id,
+        empresaId: registro.empresa_id,
+        paciente: registro,
+        empresa: { nombre: registro.empresa_nombre, email: registro.empresa_email },
+      });
+    } catch (err) {
+      return res.status(502).json({ mensaje: 'No se pudo enviar el correo de confirmacion. Intenta de nuevo.' });
+    }
 
-    await notificarRespuesta({ registro, respuesta: 'rechazado' });
-
-    res.json({ mensaje: 'Dejaste de compartir tu informacion con esta clinica.' });
+    res.json({ mensaje: 'Te enviamos un correo para confirmar que quieres dejar de compartir.' });
   } catch (err) { next(err); }
 }
 
@@ -383,4 +387,4 @@ async function solicitarConsentimiento(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { perfil, actualizar, citas, signosVitalesDeCita, recetasDeCita, laboratorioDeCita, clinicas, revocarConsentimiento, solicitarConsentimiento };
+module.exports = { perfil, actualizar, citas, signosVitalesDeCita, recetasDeCita, laboratorioDeCita, clinicas, solicitarRevocacion, solicitarConsentimiento };

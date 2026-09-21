@@ -3,7 +3,7 @@ const { pool } = require('../config/db');
 const { enviarCorreo, escaparHtml } = require('../utils/correo');
 const { obtenerPolitica, generarPasswordSegunPolitica, validarPassword } = require('../utils/politicaPassword');
 const { resolverUsuarioPortal, cambiarEmailAcceso } = require('../utils/resolverUsuarioPortal');
-const { notificarRespuesta } = require('../utils/notificacionConsentimiento');
+const { notificarRevocacionStaff } = require('../utils/notificacionConsentimiento');
 const { enviarSolicitudConsentimiento } = require('../utils/solicitudConsentimiento');
 
 // tipo_trabajo/lugar_trabajo solo tienen sentido si estado_laboral es
@@ -801,7 +801,7 @@ async function solicitarConsentimientoDatos(req, res, next) {
 async function rechazarConsentimientoDatos(req, res, next) {
   try {
     const pacienteRes = await pool.query(
-      `select p.nombre, p.identificacion, p.email as paciente_email, e.nombre as empresa_nombre, e.email as empresa_email
+      `select p.nombre, p.identificacion, p.email as paciente_email, e.nombre as empresa_nombre, e.email as empresa_email, e.telefono as empresa_telefono
        from pacientes p
        join pacientes_empresas pe on pe.paciente_id = p.id
        join empresas e on e.id = pe.empresa_id
@@ -816,7 +816,7 @@ async function rechazarConsentimientoDatos(req, res, next) {
       [req.params.id, req.empresaId]
     );
 
-    await notificarRespuesta({
+    await notificarRevocacionStaff({
       registro: {
         paciente_id: req.params.id,
         empresa_id: req.empresaId,
@@ -825,8 +825,8 @@ async function rechazarConsentimientoDatos(req, res, next) {
         paciente_email: paciente.paciente_email,
         empresa_nombre: paciente.empresa_nombre,
         empresa_email: paciente.empresa_email,
+        empresa_telefono: paciente.empresa_telefono,
       },
-      respuesta: 'rechazado',
     });
 
     const { rows: final } = await pool.query(

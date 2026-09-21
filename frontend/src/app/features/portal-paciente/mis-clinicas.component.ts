@@ -6,10 +6,10 @@ import { ClinicaConsentimiento } from '../../core/models/models';
 // "Mis Clinicas": todas las clinicas donde el paciente tiene expediente
 // (pacientes_empresas), independiente de si tiene acceso a su portal
 // ahi -- y con cuales esta compartiendo su historial en el ecosistema
-// (ver migracion 055). Activar el compartir sigue exigiendo el mismo
-// correo+token+OTP que el flujo de staff (aca solo dispara el envio);
-// revocarlo, en cambio, es inmediato porque el paciente ya esta
-// autenticado en su propio portal.
+// (ver migracion 055). Tanto activar como dejar de compartir exigen el
+// mismo correo+token+OTP (aca solo se dispara el envio) -- dejar de
+// compartir algo ya activo es mas sensible que nunca haberlo compartido,
+// asi que tampoco es inmediato aunque el paciente ya este autenticado.
 @Component({
   selector: 'app-mis-clinicas',
   standalone: true,
@@ -40,12 +40,12 @@ export class MisClinicasComponent implements OnInit {
   }
 
   revocar(c: ClinicaConsentimiento): void {
-    if (!confirm(`Vas a dejar de compartir tu informacion de ${c.empresa_nombre} con las demas clinicas de la red. Continuar?`)) return;
+    if (!confirm(`Te vamos a enviar un correo para confirmar que quieres dejar de compartir tu informacion de ${c.empresa_nombre} con las demas clinicas de la red. Continuar?`)) return;
 
     this.revocando.set(c.empresa_id);
-    this.srv.revocarConsentimiento(c.empresa_id).subscribe({
-      next: (res) => { this.revocando.set(null); alert(res.mensaje); this.cargar(); },
-      error: (err) => { this.revocando.set(null); alert(err?.error?.mensaje || 'No se pudo dejar de compartir'); },
+    this.srv.solicitarRevocacion(c.empresa_id).subscribe({
+      next: (res) => { this.revocando.set(null); alert(res.mensaje); },
+      error: (err) => { this.revocando.set(null); alert(err?.error?.mensaje || 'No se pudo enviar el correo de confirmacion'); },
     });
   }
 

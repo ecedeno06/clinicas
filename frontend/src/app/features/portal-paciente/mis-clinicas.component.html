@@ -28,7 +28,7 @@
               <td class="table-actions">
                 @if (c.comparte_historial_clinico) {
                   <button type="button" class="btn-icon"
-                    title="Ya autorizas compartir tu historial de esta clinica -- clic para dejar de compartir"
+                    title="Ya autorizas compartir tu historial de esta clinica -- clic para pedir dejar de compartir (te llega un correo con un codigo de confirmacion)"
                     aria-label="Dejar de compartir"
                     [disabled]="revocando() === c.empresa_id"
                     (click)="revocar(c)">

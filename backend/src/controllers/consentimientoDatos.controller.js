@@ -8,7 +8,7 @@ const { notificarRespuesta } = require('../utils/notificacionConsentimiento');
 async function obtener(req, res, next) {
   try {
     const { rows } = await pool.query(
-      `select ct.respuesta, ct.expira_en, p.nombre as paciente_nombre, e.nombre as empresa_nombre
+      `select ct.respuesta, ct.expira_en, ct.accion, p.nombre as paciente_nombre, e.nombre as empresa_nombre
        from consentimiento_datos_tokens ct
        join pacientes p on p.id = ct.paciente_id
        join empresas e on e.id = ct.empresa_id
@@ -24,6 +24,7 @@ async function obtener(req, res, next) {
       empresa_nombre: registro.empresa_nombre,
       respuesta_actual: registro.respuesta,
       ya_respondido: registro.respuesta !== 'pendiente',
+      accion: registro.accion,
     });
   } catch (err) { next(err); }
 }
@@ -45,7 +46,7 @@ async function responder(req, res, next) {
     }
 
     const { rows } = await pool.query(
-      `select ct.id, ct.paciente_id, ct.empresa_id, ct.otp, p.nombre as paciente_nombre, p.identificacion, p.email as paciente_email,
+      `select ct.id, ct.paciente_id, ct.empresa_id, ct.otp, ct.accion, p.nombre as paciente_nombre, p.identificacion, p.email as paciente_email,
               e.nombre as empresa_nombre, e.email as empresa_email
        from consentimiento_datos_tokens ct
        join pacientes p on p.id = ct.paciente_id
@@ -56,7 +57,13 @@ async function responder(req, res, next) {
     const registro = rows[0];
     if (!registro) return res.status(400).json({ mensaje: 'El enlace es invalido, ya expiro, o ya fue respondido.' });
 
-    if (respuesta === 'aceptado' && String(otp || '').trim() !== registro.otp) {
+    // Aceptar una solicitud siempre exige el OTP; rechazar normalmente no
+    // (accion de menor riesgo), PERO un token de 'revocacion' (el
+    // paciente ya autenticado pidiendo dejar de compartir algo activo,
+    // ver portalPaciente.controller.js#solicitarRevocacion) siempre lo
+    // exige tambien, sin importar que la respuesta sea 'rechazado'.
+    const exigeOtp = respuesta === 'aceptado' || registro.accion === 'revocacion';
+    if (exigeOtp && String(otp || '').trim() !== registro.otp) {
       return res.status(400).json({ mensaje: 'Codigo incorrecto. Revisa el correo e intenta de nuevo.' });
     }
 
