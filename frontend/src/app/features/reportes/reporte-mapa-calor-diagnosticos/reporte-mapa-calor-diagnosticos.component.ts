@@ -69,20 +69,33 @@ export class ReporteMapaCalorDiagnosticosComponent {
       });
       this.mapa = L.map(this.mapaContainerRef.nativeElement, { layers: [calles] }).setView(CENTRO_POR_DEFECTO, 12);
     }
+    // El contenedor puede no tener todavia su alto/ancho final resuelto
+    // (recien se monto con @if) -- sin esto, Leaflet a veces calcula mal
+    // el tamano del mapa y las capas que se agreguen despues no se ven.
+    this.mapa.invalidateSize();
 
     if (this.capaCalor) {
       this.mapa.removeLayer(this.capaCalor);
       this.capaCalor = null;
     }
 
-    const conCoordenadas = this.filas().filter((f) => f.latitud != null && f.longitud != null);
+    // "numeric" en Postgres llega como string por el driver -- se fuerza a
+    // numero real aca ademas de en el backend (::float8), por si alguna
+    // fila vieja llega sin ese cast.
+    const conCoordenadas = this.filas()
+      .filter((f) => f.latitud != null && f.longitud != null)
+      .map((f) => ({ ...f, latitud: Number(f.latitud), longitud: Number(f.longitud) }))
+      .filter((f) => !Number.isNaN(f.latitud) && !Number.isNaN(f.longitud));
     if (conCoordenadas.length === 0) return;
 
-    const maxCantidad = Math.max(...conCoordenadas.map((f) => f.cantidad));
-    const puntos: [number, number, number][] = conCoordenadas.map((f) => [f.latitud as number, f.longitud as number, f.cantidad / maxCantidad]);
-    this.capaCalor = L.heatLayer(puntos, { radius: 45, blur: 35, maxZoom: 17 }).addTo(this.mapa);
-
-    const bounds = L.latLngBounds(conCoordenadas.map((f) => [f.latitud as number, f.longitud as number]));
+    // fitBounds primero: si algo falla al pintar el resplandor, el mapa
+    // igual queda centrado/con zoom correcto en vez de en el centro por
+    // defecto de todo Panama.
+    const bounds = L.latLngBounds(conCoordenadas.map((f) => [f.latitud, f.longitud]));
     this.mapa.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 });
+
+    const maxCantidad = Math.max(...conCoordenadas.map((f) => f.cantidad));
+    const puntos: [number, number, number][] = conCoordenadas.map((f) => [f.latitud, f.longitud, f.cantidad / maxCantidad]);
+    this.capaCalor = L.heatLayer(puntos, { radius: 45, blur: 35, maxZoom: 17 }).addTo(this.mapa);
   }
 }

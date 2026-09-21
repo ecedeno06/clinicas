@@ -131,7 +131,8 @@ async function mapaCalorDiagnosticos(req, res, next) {
     }
 
     const { rows } = await pool.query(
-      `select s.id as sucursal_id, s.nombre as sucursal_nombre, s.latitud, s.longitud,
+      `select s.id as sucursal_id, s.nombre as sucursal_nombre,
+              s.latitud::float8 as latitud, s.longitud::float8 as longitud,
               count(hc.id)::int as cantidad
        from sucursales s
        join citas c on c.sucursal_id = s.id
