@@ -44,12 +44,14 @@ function asegurarLeafletHeat(): Promise<void> {
   return leafletHeatListo;
 }
 
-// Mapa de calor de diagnosticos por sucursal: agrega el volumen de
-// diagnosticos registrados (mismo criterio que ReporteDiagnosticosComponent)
-// por sucursal, y lo pinta como un resplandor de calor sobre sus
-// coordenadas (leaflet.heat) -- ver reportes.controller.js#mapaCalorDiagnosticos.
-// No mide "por tipo" de diagnostico (es texto libre, sin catalogo), solo
-// volumen total, con un filtro de texto opcional.
+export type CriterioMapaCalor = 'diagnostico' | 'medicamento' | 'motivo';
+
+// Mapa de calor por sucursal: agrega el volumen de diagnosticos,
+// medicamentos, o motivos de consulta (segun "criterio") por sucursal, y
+// lo pinta como un resplandor de calor sobre sus coordenadas
+// (leaflet.heat) -- ver reportes.controller.js#mapaCalorDiagnosticos.
+// Ninguno de los 3 tiene catalogo/CIE (son texto libre), asi que mide
+// volumen total, con un filtro de texto opcional sobre el campo elegido.
 @Component({
   selector: 'app-reporte-mapa-calor-diagnosticos',
   standalone: true,
@@ -60,7 +62,14 @@ function asegurarLeafletHeat(): Promise<void> {
 export class ReporteMapaCalorDiagnosticosComponent {
   desde = signal(hoyISO());
   hasta = signal(hoyISO());
-  filtroTexto = signal('');
+  criterio = signal<CriterioMapaCalor>('diagnostico');
+  valorBusqueda = signal('');
+
+  criterios: { valor: CriterioMapaCalor; etiqueta: string; etiquetaPlural: string }[] = [
+    { valor: 'diagnostico', etiqueta: 'Diagnostico', etiquetaPlural: 'diagnosticos' },
+    { valor: 'medicamento', etiqueta: 'Medicamento', etiquetaPlural: 'medicamentos' },
+    { valor: 'motivo', etiqueta: 'Motivo de consulta', etiquetaPlural: 'motivos de consulta' },
+  ];
 
   filas = signal<ReporteMapaCalorFila[]>([]);
   cargando = signal(false);
@@ -68,6 +77,7 @@ export class ReporteMapaCalorDiagnosticosComponent {
 
   sucursalesSinUbicacion = () => this.filas().filter((f) => f.latitud == null || f.longitud == null);
   totalDiagnosticos = () => this.filas().reduce((suma, f) => suma + f.cantidad, 0);
+  etiquetaCriterioActual = () => this.criterios.find((c) => c.valor === this.criterio())?.etiquetaPlural ?? 'diagnosticos';
 
   @ViewChild('mapaContainer') mapaContainerRef?: ElementRef<HTMLDivElement>;
   private mapa: L.Map | null = null;
@@ -77,8 +87,8 @@ export class ReporteMapaCalorDiagnosticosComponent {
 
   buscar(): void {
     this.cargando.set(true);
-    const filtros: Record<string, string> = { desde: this.desde(), hasta: this.hasta() };
-    if (this.filtroTexto().trim()) filtros['q'] = this.filtroTexto().trim();
+    const filtros: Record<string, string> = { desde: this.desde(), hasta: this.hasta(), criterio: this.criterio() };
+    if (this.valorBusqueda().trim()) filtros['q'] = this.valorBusqueda().trim();
 
     this.reportesSrv.mapaCalorDiagnosticos(filtros).subscribe({
       next: (data) => {

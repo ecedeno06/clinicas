@@ -109,34 +109,64 @@ async function laboratorios(req, res, next) {
   } catch (err) { next(err); }
 }
 
-// GET /api/reportes/diagnosticos/mapa-calor?desde=&hasta=&q=
-// Agrega la cantidad de diagnosticos (mismo criterio que diagnosticos()
-// -- cita atendida con historia clinica) por SUCURSAL, para pintar un
-// mapa de calor. "q" es un filtro de texto opcional sobre el
-// diagnostico (no hay catalogo/CIE, es texto libre). Devuelve TODAS las
-// sucursales con al menos un diagnostico en el rango, tengan o no
+// Como el criterio (columna/join) del mapa de calor cambia segun que se
+// este midiendo, pero SIEMPRE es un solo campo de texto libre sobre el
+// mismo esqueleto (sucursales -> citas -> algo), esta tabla mapea cada
+// criterio permitido a su join extra, su columna de conteo, y la columna
+// sobre la que aplica el filtro de texto "q". "diagnostico" (default) y
+// "motivo" salen de historias_clinicas; "medicamento" sale de
+// receta_medicamentos (una cita puede tener varias recetas).
+const CRITERIOS_MAPA_CALOR = {
+  diagnostico: {
+    join: 'join historias_clinicas hc on hc.cita_id = c.id',
+    columnaNoNula: "hc.diagnostico is not null and hc.diagnostico <> ''",
+    columnaConteo: 'hc.id',
+    columnaFiltro: 'hc.diagnostico',
+  },
+  motivo: {
+    join: 'join historias_clinicas hc on hc.cita_id = c.id',
+    columnaNoNula: "hc.motivo_consulta is not null and hc.motivo_consulta <> ''",
+    columnaConteo: 'hc.id',
+    columnaFiltro: 'hc.motivo_consulta',
+  },
+  medicamento: {
+    join: 'join recetas r on r.cita_id = c.id join receta_medicamentos rm on rm.receta_id = r.id',
+    columnaNoNula: "rm.medicamento is not null and rm.medicamento <> ''",
+    columnaConteo: 'rm.id',
+    columnaFiltro: 'rm.medicamento',
+  },
+};
+
+// GET /api/reportes/diagnosticos/mapa-calor?desde=&hasta=&criterio=&q=
+// Agrega la cantidad de diagnosticos/motivos/medicamentos (segun
+// "criterio", default "diagnostico") por SUCURSAL, para pintar un mapa
+// de calor. "q" es un filtro de texto opcional sobre el campo elegido
+// (ninguno de los 3 tiene catalogo/CIE, son texto libre). Devuelve TODAS
+// las sucursales con al menos una coincidencia en el rango, tengan o no
 // latitud/longitud guardada -- el frontend distingue las que no se
-// pueden ubicar en el mapa (ver migracion 058) para mostrarlas aparte
-// en vez de omitirlas en silencio.
+// pueden ubicar en el mapa (ver migracion 058) para mostrarlas aparte en
+// vez de omitirlas en silencio.
 async function mapaCalorDiagnosticos(req, res, next) {
   try {
     const { q } = req.query;
-    const condicionesBase = ['c.empresa_id = $1', 'hc.diagnostico is not null', "hc.diagnostico <> ''"];
-    const { where, valores } = condicionesFecha(req, condicionesBase);
+    const criterio = CRITERIOS_MAPA_CALOR[req.query.criterio] ? req.query.criterio : 'diagnostico';
+    const { join, columnaNoNula, columnaConteo, columnaFiltro } = CRITERIOS_MAPA_CALOR[criterio];
+
+    const { where, valores } = condicionesFecha(req, ['c.empresa_id = $1', columnaNoNula]);
 
     let whereFinal = where;
     if (q) {
       valores.push(`%${q}%`);
-      whereFinal += ` and hc.diagnostico ilike $${valores.length}`;
+      whereFinal += ` and ${columnaFiltro} ilike $${valores.length}`;
     }
 
     const { rows } = await pool.query(
       `select s.id as sucursal_id, s.nombre as sucursal_nombre,
               s.latitud::float8 as latitud, s.longitud::float8 as longitud,
-              count(hc.id)::int as cantidad
+              count(${columnaConteo})::int as cantidad
        from sucursales s
        join citas c on c.sucursal_id = s.id
-       join historias_clinicas hc on hc.cita_id = c.id
+       ${join}
        ${whereFinal}
        group by s.id, s.nombre, s.latitud, s.longitud
        order by cantidad desc`,

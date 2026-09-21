@@ -1,7 +1,7 @@
 <div class="page-header">
   <div>
-    <h1>Mapa de calor de diagnosticos</h1>
-    <div class="desc">Concentracion de diagnosticos por sucursal, segun su ubicacion</div>
+    <h1>Mapa de calor</h1>
+    <div class="desc">Concentracion de diagnosticos, medicamentos o motivos de consulta por sucursal, segun su ubicacion</div>
   </div>
 </div>
 
@@ -14,9 +14,15 @@
     <label>Hasta</label>
     <input class="input" type="date" [ngModel]="hasta()" (ngModelChange)="hasta.set($event)" />
   </div>
+  <div class="form-group" style="min-width:190px;">
+    <label>Criterio</label>
+    <select class="input" [ngModel]="criterio()" (ngModelChange)="criterio.set($event)">
+      @for (c of criterios; track c.valor) { <option [value]="c.valor">{{ c.etiqueta }}</option> }
+    </select>
+  </div>
   <div class="form-group" style="min-width:220px; flex:1;">
-    <label>Buscar en el diagnostico (opcional)</label>
-    <input class="input" type="text" placeholder="ej. diabetes" [ngModel]="filtroTexto()" (ngModelChange)="filtroTexto.set($event)" />
+    <label>Valor (opcional)</label>
+    <input class="input" type="text" placeholder="ej. diabetes" [ngModel]="valorBusqueda()" (ngModelChange)="valorBusqueda.set($event)" />
   </div>
   <div class="form-group" style="justify-content:flex-end; display:flex;">
     <button type="button" class="btn btn-accent" (click)="buscar()">Buscar</button>
@@ -26,7 +32,7 @@
 @if (buscado()) {
   <div class="page-header mt-16">
     <div>
-      <h2 style="margin:0;">{{ totalDiagnosticos() }} diagnosticos en {{ filas().length }} sucursal{{ filas().length === 1 ? '' : 'es' }}</h2>
+      <h2 style="margin:0;">{{ totalDiagnosticos() }} {{ etiquetaCriterioActual() }} en {{ filas().length }} sucursal{{ filas().length === 1 ? '' : 'es' }}</h2>
       <p class="text-muted text-sm" style="margin:0;">{{ desde() | date:'dd/MM/yyyy':'UTC' }} – {{ hasta() | date:'dd/MM/yyyy':'UTC' }}</p>
     </div>
   </div>
@@ -46,7 +52,7 @@
   @if (!cargando()) {
     <div class="table-wrap mt-16">
       <table class="data-table">
-        <thead><tr><th>Sucursal</th><th>Diagnosticos</th><th></th></tr></thead>
+        <thead><tr><th>Sucursal</th><th>{{ etiquetaCriterioActual() }}</th><th></th></tr></thead>
         <tbody>
           @for (f of filas(); track f.sucursal_id) {
             <tr>
@@ -59,7 +65,7 @@
               </td>
             </tr>
           } @empty {
-            <tr><td colspan="3"><div class="empty-state">No hay diagnosticos para estos filtros.</div></td></tr>
+            <tr><td colspan="3"><div class="empty-state">No hay {{ etiquetaCriterioActual() }} para estos filtros.</div></td></tr>
           }
         </tbody>
       </table>
