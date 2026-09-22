@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import * as L from 'leaflet';
 import { ReportesService } from '../../../core/services/reportes.service';
 import { ReporteMapaCalorFila } from '../../../core/models/models';
-import { hoyISO } from '../../../core/utils/fecha.util';
+import { hoyISO, primerDiaDelMesISO } from '../../../core/utils/fecha.util';
 
 // Mismo centro por defecto que mapa-selector.component.ts (Ciudad de
 // Panama) para cuando ninguna sucursal tiene coordenadas todavia.
@@ -60,7 +60,7 @@ export type CriterioMapaCalor = 'diagnostico' | 'medicamento' | 'motivo';
   styleUrl: './reporte-mapa-calor-diagnosticos.component.css',
 })
 export class ReporteMapaCalorDiagnosticosComponent {
-  desde = signal(hoyISO());
+  desde = signal(primerDiaDelMesISO());
   hasta = signal(hoyISO());
   criterio = signal<CriterioMapaCalor>('diagnostico');
   valorBusqueda = signal('');

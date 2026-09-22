@@ -25,6 +25,16 @@ export function haceDiasISO(dias: number): string {
   return `${anio}-${mes}-${dia}`;
 }
 
+// Primer dia del mes actual (fecha LOCAL, mismo criterio que hoyISO) --
+// para el default de "Desde" en filtros de rango como el mapa de calor
+// (junto con hoyISO() como "Hasta", cubre "lo que va del mes").
+export function primerDiaDelMesISO(): string {
+  const d = new Date();
+  const anio = d.getFullYear();
+  const mes = String(d.getMonth() + 1).padStart(2, '0');
+  return `${anio}-${mes}-01`;
+}
+
 const MESES_CORTO = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 
 // dd/MMM/aaaa (ej. "21/sep/2001") -- usado en columnas de fecha de
