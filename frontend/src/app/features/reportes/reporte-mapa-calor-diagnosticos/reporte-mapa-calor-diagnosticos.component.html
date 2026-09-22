@@ -70,5 +70,25 @@
         </tbody>
       </table>
     </div>
+
+    <h3 class="mt-16" style="margin-bottom:8px;">Detalle</h3>
+    <div class="table-wrap table-wrap-scroll-viewport" style="--table-scroll-offset: 500px;">
+      <table class="data-table">
+        <thead><tr><th>Paciente</th><th>Telefono</th><th>Sucursal</th><th>Fecha</th><th>{{ etiquetaCriterioSingular() }}</th></tr></thead>
+        <tbody>
+          @for (d of detalle(); track $index) {
+            <tr>
+              <td>{{ d.paciente_nombre }}</td>
+              <td>{{ d.paciente_telefono || '-' }}</td>
+              <td>{{ d.sucursal_nombre }}</td>
+              <td>{{ formatoFechaCorta(d.fecha) }}</td>
+              <td>{{ formatoValorDetalle(d.valor) }}</td>
+            </tr>
+          } @empty {
+            <tr><td colspan="5"><div class="empty-state">No hay detalle para estos filtros.</div></td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
   }
 }

@@ -3,8 +3,9 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import * as L from 'leaflet';
 import { ReportesService } from '../../../core/services/reportes.service';
-import { ReporteMapaCalorFila } from '../../../core/models/models';
+import { ReporteMapaCalorFila, ReporteMapaCalorDetalleFila } from '../../../core/models/models';
 import { hoyISO, primerDiaDelMesISO } from '../../../core/utils/fecha.util';
+import { formatoFechaCorta } from '../../../core/utils/pdf.util';
 
 // Mismo centro por defecto que mapa-selector.component.ts (Ciudad de
 // Panama) para cuando ninguna sucursal tiene coordenadas todavia.
@@ -75,12 +76,23 @@ export class ReporteMapaCalorDiagnosticosComponent {
   ];
 
   filas = signal<ReporteMapaCalorFila[]>([]);
+  detalle = signal<ReporteMapaCalorDetalleFila[]>([]);
   cargando = signal(false);
   buscado = signal(false);
 
   sucursalesSinUbicacion = () => this.filas().filter((f) => f.latitud == null || f.longitud == null);
   totalDiagnosticos = () => this.filas().reduce((suma, f) => suma + f.cantidad, 0);
   etiquetaCriterioActual = () => this.criterios.find((c) => c.valor === this.criterio())?.etiquetaPlural ?? 'diagnosticos';
+  etiquetaCriterioSingular = () => this.criterios.find((c) => c.valor === this.criterio())?.etiqueta ?? 'Diagnostico';
+  formatoFechaCorta = formatoFechaCorta;
+
+  // Alergias (y en general cualquier campo de texto libre con varias
+  // lineas, ej. un textarea) guarda cada valor en su propia linea -- en la
+  // lista de detalle se muestran separadas por coma en vez de corridas
+  // sin espacio (un <td> normal no respeta saltos de linea).
+  formatoValorDetalle(valor: string): string {
+    return valor.replace(/\n+/g, ', ');
+  }
 
   @ViewChild('mapaContainer') mapaContainerRef?: ElementRef<HTMLDivElement>;
   private mapa: L.Map | null = null;
@@ -96,14 +108,15 @@ export class ReporteMapaCalorDiagnosticosComponent {
 
     this.reportesSrv.mapaCalorDiagnosticos(filtros).subscribe({
       next: (data) => {
-        this.filas.set(data);
+        this.filas.set(data.filas);
+        this.detalle.set(data.detalle);
         this.cargando.set(false);
         this.buscado.set(true);
         // El contenedor del mapa recien se renderiza con @if -- hay que
         // esperar al siguiente ciclo para que exista en el DOM.
         setTimeout(() => { this.actualizarMapa().catch((err) => console.error('No se pudo pintar el mapa de calor', err)); }, 0);
       },
-      error: () => { this.filas.set([]); this.cargando.set(false); this.buscado.set(true); },
+      error: () => { this.filas.set([]); this.detalle.set([]); this.cargando.set(false); this.buscado.set(true); },
     });
   }
 

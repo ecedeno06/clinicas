@@ -673,3 +673,19 @@ export interface ReporteMapaCalorFila {
   longitud: number | null;
   cantidad: number;
 }
+
+// Detalle fila-por-fila del mismo endpoint (paciente, telefono, sucursal,
+// fecha y el valor puntual encontrado para el criterio elegido) -- para
+// listar debajo del mapa de calor. Limitado a 500 filas en el backend.
+export interface ReporteMapaCalorDetalleFila {
+  paciente_nombre: string;
+  paciente_telefono: string | null;
+  sucursal_nombre: string;
+  fecha: string;
+  valor: string;
+}
+
+export interface ReporteMapaCalorRespuesta {
+  filas: ReporteMapaCalorFila[];
+  detalle: ReporteMapaCalorDetalleFila[];
+}

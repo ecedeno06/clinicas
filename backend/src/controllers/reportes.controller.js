@@ -149,33 +149,42 @@ const CRITERIOS_MAPA_CALOR = {
     columnaFiltro: 'ole.nombre_examen',
   },
   alergias: {
-    join: 'join pacientes pcte on pcte.id = c.paciente_id',
-    columnaNoNula: "pcte.alergias is not null and pcte.alergias <> ''",
+    // "p" (pacientes) ya viene joineado en la consulta base -- todos los
+    // criterios lo necesitan para el detalle (paciente/telefono).
+    join: '',
+    columnaNoNula: "p.alergias is not null and p.alergias <> ''",
     columnaConteo: 'c.id',
-    columnaFiltro: 'pcte.alergias',
+    columnaFiltro: 'p.alergias',
+    // Alergias/antecedentes son datos del PACIENTE, no de la cita -- sin
+    // esto, el detalle repetiria la misma alergia una vez por cada cita
+    // que tuvo en el rango. agruparPorPaciente colapsa esas repeticiones
+    // (ver el armado de la consulta de detalle mas abajo).
+    agruparPorPaciente: true,
   },
   antecedentes: {
     join: 'join paciente_antecedente pa on pa.paciente_id = c.paciente_id join antecedentes_patologicos ap on ap.id = pa.antecedente_id',
     columnaNoNula: 'ap.nombre is not null',
     columnaConteo: 'pa.id',
     columnaFiltro: 'ap.nombre',
+    agruparPorPaciente: true,
   },
 };
 
 // GET /api/reportes/diagnosticos/mapa-calor?desde=&hasta=&criterio=&q=
-// Agrega la cantidad de diagnosticos/motivos/medicamentos (segun
+// Agrega la cantidad de diagnosticos/motivos/medicamentos/etc (segun
 // "criterio", default "diagnostico") por SUCURSAL, para pintar un mapa
-// de calor. "q" es un filtro de texto opcional sobre el campo elegido
-// (ninguno de los 3 tiene catalogo/CIE, son texto libre). Devuelve TODAS
-// las sucursales con al menos una coincidencia en el rango, tengan o no
-// latitud/longitud guardada -- el frontend distingue las que no se
-// pueden ubicar en el mapa (ver migracion 058) para mostrarlas aparte en
-// vez de omitirlas en silencio.
+// de calor -- mas el detalle fila por fila (paciente, telefono, sucursal,
+// fecha y el valor puntual encontrado) para listar debajo del mapa. "q"
+// es un filtro de texto opcional sobre el campo elegido (son todos texto
+// libre, sin catalogo/CIE). Devuelve TODAS las sucursales con al menos
+// una coincidencia en el rango, tengan o no latitud/longitud guardada --
+// el frontend distingue las que no se pueden ubicar en el mapa (ver
+// migracion 058) para mostrarlas aparte en vez de omitirlas en silencio.
 async function mapaCalorDiagnosticos(req, res, next) {
   try {
     const { q } = req.query;
     const criterio = CRITERIOS_MAPA_CALOR[req.query.criterio] ? req.query.criterio : 'diagnostico';
-    const { join, columnaNoNula, columnaConteo, columnaFiltro } = CRITERIOS_MAPA_CALOR[criterio];
+    const { join, columnaNoNula, columnaConteo, columnaFiltro, agruparPorPaciente } = CRITERIOS_MAPA_CALOR[criterio];
 
     const { where, valores } = condicionesFecha(req, ['c.empresa_id = $1', columnaNoNula]);
 
@@ -185,19 +194,52 @@ async function mapaCalorDiagnosticos(req, res, next) {
       whereFinal += ` and ${columnaFiltro} ilike $${valores.length}`;
     }
 
+    // Alergias/antecedentes: al ser datos del paciente (no de la cita), el
+    // conteo tambien se resume por paciente -- (paciente, valor) distinto,
+    // no una cita mas por cada visita que tuvo en el rango (mismo criterio
+    // que el detalle de mas abajo).
+    const expresionConteo = agruparPorPaciente ? `distinct (p.id, ${columnaFiltro})` : columnaConteo;
     const { rows } = await pool.query(
       `select s.id as sucursal_id, s.nombre as sucursal_nombre,
               s.latitud::float8 as latitud, s.longitud::float8 as longitud,
-              count(${columnaConteo})::int as cantidad
+              count(${expresionConteo})::int as cantidad
        from sucursales s
        join citas c on c.sucursal_id = s.id
+       join pacientes p on p.id = c.paciente_id
        ${join}
        ${whereFinal}
        group by s.id, s.nombre, s.latitud, s.longitud
        order by cantidad desc`,
       valores
     );
-    res.json(rows);
+
+    // Alergias/antecedentes son datos del paciente, no de la cita -- sin
+    // "distinct on" el detalle repetiria la misma alergia/antecedente una
+    // vez por cada cita que ese paciente tuvo en el rango, en la misma
+    // sucursal. Se colapsa a una fila por (paciente, sucursal, valor),
+    // quedandose con la fecha mas reciente de esas citas. Postgres exige
+    // que el ORDER BY de un "distinct on" empiece por esas mismas
+    // columnas, asi que el reordenado final (mas reciente primero) se
+    // hace en una subconsulta aparte.
+    const filaBase = `p.nombre as paciente_nombre, p.telefono as paciente_telefono,
+              s.nombre as sucursal_nombre, c.fecha, ${columnaFiltro} as valor
+       from sucursales s
+       join citas c on c.sucursal_id = s.id
+       join pacientes p on p.id = c.paciente_id
+       ${join}
+       ${whereFinal}`;
+    const sqlDetalle = agruparPorPaciente
+      ? `select * from (
+           select distinct on (p.id, s.id, ${columnaFiltro}) ${filaBase}
+           order by p.id, s.id, ${columnaFiltro}, c.fecha desc
+         ) t
+         order by fecha desc
+         limit 500`
+      : `select ${filaBase}
+         order by c.fecha desc
+         limit 500`;
+    const { rows: detalle } = await pool.query(sqlDetalle, valores);
+    res.json({ filas: rows, detalle });
   } catch (err) { next(err); }
 }
 
