@@ -1,3 +1,11 @@
+/* Alergias: se deja expandir verticalmente arrastrando la esquina --
+   "both" (el default del navegador) se ve raro junto a un input con
+   width:100%, asi que se restringe a solo vertical. */
+textarea.input {
+  resize: vertical;
+  min-height: 60px;
+}
+
 /* Lista de antecedentes patologicos (tab Antecedentes): no mas de ~5 filas
    visibles, el resto con scroll -- el detalle de la fila seleccionada se
    muestra en un card debajo. Mismo patron que pacientes.component.css. */

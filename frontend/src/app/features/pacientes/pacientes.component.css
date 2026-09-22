@@ -1,3 +1,12 @@
+/* Alergias (tab Antecedentes): se deja expandir verticalmente
+   arrastrando la esquina -- "both" (el default del navegador) se ve
+   raro junto a un input con width:100%, asi que se restringe a solo
+   vertical. Mismo criterio que perfil-paciente.component.css (portal). */
+textarea.input {
+  resize: vertical;
+  min-height: 60px;
+}
+
 /* Tabla mas compacta -- con la columna nueva de Fecha nacimiento, el
    tamano de fuente por defecto (13.5px) hacia que "Nombre" se partiera
    en 2 lineas en varias filas. */
