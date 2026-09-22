@@ -82,6 +82,7 @@ export class ReporteMapaCalorDiagnosticosComponent {
   @ViewChild('mapaContainer') mapaContainerRef?: ElementRef<HTMLDivElement>;
   private mapa: L.Map | null = null;
   private capaCalor: L.Layer | null = null;
+  private capaEtiquetas: L.LayerGroup | null = null;
 
   constructor(private reportesSrv: ReportesService) {}
 
@@ -121,6 +122,10 @@ export class ReporteMapaCalorDiagnosticosComponent {
       this.mapa.removeLayer(this.capaCalor);
       this.capaCalor = null;
     }
+    if (this.capaEtiquetas) {
+      this.mapa.removeLayer(this.capaEtiquetas);
+      this.capaEtiquetas = null;
+    }
 
     // "numeric" en Postgres llega como string por el driver -- se fuerza a
     // numero real aca ademas de en el backend (::float8), por si alguna
@@ -148,5 +153,28 @@ export class ReporteMapaCalorDiagnosticosComponent {
     const maxCantidad = Math.max(...conCoordenadas.map((f) => f.cantidad));
     const puntos: [number, number, number][] = conCoordenadas.map((f) => [f.latitud, f.longitud, f.cantidad / maxCantidad]);
     this.capaCalor = L.heatLayer(puntos, { radius: 45, blur: 35, maxZoom: ZOOM_UN_PUNTO, minOpacity: 0.4 }).addTo(this.mapa);
+
+    // Etiqueta fija por sucursal (nombre + criterio elegido + cantidad):
+    // el resplandor de calor no dice por si solo que se esta midiendo ni
+    // cuanto es exactamente. Contenido armado como nodos de DOM (no HTML
+    // en un string) para no interpretar el nombre de la sucursal como
+    // marcado si algun dia trae caracteres como "<".
+    const etiquetaCriterio = this.criterios.find((c) => c.valor === this.criterio())?.etiqueta ?? 'Diagnostico';
+    this.capaEtiquetas = L.layerGroup(
+      conCoordenadas.map((f) => {
+        const contenido = document.createElement('div');
+        const nombre = document.createElement('strong');
+        nombre.textContent = f.sucursal_nombre;
+        contenido.appendChild(nombre);
+        contenido.appendChild(document.createElement('br'));
+        contenido.appendChild(document.createTextNode(`${etiquetaCriterio}: ${f.cantidad}`));
+        return L.circleMarker([f.latitud, f.longitud], { radius: 4, color: '#1d4ed8', weight: 1, fillColor: '#3b82f6', fillOpacity: 0.9 }).bindTooltip(contenido, {
+          permanent: true,
+          direction: 'top',
+          offset: [0, -6],
+          className: 'etiqueta-mapa-calor',
+        });
+      })
+    ).addTo(this.mapa);
   }
 }
