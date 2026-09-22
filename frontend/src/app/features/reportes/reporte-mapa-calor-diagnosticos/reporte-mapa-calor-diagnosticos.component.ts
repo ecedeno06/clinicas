@@ -160,6 +160,7 @@ export class ReporteMapaCalorDiagnosticosComponent {
     // en un string) para no interpretar el nombre de la sucursal como
     // marcado si algun dia trae caracteres como "<".
     const etiquetaCriterio = this.criterios.find((c) => c.valor === this.criterio())?.etiqueta ?? 'Diagnostico';
+    const valorBuscado = this.valorBusqueda().trim();
     this.capaEtiquetas = L.layerGroup(
       conCoordenadas.map((f) => {
         const contenido = document.createElement('div');
@@ -167,7 +168,11 @@ export class ReporteMapaCalorDiagnosticosComponent {
         nombre.textContent = f.sucursal_nombre;
         contenido.appendChild(nombre);
         contenido.appendChild(document.createElement('br'));
-        contenido.appendChild(document.createTextNode(`${etiquetaCriterio}: ${f.cantidad}`));
+        // Si hay un valor buscado (ej. "diabetes"), se muestra entre
+        // comillas para dejar claro que la cantidad mide ESE valor
+        // puntual del criterio, no el total general.
+        const etiquetaTexto = valorBuscado ? `${etiquetaCriterio} "${valorBuscado}"` : etiquetaCriterio;
+        contenido.appendChild(document.createTextNode(`${etiquetaTexto}: ${f.cantidad}`));
         return L.circleMarker([f.latitud, f.longitud], { radius: 4, color: '#1d4ed8', weight: 1, fillColor: '#3b82f6', fillOpacity: 0.9 }).bindTooltip(contenido, {
           permanent: true,
           direction: 'top',
