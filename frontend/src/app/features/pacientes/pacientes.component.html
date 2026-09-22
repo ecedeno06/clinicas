@@ -22,7 +22,7 @@
         <th>Nombre</th>
         <th>Identificacion</th>
         <th>Telefono</th>
-        <th>Fecha nacimiento</th>
+        <th style="width:130px;">Fecha nacimiento</th>
         <th>Estado</th>
         <th></th>
       </tr>
@@ -30,7 +30,7 @@
         <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroNombre()" (ngModelChange)="filtroNombre.set($event)" /></th>
         <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroIdentificacion()" (ngModelChange)="filtroIdentificacion.set($event)" /></th>
         <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroTelefono()" (ngModelChange)="filtroTelefono.set($event)" /></th>
-        <th><input class="input" type="text" placeholder="dd/mmm/aaaa" [ngModel]="filtroFechaNacimiento()" (ngModelChange)="filtroFechaNacimiento.set($event)" /></th>
+        <th style="width:130px;"><input class="input" type="text" placeholder="dd/mmm/aaaa" [ngModel]="filtroFechaNacimiento()" (ngModelChange)="filtroFechaNacimiento.set($event)" /></th>
         <th></th>
         <th>
           @if (hayFiltros()) { <button class="btn btn-outline btn-sm" (click)="limpiarFiltros()">Limpiar</button> }

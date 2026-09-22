@@ -1,3 +1,10 @@
+/* Tabla mas compacta -- con la columna nueva de Fecha nacimiento, el
+   tamano de fuente por defecto (13.5px) hacia que "Nombre" se partiera
+   en 2 lineas en varias filas. */
+.data-table {
+  font-size: 12px;
+}
+
 /* Cintillo de las pestanas Receta/Laboratorio del historial clinico
    cuando el rol actual (ej. recepcionista) no tiene permiso para ver
    ese dato confidencial -- reemplaza el listado en vez de mostrarlo
