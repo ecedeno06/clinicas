@@ -115,7 +115,14 @@ async function laboratorios(req, res, next) {
 // criterio permitido a su join extra, su columna de conteo, y la columna
 // sobre la que aplica el filtro de texto "q". "diagnostico" (default) y
 // "motivo" salen de historias_clinicas; "medicamento" sale de
-// receta_medicamentos (una cita puede tener varias recetas).
+// receta_medicamentos (una cita puede tener varias recetas); "laboratorio"
+// sale de orden_laboratorio_examenes (mismo patron que medicamento, una
+// orden puede tener varios examenes). "alergias" y "antecedentes" no son
+// datos de la cita sino del PACIENTE (alergias es un campo libre en
+// pacientes; antecedentes vive en paciente_antecedente, sin cita_id ni
+// fecha propia) -- se llega a ellos igual via el paciente de la cita, asi
+// que miden "citas en el rango cuyo paciente tiene esa alergia/antecedente
+// registrado", no un evento puntual de esa cita.
 const CRITERIOS_MAPA_CALOR = {
   diagnostico: {
     join: 'join historias_clinicas hc on hc.cita_id = c.id',
@@ -134,6 +141,24 @@ const CRITERIOS_MAPA_CALOR = {
     columnaNoNula: "rm.medicamento is not null and rm.medicamento <> ''",
     columnaConteo: 'rm.id',
     columnaFiltro: 'rm.medicamento',
+  },
+  laboratorio: {
+    join: 'join ordenes_laboratorio ol on ol.cita_id = c.id join orden_laboratorio_examenes ole on ole.orden_id = ol.id',
+    columnaNoNula: "ole.nombre_examen is not null and ole.nombre_examen <> ''",
+    columnaConteo: 'ole.id',
+    columnaFiltro: 'ole.nombre_examen',
+  },
+  alergias: {
+    join: 'join pacientes pcte on pcte.id = c.paciente_id',
+    columnaNoNula: "pcte.alergias is not null and pcte.alergias <> ''",
+    columnaConteo: 'c.id',
+    columnaFiltro: 'pcte.alergias',
+  },
+  antecedentes: {
+    join: 'join paciente_antecedente pa on pa.paciente_id = c.paciente_id join antecedentes_patologicos ap on ap.id = pa.antecedente_id',
+    columnaNoNula: 'ap.nombre is not null',
+    columnaConteo: 'pa.id',
+    columnaFiltro: 'ap.nombre',
   },
 };
 

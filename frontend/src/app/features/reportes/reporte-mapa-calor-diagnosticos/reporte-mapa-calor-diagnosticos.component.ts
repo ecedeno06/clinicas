@@ -44,7 +44,7 @@ function asegurarLeafletHeat(): Promise<void> {
   return leafletHeatListo;
 }
 
-export type CriterioMapaCalor = 'diagnostico' | 'medicamento' | 'motivo';
+export type CriterioMapaCalor = 'diagnostico' | 'medicamento' | 'motivo' | 'laboratorio' | 'alergias' | 'antecedentes';
 
 // Mapa de calor por sucursal: agrega el volumen de diagnosticos,
 // medicamentos, o motivos de consulta (segun "criterio") por sucursal, y
@@ -69,6 +69,9 @@ export class ReporteMapaCalorDiagnosticosComponent {
     { valor: 'diagnostico', etiqueta: 'Diagnostico', etiquetaPlural: 'diagnosticos' },
     { valor: 'medicamento', etiqueta: 'Medicamento', etiquetaPlural: 'medicamentos' },
     { valor: 'motivo', etiqueta: 'Motivo de consulta', etiquetaPlural: 'motivos de consulta' },
+    { valor: 'laboratorio', etiqueta: 'Examen de laboratorio', etiquetaPlural: 'examenes de laboratorio' },
+    { valor: 'alergias', etiqueta: 'Alergia', etiquetaPlural: 'alergias' },
+    { valor: 'antecedentes', etiqueta: 'Antecedente patologico', etiquetaPlural: 'antecedentes patologicos' },
   ];
 
   filas = signal<ReporteMapaCalorFila[]>([]);
