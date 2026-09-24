@@ -6,6 +6,16 @@
 // "citas" que cada uno de esos controllers ya hace, en vez de recibirlos
 // aparte.
 //
+// Consentimiento BIDIRECCIONAL (ajustado para Ley 81): no alcanza con que
+// la clinica DUENA del dato (pe_origen) lo libere -- la clinica que
+// CONSULTA (pe_viewer) tambien debe tener su propio consentimiento activo
+// otorgado. Sin este requisito, cualquier clinica con una relacion activa
+// con el paciente podia ver lo compartido por otra sin haber pedido ni
+// dado su propio consentimiento -- eso no es un cruce autorizado por
+// ambas partes, es una fuga unidireccional. La revocacion en CUALQUIERA
+// de las dos clinicas corta el cruce de inmediato (basta con que uno de
+// los dos "exists" deje de cumplirse).
+//
 // aliasCitas: alias de la tabla citas ya unida en el FROM/JOIN (ej. 'c').
 // empresaViewerPlaceholder: el placeholder ($1, $2, etc.) que ya trae la
 // empresa de quien consulta (req.empresaId) en esa consulta puntual.
@@ -25,6 +35,7 @@ function condicionAccesoPorCita(aliasCitas, empresaViewerPlaceholder) {
         where pe_viewer.paciente_id = ${aliasCitas}.paciente_id
           and pe_viewer.empresa_id = ${empresaViewerPlaceholder}
           and pe_viewer.activo
+          and pe_viewer.comparte_historial_clinico = true
       )
     )
   )`;

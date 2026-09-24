@@ -90,11 +90,19 @@ const TIENE_ACCESO_ESTA_CLINICA = `
 // clinica solo ve SUS PROPIOS registros ("alias".empresa_id = $2); si
 // ademas la clinica DUENA del registro ("alias".empresa_id) activo su
 // consentimiento para compartir (pacientes_empresas.comparte_historial_clinico,
-// ver migracion 055) Y la clinica que esta consultando ($2) tambien esta
-// vinculada (activa) a ese mismo paciente, tambien lo ve. La clinica que
-// consulta NO necesita tener ella misma el consentimiento activado --
-// solo la clinica DUENA del dato decide si lo libera. $1 = paciente_id,
-// $2 = empresa_id de quien consulta (mismo orden que usan estos 4 endpoints).
+// ver migracion 055) Y la clinica que esta consultando ($2) TAMBIEN activo
+// el suyo propio, tambien lo ve.
+//
+// Consentimiento BIDIRECCIONAL (ajustado para Ley 81): no alcanza con que
+// la clinica dueña libere el dato -- la que consulta debe haber dado su
+// propio consentimiento tambien, no solo estar "vinculada" (activa) al
+// paciente. Antes de este ajuste, cualquier clinica con una relacion
+// activa con el paciente veia lo compartido por otra sin haber pedido ni
+// otorgado su propio consentimiento -- eso es una fuga unidireccional, no
+// un cruce autorizado por ambas partes. La revocacion en CUALQUIERA de
+// las dos clinicas corta el cruce de inmediato (basta con que uno de los
+// dos "exists" deje de cumplirse). $1 = paciente_id, $2 = empresa_id de
+// quien consulta (mismo orden que usan estos 4 endpoints).
 function condicionAccesoHistorial(alias) {
   return `(
     ${alias}.empresa_id = $2
@@ -111,6 +119,7 @@ function condicionAccesoHistorial(alias) {
         where pe_viewer.paciente_id = $1
           and pe_viewer.empresa_id = $2
           and pe_viewer.activo
+          and pe_viewer.comparte_historial_clinico = true
       )
     )
   )`;
