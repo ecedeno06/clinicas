@@ -568,7 +568,7 @@
 
 @if (pacienteHistorial(); as p) {
   <div class="overlay">
-    <div class="drawer">
+    <div class="drawer drawer-historial">
       <div class="drawer-header">
         <h2>Historial clinico &middot; {{ p.nombre }}</h2>
         <button class="close" (click)="cerrarHistorial()">&times;</button>
@@ -596,11 +596,12 @@
           <div class="table-wrap">
             <table class="data-table">
               <thead>
-                <tr><th>Fecha</th><th>Hora</th><th>Doctor</th><th>Sucursal</th><th>Estado</th><th></th></tr>
+                <tr><th>Fecha</th><th>Hora</th><th>Doctor</th><th>Clinica</th><th>Sucursal</th><th>Estado</th><th></th></tr>
                 <tr class="filter-row">
                   <th><input class="input" type="text" placeholder="dd/mm/aaaa" [ngModel]="filtroHistorialFecha()" (ngModelChange)="filtroHistorialFecha.set($event)" /></th>
                   <th></th>
                   <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroHistorialDoctor()" (ngModelChange)="filtroHistorialDoctor.set($event)" /></th>
+                  <th></th>
                   <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroHistorialSucursal()" (ngModelChange)="filtroHistorialSucursal.set($event)" /></th>
                   <th><input class="input" type="text" placeholder="Filtrar..." [ngModel]="filtroHistorialEstado()" (ngModelChange)="filtroHistorialEstado.set($event)" /></th>
                   <th>
@@ -610,13 +611,14 @@
               </thead>
               <tbody>
                 @if (cargandoHistorial()) {
-                  <tr><td colspan="6"><div class="empty-state">Cargando historial...</div></td></tr>
+                  <tr><td colspan="7"><div class="empty-state">Cargando historial...</div></td></tr>
                 } @else {
                   @for (h of historialFiltrado(); track h.id) {
                     <tr class="row-clickable" [class.row-selected]="historialSeleccionado()?.id === h.id" (click)="seleccionarHistorial(h)">
                       <td style="white-space: nowrap;">{{ h.fecha_cita | date:'dd/MM/yyyy':'UTC' }}</td>
                       <td style="white-space: nowrap;">{{ h.hora_cita ? formatoAmPm(h.hora_cita) : '-' }}</td>
                       <td>{{ h.doctor_nombre }} <div class="text-muted text-sm">{{ h.especialidad_nombre }}</div></td>
+                      <td>{{ h.empresa_nombre || '-' }}</td>
                       <td>
                         {{ h.sucursal_nombre || '-' }}
                         @if (h.es_domicilio) {
@@ -656,7 +658,7 @@
                       </td>
                     </tr>
                   } @empty {
-                    <tr><td colspan="6"><div class="empty-state">Este paciente todavia no tiene historial clinico.</div></td></tr>
+                    <tr><td colspan="7"><div class="empty-state">Este paciente todavia no tiene historial clinico.</div></td></tr>
                   }
                 }
               </tbody>

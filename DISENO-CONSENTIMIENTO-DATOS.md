@@ -69,7 +69,8 @@ Ambas expresan la misma condicion SQL:
 (
   <dato>.empresa_id = <empresa_del_viewer>
   or (
-    exists(  -- la clinica DUEÑA del dato dio su consentimiento
+    <cita>.estado = 'atendida'  -- solo lo cruzado se filtra a esto
+    and exists(  -- la clinica DUEÑA del dato dio su consentimiento
       select 1 from pacientes_empresas pe_origen
       where pe_origen.paciente_id = <paciente>
         and pe_origen.empresa_id = <dato>.empresa_id
@@ -94,10 +95,20 @@ pedido ni otorgado su propio consentimiento. Eso era una fuga
 unidireccional, no un cruce autorizado por ambas partes; se corrigio
 agregando esa misma condicion al lado del viewer en las dos funciones.
 
+**El mismo dia se agrego ademas el filtro `estado = 'atendida'`** al lado
+cruzado (no al lado propio): una cita pendiente, cancelada o "no_asistio"
+de la otra clinica no aporta continuidad de atencion -- el fin declarado
+del consentimiento -- y expone informacion sin valor clinico real (ej. una
+cita futura agendada, que ni siquiera paso todavia). La propia clinica
+sigue viendo TODOS los estados de sus propias citas; el filtro es
+exclusivo de lo compartido.
+
 Probado con Postgres real (dos empresas reales, un paciente vinculado a
 ambas): A comparte + B no comparte -> sin acceso; A comparte + B tambien
 comparte -> con acceso; revocar en cualquiera de las dos corta el cruce de
-inmediato; la propia clinica dueña siempre ve sus datos sin condicion.
+inmediato; la propia clinica dueña siempre ve sus datos sin condicion; una
+cita pendiente de A no aparece en el cruce hacia B aunque ambas compartan,
+pero A si la ve en su propio historial.
 
 ## 4. Flujo de solicitud (otorgar consentimiento)
 

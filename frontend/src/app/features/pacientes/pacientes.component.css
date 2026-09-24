@@ -1,3 +1,12 @@
+/* Solo el panel de "Historial clinico" necesita mas ancho que el resto
+   de los drawers de esta pantalla (gano una columna de Clinica) -- por
+   eso es una clase aparte en vez de tocar el .drawer global en
+   styles.css (mismo criterio que .drawer-wide en citas.component.css y
+   .drawer-horario en doctores.component.css). */
+.drawer.drawer-historial {
+  width: 900px;
+}
+
 /* Alergias (tab Antecedentes): se deja expandir verticalmente
    arrastrando la esquina -- "both" (el default del navegador) se ve
    raro junto a un input con width:100%, asi que se restringe a solo

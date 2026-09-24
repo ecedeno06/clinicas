@@ -34,13 +34,16 @@
           @if (respuesta() === 'aceptado') {
             <p class="text-sm" style="text-align:justify; margin-top:16px;">
               Vas a <strong>autorizar</strong> que {{ ctx.empresa_nombre }} comparta tu historial clinico (citas,
-              historias, recetas, laboratorio) con las demas clinicas del ecosistema donde tambien te atiendas.
+              historias, recetas, laboratorio) con las demas clinicas del ecosistema donde tambien te atiendas, y
+              que {{ ctx.empresa_nombre }} reciba y consulte lo que esas otras clinicas hayan compartido sobre ti --
+              en ambos casos, solo con las clinicas donde tambien hayas dado este mismo consentimiento.
               Para confirmar, escribe el codigo de 6 digitos que te enviamos en el correo.
             </p>
           } @else if (ctx.accion === 'revocacion') {
             <p class="text-sm" style="text-align:justify; margin-top:16px;">
               Vas a <strong>dejar de compartir</strong> tu historial clinico de {{ ctx.empresa_nombre }} con las
-              demas clinicas del ecosistema. Como ya estaba activo, para confirmarlo escribe el codigo de 6 digitos
+              demas clinicas del ecosistema, y {{ ctx.empresa_nombre }} tambien dejara de recibir lo que esas otras
+              clinicas comparten sobre ti. Como ya estaba activo, para confirmarlo escribe el codigo de 6 digitos
               que te enviamos en el correo.
             </p>
           } @else {

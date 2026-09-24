@@ -103,11 +103,21 @@ const TIENE_ACCESO_ESTA_CLINICA = `
 // las dos clinicas corta el cruce de inmediato (basta con que uno de los
 // dos "exists" deje de cumplirse). $1 = paciente_id, $2 = empresa_id de
 // quien consulta (mismo orden que usan estos 4 endpoints).
+//
+// Ademas, lo COMPARTIDO cruzado (no lo propio) se filtra a citas
+// ATENDIDAS: una cita pendiente/cancelada/no_asistio de la otra clinica no
+// aporta continuidad de atencion (el fin declarado del consentimiento,
+// ver DISENO-CONSENTIMIENTO-DATOS.md) y expone informacion sin valor
+// clinico real (ej. una cita futura agendada). La propia clinica sigue
+// viendo TODOS los estados de sus propias citas, sin este filtro -- "c"
+// es siempre el alias de la tabla citas en las 4 consultas que usan esta
+// funcion, independiente del alias que reciba como parametro.
 function condicionAccesoHistorial(alias) {
   return `(
     ${alias}.empresa_id = $2
     or (
-      exists(
+      c.estado = 'atendida'
+      and exists(
         select 1 from pacientes_empresas pe_origen
         where pe_origen.paciente_id = $1
           and pe_origen.empresa_id = ${alias}.empresa_id
@@ -431,6 +441,7 @@ async function historial(req, res, next) {
                  where de2.doctor_id = d.id)
               ) as especialidad_nombre,
               s.nombre as sucursal_nombre,
+              emp.nombre as empresa_nombre,
               exists(select 1 from recetas r where r.cita_id = c.id) as tiene_receta,
               exists(select 1 from ordenes_laboratorio ol where ol.cita_id = c.id) as tiene_laboratorio,
               (case
@@ -443,6 +454,7 @@ async function historial(req, res, next) {
        join doctores d on d.id = c.doctor_id
        left join sucursales s on s.id = c.sucursal_id
        left join historias_clinicas hc on hc.cita_id = c.id
+       join empresas emp on emp.id = c.empresa_id
        where c.paciente_id = $1 and ${condicionAccesoHistorial('c')}
        order by c.fecha desc, c.hora_inicio desc`,
       [req.params.id, req.empresaId]

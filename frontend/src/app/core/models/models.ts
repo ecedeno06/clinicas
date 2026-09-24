@@ -440,9 +440,11 @@ export interface Cita {
 export interface HistoriaClinica {
   id: string;
   empresa_id?: string;
-  // Solo viene del portal del paciente (agrega citas de varias clinicas
-  // a la vez) -- el historial de staff siempre esta dentro de una sola
-  // clinica, no lo necesita.
+  // Viene siempre del portal del paciente (agrega citas de varias
+  // clinicas a la vez), y tambien del historial de staff cuando el
+  // consentimiento cruzado (ver DISENO-CONSENTIMIENTO-DATOS.md) trae una
+  // fila generada en OTRA clinica -- ahi ya no alcanza con dar por
+  // sentado que todo es de la propia empresa.
   empresa_nombre?: string;
   cita_id: string;
   paciente_id: string;
