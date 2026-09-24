@@ -247,8 +247,8 @@
 
         <div class="tabs">
           <button type="button" class="tab-btn" [class.active]="tabFormulario() === 'generales'" (click)="tabFormulario.set('generales')">Datos generales</button>
-          <button type="button" class="tab-btn" [class.active]="tabFormulario() === 'familiares'" (click)="tabFormulario.set('familiares')">Familiares</button>
-          <button type="button" class="tab-btn" [class.active]="tabFormulario() === 'antecedentes'" (click)="tabFormulario.set('antecedentes')">Antecedentes</button>
+          <button type="button" class="tab-btn" [class.active]="tabFormulario() === 'familiares'" [disabled]="!editando()" [title]="!editando() ? 'Guarda los datos generales del paciente primero' : ''" (click)="tabFormulario.set('familiares')">Familiares</button>
+          <button type="button" class="tab-btn" [class.active]="tabFormulario() === 'antecedentes'" [disabled]="!editando()" [title]="!editando() ? 'Guarda los datos generales del paciente primero' : ''" (click)="tabFormulario.set('antecedentes')">Antecedentes</button>
         </div>
 
         <div [hidden]="tabFormulario() !== 'generales'">

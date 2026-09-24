@@ -731,6 +731,8 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; colo
 }
 .tab-btn:hover { color: var(--slate-900); }
 .tab-btn.active { color: var(--slate-900); border-bottom-color: var(--slate-900); }
+.tab-btn:disabled { color: var(--slate-300); cursor: not-allowed; }
+.tab-btn:disabled:hover { color: var(--slate-300); }
 
 .tab-badge {
   position: absolute;
