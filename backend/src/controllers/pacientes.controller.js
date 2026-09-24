@@ -328,6 +328,18 @@ async function actualizar(req, res, next) {
     );
     if (!vinculo.rows[0]) return res.status(404).json({ mensaje: 'Paciente no encontrado' });
 
+    // Una vez el paciente tiene usuario_id (ya es usuario del ecosistema,
+    // sin importar en que clinica se invito -- ver TIENE_ACCESO_ESTA_CLINICA
+    // arriba), sus datos generales solo los puede tocar el o un super
+    // admin. El staff normal puede seguir editando mientras no tenga
+    // acceso al portal en ninguna clinica todavia.
+    if (!req.usuario.es_super_admin) {
+      const { rows: [pacienteActual] } = await client.query('select usuario_id from pacientes where id = $1', [req.params.id]);
+      if (pacienteActual?.usuario_id) {
+        return res.status(403).json({ mensaje: 'Este paciente ya tiene acceso al portal -- solo el mismo o un super administrador pueden editar sus datos.' });
+      }
+    }
+
     await client.query('begin');
 
     const { rows } = await client.query(

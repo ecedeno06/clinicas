@@ -248,14 +248,16 @@ export class PacientesComponent implements OnInit {
   // un formulario que ya se reseteo -- ver onIdentificacionBlur().
   private tokenBusquedaIdentificacion = 0;
 
-  // Un paciente ya existente solo lo puede editar el propio paciente (desde
-  // su portal, flujo aparte) o el super admin -- el staff normal (admin/
-  // recepcionista) puede seguir creando pacientes nuevos libremente, pero
-  // al abrir uno ya guardado el formulario queda en solo lectura. El
-  // backend aplica la misma regla en PUT /api/pacientes/:id (ver
-  // pacientes.routes.js).
+  // Una vez el paciente YA ES USUARIO del ecosistema (usuario_id seteado,
+  // sin importar en que clinica se invito -- es una cuenta global) solo lo
+  // puede editar el mismo (desde su portal, flujo aparte) o el super
+  // admin. Mientras no tenga acceso al portal en ninguna clinica todavia,
+  // el staff normal (admin/recepcionista) puede seguir editandolo
+  // libremente. El backend aplica la misma regla puntual (no por rol de
+  // ruta, por registro) en PUT /api/pacientes/:id (ver
+  // pacientes.controller.js#actualizar).
   soloLecturaPaciente(): boolean {
-    return !!this.editando() && !this.auth.esSuperAdmin();
+    return !!this.editando()?.usuario_id && !this.auth.esSuperAdmin();
   }
 
   abrirNuevo(): void {
